@@ -44,6 +44,16 @@ export async function lockProducts(tx: Tx, productIds: string[]) {
   await tx.$queryRaw`SELECT "id" FROM "Product" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR UPDATE`;
 }
 
+/**
+ * Shared row lock for sales: many sales can run at once, but a receipt (FOR UPDATE) waits until they
+ * finish, so the average cost a sale snapshots as COGS can't change underneath it.
+ */
+export async function lockProductsShared(tx: Tx, productIds: string[]) {
+  const ids = [...new Set(productIds)].sort();
+  if (ids.length === 0) return;
+  await tx.$queryRaw`SELECT "id" FROM "Product" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR SHARE`;
+}
+
 /** Ensures the balance row exists, locks it, and returns the current quantity. */
 export async function lockBalance(tx: Tx, productId: string, locationId: string): Promise<Dec> {
   await tx.$executeRaw`

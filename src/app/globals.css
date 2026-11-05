@@ -126,3 +126,12 @@ body {
     @apply bg-slate-50/60;
   }
 }
+
+@media print {
+  body {
+    background: #fff;
+  }
+  .card {
+    box-shadow: none;
+  }
+}

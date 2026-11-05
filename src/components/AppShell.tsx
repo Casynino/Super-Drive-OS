@@ -87,9 +87,9 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   );
 
   return (
-    <div className="min-h-dvh lg:pl-64">
+    <div className="min-h-dvh lg:pl-64 print:pl-0">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-line bg-white lg:block">{sidebar}</aside>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-line bg-white lg:block print:hidden">{sidebar}</aside>
 
       {/* Mobile drawer */}
       {open && (
@@ -99,7 +99,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         </div>
       )}
 
-      <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-white/95 px-4 backdrop-blur sm:px-6">
+      <header className="sticky top-0 z-20 flex h-14 print:hidden items-center justify-between border-b border-line bg-white/95 px-4 backdrop-blur sm:px-6">
         <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
           <Menu size={18} />
         </button>
@@ -126,7 +126,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">{children}</main>
+      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 print:max-w-none print:p-0">{children}</main>
     </div>
   );
 }

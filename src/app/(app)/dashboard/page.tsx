@@ -1,15 +1,32 @@
 import Link from "next/link";
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle, ShoppingCart } from "lucide-react";
 import { PageHeader, Stat } from "@/components/ui";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
+import { formatMoney } from "@/lib/money";
+import { getCurrency } from "@/lib/settings";
 
 export const metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
   const user = await requireUser();
   const showStats = can(user, "dashboard.view");
+  const viewAllSales = can(user, "sales.view_all");
+  const seesSales = viewAllSales || can(user, "sales.view_own");
+
+  // "Today" in the business time zone (UTC+3, no daylight saving)
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
+  const [todaySales, currency] = await Promise.all([
+    seesSales
+      ? db.sale.aggregate({
+          where: { status: "COMPLETED", createdAt: { gte: new Date(`${today}T00:00:00+03:00`), lte: new Date(`${today}T23:59:59.999+03:00`) }, ...(viewAllSales ? {} : { salespersonId: user.id }) },
+          _sum: { total: true, amountPaid: true },
+          _count: true,
+        })
+      : null,
+    getCurrency(),
+  ]);
 
   const [products, categories, employees, locations] = showStats
     ? await Promise.all([
@@ -28,7 +45,24 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <PageHeader title={`Welcome, ${user.name.split(" ")[0]}`} description="Here is where your business stands today." />
+      <PageHeader
+        title={`Welcome, ${user.name.split(" ")[0]}`}
+        description="Here is where your business stands today."
+        actions={
+          can(user, "sales.pos") && (
+            <Link href="/pos" className="btn-primary">
+              <ShoppingCart size={16} /> Open POS
+            </Link>
+          )
+        }
+      />
+
+      {todaySales && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <Stat label={viewAllSales ? "Sales today" : "Your sales today"} value={formatMoney(todaySales._sum.total ?? 0, currency)} hint={`${todaySales._count} sale${todaySales._count === 1 ? "" : "s"}`} />
+          <Stat label="Collected on those sales" value={formatMoney(todaySales._sum.amountPaid ?? 0, currency)} hint="Paid at the time of sale" />
+        </div>
+      )}
 
       {showStats ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">

@@ -71,6 +71,7 @@ async function main() {
     data: [
       { key: "businessName", value: "Super Drive Oil" },
       { key: "currency", value: { code: "TZS", symbol: "TSh", decimals: 0 } },
+      { key: "creditTermsDays", value: 30 },
     ],
     skipDuplicates: true,
   });

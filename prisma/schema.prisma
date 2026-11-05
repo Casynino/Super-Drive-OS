@@ -82,6 +82,10 @@ model User {
   stockReceipts      StockReceipt[]
   stockTransfers     StockTransfer[]
   stockAdjustments   StockAdjustment[]
+  sales              Sale[]            @relation("SaleSalesperson")
+  creditApprovals    Sale[]            @relation("SaleCreditApprover")
+  paymentsReceived   Payment[]
+  customersCreated   Customer[]
 
   @@index([roleId])
 }
@@ -119,6 +123,7 @@ model Location {
   transfersOut   StockTransfer[]   @relation("TransferFrom")
   transfersIn    StockTransfer[]   @relation("TransferTo")
   adjustments    StockAdjustment[]
+  sales          Sale[]
 }
 
 model Setting {
@@ -162,6 +167,7 @@ model Unit {
   receiptItems  StockReceiptItem[]
   transferItems StockTransferItem[]
   adjustItems   StockAdjustmentItem[]
+  saleItems     SaleItem[]
 }
 
 model Product {
@@ -193,6 +199,7 @@ model Product {
   receiptItems   StockReceiptItem[]
   transferItems  StockTransferItem[]
   adjustItems    StockAdjustmentItem[]
+  saleItems      SaleItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -434,4 +441,149 @@ model StockAdjustmentItem {
 
   @@index([adjustmentId])
   @@index([productId])
+}
+
+// ───────────── Phase 3: Customers, sales, payments ─────────────
+
+enum CustomerType {
+  RETAIL
+  WHOLESALE
+  DISTRIBUTOR
+  BUSINESS
+  OTHER
+}
+
+enum SaleStatus {
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  BANK
+}
+
+enum PaymentSource {
+  AT_SALE
+  DEBT_COLLECTION
+}
+
+// What a customer owes is NOT stored here: it is always calculated from their sales and payment
+// allocations, so it can never drift out of step with the transactions.
+model Customer {
+  id               String       @id @default(cuid())
+  name             String
+  contactPerson    String?
+  phone            String?
+  businessLocation String?
+  type             CustomerType @default(RETAIL)
+  creditLimit      Decimal      @default(0) @db.Decimal(14, 2) // 0 = no credit allowed
+  notes            String?
+  status           RecordStatus @default(ACTIVE)
+  createdById      String?
+  createdBy        User?        @relation(fields: [createdById], references: [id])
+  createdAt        DateTime     @default(now()) // account opening date
+  updatedAt        DateTime     @updatedAt
+  sales            Sale[]
+  payments         Payment[]
+
+  @@index([name])
+  @@index([phone])
+  @@index([status])
+}
+
+// An invoice. Revenue is recognised here, once. Cash received later is a Payment, never a new Sale.
+model Sale {
+  id                    String            @id @default(cuid())
+  saleNo                String            @unique
+  customerId            String?
+  customer              Customer?         @relation(fields: [customerId], references: [id])
+  locationId            String
+  location              Location          @relation(fields: [locationId], references: [id])
+  salespersonId         String
+  salesperson           User              @relation("SaleSalesperson", fields: [salespersonId], references: [id])
+  status                SaleStatus        @default(COMPLETED)
+  subtotal              Decimal           @db.Decimal(14, 2) // at list prices
+  discountTotal         Decimal           @default(0) @db.Decimal(14, 2)
+  total                 Decimal           @db.Decimal(14, 2) // subtotal - discountTotal
+  amountPaid            Decimal           @default(0) @db.Decimal(14, 2) // = sum of payment allocations
+  paymentStatus         PaymentStatus
+  dueDate               DateTime?         @db.Date
+  cogsTotal             Decimal           @db.Decimal(14, 2) // cost of goods sold, snapshot at sale time
+  notes                 String?
+  creditApprovedById    String?
+  creditApprovedBy      User?             @relation("SaleCreditApprover", fields: [creditApprovedById], references: [id])
+  creditExceptionReason String?
+  submissionKey         String            @unique
+  createdAt             DateTime          @default(now())
+  items                 SaleItem[]
+  allocations           PaymentAllocation[]
+
+  @@index([createdAt])
+  @@index([customerId, status])
+  @@index([salespersonId, createdAt])
+  @@index([paymentStatus])
+  @@index([locationId])
+}
+
+model SaleItem {
+  id            String  @id @default(cuid())
+  saleId        String
+  sale          Sale    @relation(fields: [saleId], references: [id])
+  productId     String
+  product       Product @relation(fields: [productId], references: [id])
+  enteredQty    Decimal @db.Decimal(14, 3)
+  enteredUnitId String
+  enteredUnit   Unit    @relation(fields: [enteredUnitId], references: [id])
+  factor        Decimal @db.Decimal(14, 4)
+  quantity      Decimal @db.Decimal(14, 3) // base units deducted from stock
+  listPrice     Decimal @db.Decimal(14, 2) // per entered unit, from the price list
+  unitPrice     Decimal @db.Decimal(14, 2) // per entered unit, actually charged
+  discount      Decimal @default(0) @db.Decimal(14, 2) // line total at list price - lineTotal
+  lineTotal     Decimal @db.Decimal(14, 2)
+  unitCost      Decimal @db.Decimal(16, 4) // average cost per base unit at sale time
+  costTotal     Decimal @db.Decimal(14, 2)
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+// Money received. Linked to invoices through PaymentAllocation. Anything not allocated is customer credit (Phase 4).
+model Payment {
+  id           String        @id @default(cuid())
+  paymentNo    String        @unique
+  source       PaymentSource
+  customerId   String?
+  customer     Customer?     @relation(fields: [customerId], references: [id])
+  method       PaymentMethod
+  amount       Decimal       @db.Decimal(14, 2)
+  reference    String? // mobile money / bank transaction reference
+  notes        String?
+  receivedById String
+  receivedBy   User          @relation(fields: [receivedById], references: [id])
+  receivedAt   DateTime      @default(now())
+  allocations  PaymentAllocation[]
+
+  @@index([receivedAt])
+  @@index([customerId])
+  @@index([method, receivedAt])
+}
+
+model PaymentAllocation {
+  id        String  @id @default(cuid())
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id])
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  amount    Decimal @db.Decimal(14, 2)
+
+  @@unique([paymentId, saleId])
+  @@index([saleId])
 }

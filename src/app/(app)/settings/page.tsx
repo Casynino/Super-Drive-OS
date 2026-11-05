@@ -5,8 +5,8 @@ import EntityForm from "@/components/EntityForm";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
-import { getBusinessName, getCurrency } from "@/lib/settings";
-import { saveBrand, saveBusinessName, saveCategory, saveLocation, saveUnit, setEntityStatus } from "./actions";
+import { getBusinessProfile, getCurrency } from "@/lib/settings";
+import { saveBrand, saveBusinessProfile, saveCategory, saveLocation, saveUnit, setEntityStatus } from "./actions";
 
 export const metadata = { title: "Settings" };
 
@@ -46,12 +46,12 @@ export default async function SettingsPage() {
   const canCatalog = can(user, "catalog.manage");
   const canSettings = can(user, "settings.manage");
 
-  const [categories, brands, units, locations, businessName, currency, activeBaseUse] = await Promise.all([
+  const [categories, brands, units, locations, profile, currency, activeBaseUse] = await Promise.all([
     db.category.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { products: true } } } }),
     db.brand.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { products: true } } } }),
     db.unit.findMany({ orderBy: { name: "asc" } }),
     db.location.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
-    getBusinessName(),
+    getBusinessProfile(),
     getCurrency(),
     db.product.groupBy({ by: ["baseUnitId"], where: { status: "ACTIVE" }, _count: { _all: true } }),
   ]);
@@ -72,14 +72,18 @@ export default async function SettingsPage() {
       />
 
       <div className="space-y-6">
-        <Section title="Business" description="Shown in the app header and on receipts.">
+        <Section title="Business" description="Shown in the app header and printed on receipts.">
           <div className="px-4 py-4 sm:px-5">
             <EntityForm
-              layout="inline"
-              action={saveBusinessName}
+              action={saveBusinessProfile}
               submitLabel="Save"
               disabled={!canSettings}
-              fields={[{ name: "businessName", label: "Business name", value: businessName, required: true }]}
+              fields={[
+                { name: "businessName", label: "Business name", value: profile.name, required: true },
+                { name: "businessPhone", label: "Phone", value: profile.phone },
+                { name: "businessAddress", label: "Address", value: profile.address },
+                { name: "creditTermsDays", label: "Credit period (days)", value: String(profile.creditTermsDays), hint: "How long customers have to pay a credit sale before it is overdue." },
+              ]}
             />
             <p className="mt-3 text-sm text-slate-500">
               Currency: <span className="font-medium text-slate-700">{currency.code}</span> ({currency.symbol}). Fixed because every recorded amount depends on it.

@@ -244,32 +244,37 @@ export async function setEntityStatus(fd: FormData): Promise<void> {
   revalidatePath("/settings");
 }
 
-// ───────────── Business name ─────────────
+// ───────────── Business profile ─────────────
 
-export async function saveBusinessName(_prev: ActionState, fd: FormData): Promise<ActionState> {
+const profileSchema = z.object({
+  businessName: z.string().trim().min(2, "Enter the business name.").max(80, "Too long."),
+  businessPhone: z.string().trim().max(40, "Too long."),
+  businessAddress: z.string().trim().max(200, "Too long."),
+  creditTermsDays: z.coerce.number({ error: "Enter a number of days." }).int("Whole days only.").min(0, "0 or more.").max(365, "At most 365."),
+});
+
+export async function saveBusinessProfile(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const values = formValues(fd);
   return guarded("settings.manage", async (user) => {
-    const parsed = z.object({ businessName: z.string().trim().min(2, "Enter the business name.").max(80, "Too long.") }).safeParse({
+    const parsed = profileSchema.safeParse({
       businessName: formString(fd, "businessName"),
+      businessPhone: formString(fd, "businessPhone"),
+      businessAddress: formString(fd, "businessAddress"),
+      creditTermsDays: formString(fd, "creditTermsDays") || "30",
     });
     if (!parsed.success) return invalid(parsed.error, values);
-    const before = await db.setting.findUnique({ where: { key: "businessName" } });
+    const next: Record<string, string | number> = { ...parsed.data };
+
+    const rows = await db.setting.findMany({ where: { key: { in: Object.keys(next) } } });
+    const before = Object.fromEntries(rows.map((r) => [r.key, r.value]));
     await db.$transaction(async (tx) => {
-      await tx.setting.upsert({
-        where: { key: "businessName" },
-        update: { value: parsed.data.businessName, updatedById: user.id },
-        create: { key: "businessName", value: parsed.data.businessName, updatedById: user.id },
-      });
-      await writeAudit(tx, {
-        user,
-        action: "setting.update",
-        entityType: "Setting",
-        entityId: "businessName",
-        before: { businessName: before?.value ?? null },
-        after: { businessName: parsed.data.businessName },
-      });
+      for (const [key, value] of Object.entries(next)) {
+        await tx.setting.upsert({ where: { key }, update: { value, updatedById: user.id }, create: { key, value, updatedById: user.id } });
+      }
+      const d = diffFields(before as Record<string, unknown>, next);
+      if (d.changed) await writeAudit(tx, { user, action: "setting.update", entityType: "Setting", entityId: "businessProfile", before: d.before, after: d.after });
     });
     revalidatePath("/", "layout");
-    return { ok: true, message: "Business name saved." };
+    return { ok: true, message: "Business details saved." };
   });
 }

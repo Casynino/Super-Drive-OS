@@ -44,9 +44,9 @@ export const NAV: NavGroup[] = [
   {
     label: "Operations",
     items: [
-      { label: "Sales / POS", href: "/pos", icon: ShoppingCart, permissions: ["sales.pos"], ready: false },
-      { label: "Sales History", href: "/sales", icon: Receipt, permissions: ["sales.view_own", "sales.view_all"], ready: false },
-      { label: "Customers", href: "/customers", icon: Users, permissions: ["customers.view"], ready: false },
+      { label: "Sales / POS", href: "/pos", icon: ShoppingCart, permissions: ["sales.pos"], ready: true },
+      { label: "Sales History", href: "/sales", icon: Receipt, permissions: ["sales.view_own", "sales.view_all"], ready: true },
+      { label: "Customers", href: "/customers", icon: Users, permissions: ["customers.view"], ready: true },
       { label: "Credit Management", href: "/credit", icon: HandCoins, permissions: ["credit.view"], ready: false },
     ],
   },
