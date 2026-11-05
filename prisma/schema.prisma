@@ -1,0 +1,222 @@
+// Super Drive Oil - Phase 1 schema (foundation + catalog).
+// Conventions:
+//  - Money: Decimal(14,2). Quantities: Decimal(14,3). Unit factors: Decimal(14,4).
+//  - Stock is ALWAYS stored in the product's base unit. Other units convert via ProductUnit.factor.
+//  - Nothing here is hard-deleted by the app: records are deactivated (status) instead.
+//  - Extra DB-level guards (CHECK constraints, single default location, immutable audit log)
+//    live in the init migration SQL because Prisma cannot express them.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum LocationType {
+  WAREHOUSE
+  SHOP
+  OTHER
+}
+
+// ───────────── Access control ─────────────
+
+model Role {
+  id           String           @id @default(cuid())
+  key          String           @unique // stable identifier, e.g. SUPER_ADMIN
+  name         String
+  description  String?
+  isSystem     Boolean          @default(false) // built-in roles cannot be deleted
+  isSuperAdmin Boolean          @default(false) // always has every permission (lock-out protection)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  permissions  RolePermission[]
+  users        User[]
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  key         String           @unique // e.g. products.create
+  module      String
+  label       String
+  description String?
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model User {
+  id                 String       @id @default(cuid())
+  username           String       @unique // stored lowercase
+  name               String
+  email              String?      @unique
+  phone              String?
+  passwordHash       String
+  roleId             String
+  role               Role         @relation(fields: [roleId], references: [id])
+  status             RecordStatus @default(ACTIVE)
+  mustChangePassword Boolean      @default(false)
+  failedLoginCount   Int          @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  sessions           Session[]
+  auditLogs          AuditLog[]
+
+  @@index([roleId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique // sha256 of the cookie token; the raw token is never stored
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  ipAddress String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ───────────── Business setup ─────────────
+
+model Location {
+  id        String       @id @default(cuid())
+  code      String       @unique
+  name      String       @unique
+  type      LocationType @default(WAREHOUSE)
+  address   String?
+  isDefault Boolean      @default(false)
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Setting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+}
+
+// ───────────── Catalog ─────────────
+
+model Category {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  products    Product[]
+}
+
+model Brand {
+  id        String       @id @default(cuid())
+  name      String       @unique
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  products  Product[]
+}
+
+model Unit {
+  id            String        @id @default(cuid())
+  name          String        @unique // Litre
+  symbol        String        @unique // L
+  allowsDecimal Boolean       @default(false) // litres: true, pieces/cartons: false
+  status        RecordStatus  @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  baseProducts  Product[]
+  productUnits  ProductUnit[]
+}
+
+model Product {
+  id             String        @id @default(cuid())
+  sku            String        @unique // stored uppercase
+  barcode        String?       @unique
+  name           String
+  description    String?
+  categoryId     String
+  category       Category      @relation(fields: [categoryId], references: [id])
+  brandId        String?
+  brand          Brand?        @relation(fields: [brandId], references: [id])
+  packagingType  String?
+  baseUnitId     String
+  baseUnit       Unit          @relation(fields: [baseUnitId], references: [id])
+  purchasePrice  Decimal       @db.Decimal(14, 2) // per base unit (default/last cost)
+  sellingPrice   Decimal       @db.Decimal(14, 2) // per base unit
+  wholesalePrice Decimal?      @db.Decimal(14, 2) // per base unit
+  minStock       Decimal       @default(0) @db.Decimal(14, 3) // in base units
+  imageUrl       String?
+  status         RecordStatus  @default(ACTIVE)
+  createdById    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  units          ProductUnit[]
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([status])
+  @@index([name])
+}
+
+// Packaging conversion: 1 <unit> = <factor> base units (e.g. 1 carton = 12 bottles => factor 12).
+// Price overrides are optional; when null the price is base price x factor.
+model ProductUnit {
+  id             String   @id @default(cuid())
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  unitId         String
+  unit           Unit     @relation(fields: [unitId], references: [id])
+  factor         Decimal  @db.Decimal(14, 4)
+  sellingPrice   Decimal? @db.Decimal(14, 2)
+  wholesalePrice Decimal? @db.Decimal(14, 2)
+  createdAt      DateTime @default(now())
+
+  @@unique([productId, unitId])
+  @@index([unitId])
+}
+
+// ───────────── Accountability ─────────────
+
+// Append-only. A DB trigger (see init migration) rejects UPDATE and DELETE.
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userName   String? // snapshot so history stays readable
+  action     String // e.g. product.update
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  reason     String?
+  reference  String? // related transaction number
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([action])
+}

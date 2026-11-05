@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+src/generated
+.DS_Store
+.vercel
+coverage
+
+# Client source assets (kept locally, not in the repo)
+LOGO/
+PRODUCTS */

@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+/* Brand palette taken from the Super Drive Oil logo: navy, signal red, oil yellow. */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-navy-50: #eef4fa;
+  --color-navy-100: #d9e6f3;
+  --color-navy-200: #b3cde7;
+  --color-navy-300: #84add4;
+  --color-navy-400: #4f85b9;
+  --color-navy-500: #2a64a0;
+  --color-navy-600: #164e87;
+  --color-navy-700: #0e3d6e;
+  --color-navy-800: #0b2f55;
+  --color-navy-900: #082340;
+  --color-navy-950: #051627;
+
+  --color-brand-red: #ed1c24;
+  --color-brand-red-dark: #c8141b;
+  --color-brand-red-soft: #fef0f0;
+
+  --color-oil-400: #fdc400;
+  --color-oil-500: #e5b000;
+  --color-oil-soft: #fff8dc;
+
+  --color-surface: #f4f6f9;
+  --color-line: #e2e7ee;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-surface);
+  color: #0f1b2d;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-navy-500);
+  outline-offset: 2px;
+}
+
+/* Base building blocks (utilities so other component classes can @apply them) */
+@utility btn {
+  @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-60;
+}
+@utility badge {
+  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(15,27,45,0.04)];
+  }
+  .card-pad {
+    @apply p-4 sm:p-5;
+  }
+
+  .label {
+    @apply mb-1.5 block text-[13px] font-medium text-slate-700;
+  }
+  .hint {
+    @apply mt-1 text-xs text-slate-500;
+  }
+  .field-error {
+    @apply mt-1 text-xs font-medium text-brand-red-dark;
+  }
+
+  .input {
+    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500;
+  }
+  .input-error {
+    @apply border-brand-red focus:border-brand-red focus:ring-red-100;
+  }
+
+  .btn-primary {
+    @apply btn bg-navy-700 text-white shadow-sm hover:bg-navy-800 active:bg-navy-900;
+  }
+  .btn-secondary {
+    @apply btn border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50;
+  }
+  .btn-danger {
+    @apply btn border border-red-200 bg-white text-brand-red-dark hover:bg-brand-red-soft;
+  }
+  .btn-sm {
+    @apply min-h-8 px-2.5 py-1.5 text-[13px];
+  }
+
+  .badge-green {
+    @apply badge bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200;
+  }
+  .badge-gray {
+    @apply badge bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200;
+  }
+  .badge-red {
+    @apply badge bg-brand-red-soft text-brand-red-dark ring-1 ring-inset ring-red-200;
+  }
+  .badge-yellow {
+    @apply badge bg-oil-soft text-yellow-800 ring-1 ring-inset ring-yellow-200;
+  }
+  .badge-blue {
+    @apply badge bg-navy-50 text-navy-700 ring-1 ring-inset ring-navy-100;
+  }
+
+  .table-wrap {
+    @apply overflow-x-auto;
+  }
+  .table {
+    @apply w-full text-left text-sm;
+  }
+  .table thead th {
+    @apply whitespace-nowrap border-b border-line bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+  .table tbody td {
+    @apply border-b border-slate-100 px-4 py-3 align-middle;
+  }
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .table tbody tr:hover {
+    @apply bg-slate-50/60;
+  }
+}

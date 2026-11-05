@@ -1,0 +1,92 @@
+// Idempotent bootstrap: permissions, built-in roles, base units, default location, core settings,
+// and (only when the system has no users) the first Super Admin taken from environment variables.
+// It never creates products, customers, sales, stock or any other business data.
+import "dotenv/config";
+import bcrypt from "bcryptjs";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { DEFAULT_ROLES, PERMISSIONS } from "../src/lib/permissions";
+
+const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+
+const BASE_UNITS = [
+  { name: "Litre", symbol: "L", allowsDecimal: true },
+  { name: "Piece", symbol: "pc", allowsDecimal: false },
+  { name: "Bottle", symbol: "btl", allowsDecimal: false },
+  { name: "Container", symbol: "cont", allowsDecimal: false },
+  { name: "Drum", symbol: "drum", allowsDecimal: false },
+  { name: "Carton", symbol: "ctn", allowsDecimal: false },
+  { name: "Box", symbol: "box", allowsDecimal: false },
+];
+
+async function main() {
+  // 1. Permissions (sync registry → table)
+  for (const p of PERMISSIONS) {
+    await db.permission.upsert({
+      where: { key: p.key },
+      update: { module: p.module, label: p.label },
+      create: { key: p.key, module: p.module, label: p.label },
+    });
+  }
+  await db.permission.deleteMany({ where: { key: { notIn: PERMISSIONS.map((p) => p.key) } } });
+
+  // 2. Built-in roles - created once; later edits by the owner are never overwritten
+  const permIds = new Map((await db.permission.findMany({ select: { id: true, key: true } })).map((p) => [p.key, p.id]));
+  for (const role of DEFAULT_ROLES) {
+    const existing = await db.role.findUnique({ where: { key: role.key } });
+    if (existing) continue;
+    await db.role.create({
+      data: {
+        key: role.key,
+        name: role.name,
+        description: role.description,
+        isSystem: true,
+        isSuperAdmin: role.isSuperAdmin ?? false,
+        permissions: { create: role.permissions.map((k) => ({ permissionId: permIds.get(k)! })) },
+      },
+    });
+  }
+
+  // 3. Units, default location, settings (never overwrite existing rows)
+  await db.unit.createMany({ data: BASE_UNITS, skipDuplicates: true });
+
+  if ((await db.location.count()) === 0) {
+    await db.location.create({ data: { code: "MAIN", name: "Main Store", type: "WAREHOUSE", isDefault: true } });
+  }
+
+  await db.setting.createMany({
+    data: [
+      { key: "businessName", value: "Super Drive Oil" },
+      { key: "currency", value: { code: "TZS", symbol: "TSh", decimals: 0 } },
+      { key: "allowNegativeStock", value: false },
+    ],
+    skipDuplicates: true,
+  });
+
+  // 4. First Super Admin (only when there are no users at all)
+  if ((await db.user.count()) === 0) {
+    const username = process.env.ADMIN_USERNAME?.trim().toLowerCase();
+    const password = process.env.ADMIN_PASSWORD;
+    const name = process.env.ADMIN_NAME?.trim() || "Business Owner";
+    if (!username || !password || password.length < 12) {
+      throw new Error("Set ADMIN_USERNAME and ADMIN_PASSWORD (min 12 chars) in .env to create the first Super Admin.");
+    }
+    const role = await db.role.findUniqueOrThrow({ where: { key: "SUPER_ADMIN" } });
+    const user = await db.user.create({
+      data: { username, name, roleId: role.id, passwordHash: await bcrypt.hash(password, 12), mustChangePassword: false },
+    });
+    await db.auditLog.create({
+      data: { userId: user.id, userName: user.name, action: "user.create", entityType: "User", entityId: user.id, reason: "Initial Super Admin created by seed" },
+    });
+    console.log(`Created first Super Admin "${username}".`);
+  }
+
+  console.log("Seed complete.");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => db.$disconnect());
