@@ -85,7 +85,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                   <Alert kind="info">
                     <span className="flex items-start gap-2">
                       <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                      <span>Cash from {older.length === 1 ? "an earlier day" : "earlier days"} ({older.map((d) => formatDate(`${d}T00:00:00Z`)).join(", ")}) was never closed. It is included in today&apos;s figures below.</span>
+                      <span>Cash from {older.length === 1 ? "an earlier day" : "earlier days"} ({older.slice(0, 5).map((d) => formatDate(`${d}T00:00:00Z`)).join(", ")}{older.length > 5 ? ` and ${older.length - 5} more` : ""}) was never closed. It is included in today&apos;s figures below.</span>
                     </span>
                   </Alert>
                 </div>

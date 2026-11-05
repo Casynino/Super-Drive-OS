@@ -158,3 +158,150 @@ export async function getOwnerExtras(db: Db, range: DateRange, opts: { resellers
     resellers: resellers[0] ? { count: Number(resellers[0].n), held: n(resellers[0].held), owed: n(resellers[0].owed), overdue: n(resellers[0].overdue) } : null,
   };
 }
+
+// ───────────── The owner's home: this month against last month, and twelve months of history ─────────────
+
+const ymdOf = (d: Date) => d.toISOString().slice(0, 10);
+const shiftDay = (s: string, days: number) => {
+  const d = new Date(`${s}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return ymdOf(d);
+};
+const shiftMonth = (firstOfMonth: string, months: number) => {
+  const d = new Date(`${firstOfMonth}T00:00:00.000Z`);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return ymdOf(d);
+};
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export type OwnerOverview = Awaited<ReturnType<typeof getOwnerOverview>>;
+
+/**
+ * Month-to-date against the same days of last month, the last twelve months, ageing of debts, best customers and
+ * what each product earns. `financials` adds cost and profit (hidden from people who may not see them).
+ */
+export async function getOwnerOverview(db: Db, opts: { financials: boolean }) {
+  const today = todayYmd();
+  const first = `${today.slice(0, 8)}01`;
+  const dayNo = Number(today.slice(8, 10));
+  const prevFirst = shiftMonth(first, -1);
+  const prevMonthEnd = shiftDay(first, -1);
+  const prevLast = shiftDay(prevFirst, dayNo - 1) > prevMonthEnd ? prevMonthEnd : shiftDay(prevFirst, dayNo - 1);
+  const from12 = shiftMonth(first, -11);
+  const since = new Date(`${from12}T00:00:00+03:00`);
+  const local = (col: string, alias?: string) => Prisma.raw(`(${alias ? `${alias}.` : ""}"${col}" AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Dar_es_Salaam')::date`);
+  const monthOf = (col: string, alias?: string) => Prisma.raw(`to_char(date_trunc('month', (${alias ? `${alias}.` : ""}"${col}" AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Dar_es_Salaam')::date), 'YYYY-MM')`);
+  const cur = (d: Prisma.Sql) => Prisma.sql`(${d} >= ${first}::date AND ${d} <= ${today}::date)`;
+  const prev = (d: Prisma.Sql) => Prisma.sql`(${d} >= ${prevFirst}::date AND ${d} <= ${prevLast}::date)`;
+
+  const [sales, restored, units, pays, exps, sups, refunds, byMonth, restoredByMonth, aging, customers, products, todayFlow] = await Promise.all([
+    db.$queryRaw<{ cs: Dec | null; ps: Dec | null; cn: bigint; pn: bigint; cc: Dec | null; pc: Dec | null }[]>`
+      SELECT SUM(CASE WHEN ${cur(local("createdAt"))} THEN "total" - "returnedTotal" END) AS cs, SUM(CASE WHEN ${prev(local("createdAt"))} THEN "total" - "returnedTotal" END) AS ps,
+             COUNT(CASE WHEN ${cur(local("createdAt"))} THEN 1 END) AS cn, COUNT(CASE WHEN ${prev(local("createdAt"))} THEN 1 END) AS pn,
+             SUM(CASE WHEN ${cur(local("createdAt"))} THEN "cogsTotal" END) AS cc, SUM(CASE WHEN ${prev(local("createdAt"))} THEN "cogsTotal" END) AS pc
+        FROM "Sale" WHERE "status" = 'COMPLETED' AND "createdAt" >= ${new Date(`${prevFirst}T00:00:00+03:00`)}`,
+    db.$queryRaw<{ c: Dec | null; p: Dec | null }[]>`
+      SELECT SUM(CASE WHEN ${cur(local("createdAt", "s"))} THEN ri."costValue" END) AS c, SUM(CASE WHEN ${prev(local("createdAt", "s"))} THEN ri."costValue" END) AS p
+        FROM "ReversalItem" ri JOIN "SaleReversal" rv ON rv."id" = ri."reversalId" JOIN "Sale" s ON s."id" = rv."saleId"
+       WHERE rv."status" = 'COMPLETED' AND s."status" = 'COMPLETED' AND s."createdAt" >= ${new Date(`${prevFirst}T00:00:00+03:00`)}`,
+    db.$queryRaw<{ c: Dec | null; p: Dec | null }[]>`
+      SELECT SUM(CASE WHEN ${cur(local("createdAt", "s"))} THEN si."quantity" - COALESCE(x.q, 0) END) AS c, SUM(CASE WHEN ${prev(local("createdAt", "s"))} THEN si."quantity" - COALESCE(x.q, 0) END) AS p
+        FROM "SaleItem" si JOIN "Sale" s ON s."id" = si."saleId"
+        LEFT JOIN (SELECT ri."saleItemId", SUM(ri."quantity") AS q FROM "ReversalItem" ri JOIN "SaleReversal" rv ON rv."id" = ri."reversalId" WHERE rv."status" = 'COMPLETED' GROUP BY 1) x ON x."saleItemId" = si."id"
+       WHERE s."status" = 'COMPLETED' AND s."createdAt" >= ${new Date(`${prevFirst}T00:00:00+03:00`)}`,
+    db.$queryRaw<{ c: Dec | null; p: Dec | null }[]>`
+      SELECT SUM(CASE WHEN ${cur(local("receivedAt"))} THEN "amount" END) AS c, SUM(CASE WHEN ${prev(local("receivedAt"))} THEN "amount" END) AS p FROM "Payment" WHERE "receivedAt" >= ${new Date(`${prevFirst}T00:00:00+03:00`)}`,
+    db.$queryRaw<{ c: Dec | null; p: Dec | null }[]>`
+      SELECT SUM(CASE WHEN "expenseDate" >= ${first}::date AND "expenseDate" <= ${today}::date THEN "amount" END) AS c, SUM(CASE WHEN "expenseDate" >= ${prevFirst}::date AND "expenseDate" <= ${prevLast}::date THEN "amount" END) AS p
+        FROM "Expense" WHERE "status" = 'APPROVED' AND "expenseDate" >= ${prevFirst}::date`,
+    db.$queryRaw<{ c: Dec | null; p: Dec | null }[]>`
+      SELECT SUM(CASE WHEN ${cur(local("paidAt"))} THEN "amount" END) AS c, SUM(CASE WHEN ${prev(local("paidAt"))} THEN "amount" END) AS p FROM "SupplierPayment" WHERE "paidAt" >= ${new Date(`${prevFirst}T00:00:00+03:00`)}`,
+    db.$queryRaw<{ c: Dec | null; p: Dec | null }[]>`
+      SELECT SUM(CASE WHEN ${cur(local("decidedAt"))} THEN "refundAmount" END) AS c, SUM(CASE WHEN ${prev(local("decidedAt"))} THEN "refundAmount" END) AS p
+        FROM "SaleReversal" WHERE "status" = 'COMPLETED' AND "refundAmount" > 0 AND "decidedAt" >= ${new Date(`${prevFirst}T00:00:00+03:00`)}`,
+    db.$queryRaw<{ m: string; sales: Dec | null; cogs: Dec | null; pay: Dec | null; exp: Dec | null; sup: Dec | null; ref: Dec | null }[]>`
+      WITH s AS (SELECT ${monthOf("createdAt")} AS m, SUM("total" - "returnedTotal") AS sales, SUM("cogsTotal") AS cogs FROM "Sale" WHERE "status" = 'COMPLETED' AND "createdAt" >= ${since} GROUP BY 1),
+           p AS (SELECT ${monthOf("receivedAt")} AS m, SUM("amount") AS pay FROM "Payment" WHERE "receivedAt" >= ${since} GROUP BY 1),
+           e AS (SELECT to_char(date_trunc('month', "expenseDate"), 'YYYY-MM') AS m, SUM("amount") AS exp FROM "Expense" WHERE "status" = 'APPROVED' AND "expenseDate" >= ${from12}::date GROUP BY 1),
+           u AS (SELECT ${monthOf("paidAt")} AS m, SUM("amount") AS sup FROM "SupplierPayment" WHERE "paidAt" >= ${since} GROUP BY 1),
+           r AS (SELECT ${monthOf("decidedAt")} AS m, SUM("refundAmount") AS ref FROM "SaleReversal" WHERE "status" = 'COMPLETED' AND "decidedAt" >= ${since} GROUP BY 1)
+      SELECT m.m, s.sales, s.cogs, p.pay, e.exp, u.sup, r.ref
+        FROM (SELECT to_char(g, 'YYYY-MM') AS m FROM generate_series(${from12}::date, ${first}::date, interval '1 month') g) m
+        LEFT JOIN s ON s.m = m.m LEFT JOIN p ON p.m = m.m LEFT JOIN e ON e.m = m.m LEFT JOIN u ON u.m = m.m LEFT JOIN r ON r.m = m.m ORDER BY m.m`,
+    db.$queryRaw<{ m: string; v: Dec | null }[]>`
+      SELECT ${monthOf("createdAt", "s")} AS m, SUM(ri."costValue") AS v FROM "ReversalItem" ri JOIN "SaleReversal" rv ON rv."id" = ri."reversalId" JOIN "Sale" s ON s."id" = rv."saleId"
+       WHERE rv."status" = 'COMPLETED' AND s."status" = 'COMPLETED' AND s."createdAt" >= ${since} GROUP BY 1`,
+    db.$queryRaw<{ b: number; n: bigint; v: Dec | null; oldest: number | null }[]>`
+      SELECT CASE WHEN age <= 7 THEN 0 WHEN age <= 14 THEN 1 WHEN age <= 30 THEN 2 ELSE 3 END AS b, COUNT(*) AS n, SUM(owed) AS v, MAX(age)::int AS oldest
+        FROM (SELECT (${today}::date - ${local("createdAt")}) AS age, ${owedSql()} AS owed FROM "Sale" WHERE "status" = 'COMPLETED') t WHERE owed > 0 GROUP BY 1`,
+    db.$queryRaw<{ id: string; name: string; billed: Dec | null; owed: Dec | null }[]>`
+      SELECT c."id", c."name", SUM(s."total" - s."returnedTotal") AS billed,
+             (SELECT SUM(${owedSql("x")}) FROM "Sale" x WHERE x."customerId" = c."id" AND x."status" = 'COMPLETED') AS owed
+        FROM "Sale" s JOIN "Customer" c ON c."id" = s."customerId"
+       WHERE s."status" = 'COMPLETED' AND ${cur(local("createdAt", "s"))} GROUP BY c."id", c."name" ORDER BY billed DESC LIMIT 6`,
+    db.$queryRaw<{ id: string; name: string; units: Dec | null; sales: Dec | null; cost: Dec | null }[]>`
+      SELECT p."id", p."name", SUM(si."quantity" - COALESCE(x.q, 0)) AS units, SUM(si."lineTotal" - COALESCE(x.v, 0)) AS sales, SUM(si."costTotal" - COALESCE(x.c, 0)) AS cost
+        FROM "SaleItem" si JOIN "Sale" s ON s."id" = si."saleId" JOIN "Product" p ON p."id" = si."productId"
+        LEFT JOIN (SELECT ri."saleItemId", SUM(ri."quantity") AS q, SUM(ri."returnValue") AS v, SUM(ri."costValue") AS c FROM "ReversalItem" ri JOIN "SaleReversal" rv ON rv."id" = ri."reversalId" WHERE rv."status" = 'COMPLETED' GROUP BY 1) x ON x."saleItemId" = si."id"
+       WHERE s."status" = 'COMPLETED' AND ${cur(local("createdAt", "s"))} GROUP BY p."id", p."name" ORDER BY sales DESC LIMIT 8`,
+    db.$queryRaw<{ pay: Dec | null; exp: Dec | null; sup: Dec | null; ref: Dec | null }[]>`
+      SELECT (SELECT SUM("amount") FROM "Payment" WHERE ${local("receivedAt")} = ${today}::date) AS pay,
+             (SELECT SUM("amount") FROM "Expense" WHERE "status" = 'APPROVED' AND "expenseDate" = ${today}::date) AS exp,
+             (SELECT SUM("amount") FROM "SupplierPayment" WHERE ${local("paidAt")} = ${today}::date) AS sup,
+             (SELECT SUM("refundAmount") FROM "SaleReversal" WHERE "status" = 'COMPLETED' AND ${local("decidedAt")} = ${today}::date) AS ref`,
+  ]);
+
+  const ratio = (a: number, b: number) => (b > 0 ? ((a - b) / b) * 100 : null);
+  const restoredBy = new Map(restoredByMonth.map((r) => [r.m, n(r.v)]));
+  const s0 = sales[0];
+  const curSales = n(s0?.cs);
+  const prevSales = n(s0?.ps);
+  const curCogs = n(s0?.cc) - n(restored[0]?.c);
+  const prevCogs = n(s0?.pc) - n(restored[0]?.p);
+  const curProfit = curSales - curCogs;
+  const prevProfit = prevSales - prevCogs;
+  const curSpent = n(exps[0]?.c);
+  const prevSpent = n(exps[0]?.p);
+  const curMoney = n(pays[0]?.c);
+  const prevMoney = n(pays[0]?.p);
+  const year = byMonth.map((r) => {
+    const sales = n(r.sales);
+    const cogs = n(r.cogs) - (restoredBy.get(r.m) ?? 0);
+    const costs = (opts.financials ? cogs : 0) + n(r.exp);
+    return { label: MONTH_NAMES[Number(r.m.slice(5, 7)) - 1]!, key: r.m, sales, costs, left: sales - costs, in: n(r.pay), out: n(r.exp) + n(r.sup) + n(r.ref) };
+  });
+  const bucket = ["This week", "8 to 14 days", "15 to 30 days", "Over 30 days"];
+  const agingRows = bucket.map((label, i) => {
+    const row = aging.find((a) => a.b === i);
+    return { label, count: Number(row?.n ?? 0), value: n(row?.v), oldest: row?.oldest ?? 0 };
+  });
+  const owedTotal = agingRows.reduce((t, a) => t + a.value, 0);
+  const yearSales = year.reduce((t, y) => t + y.sales, 0);
+  const todayOut = n(todayFlow[0]?.exp) + n(todayFlow[0]?.sup) + n(todayFlow[0]?.ref);
+
+  return {
+    monthLabel: new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" }).format(new Date(`${first}T00:00:00Z`)),
+    prevMonthLabel: new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" }).format(new Date(`${prevFirst}T00:00:00Z`)),
+    month: {
+      sales: { value: curSales, change: ratio(curSales, prevSales), count: Number(s0?.cn ?? 0) },
+      money: { value: curMoney, change: ratio(curMoney, prevMoney) },
+      spent: { value: curSpent, change: ratio(curSpent, prevSpent) },
+      profit: opts.financials ? { value: curProfit, change: ratio(curProfit, prevProfit) } : null,
+      units: { value: n(units[0]?.c), change: ratio(n(units[0]?.c), n(units[0]?.p)) },
+      collectionRate: curSales > 0 ? (curMoney / curSales) * 100 : null,
+      margin: opts.financials && curSales > 0 ? (curProfit / curSales) * 100 : null,
+      expenseRatio: curSales > 0 ? (curSpent / curSales) * 100 : null,
+      supplierPaid: n(sups[0]?.c),
+      refunded: n(refunds[0]?.c),
+    },
+    year,
+    yearSales,
+    outstandingRatio: yearSales > 0 ? (owedTotal / yearSales) * 100 : null,
+    aging: agingRows,
+    owedTotal,
+    oldestOwed: Math.max(0, ...agingRows.map((a) => a.oldest)),
+    customers: customers.map((c) => ({ id: c.id, name: c.name, billed: n(c.billed), owed: n(c.owed) })),
+    products: products.map((p) => ({ id: p.id, name: p.name, units: n(p.units), sales: n(p.sales), cost: opts.financials ? n(p.cost) : null, profit: opts.financials ? n(p.sales) - n(p.cost) : null })),
+    today: { collected: n(todayFlow[0]?.pay), spent: todayOut, net: n(todayFlow[0]?.pay) - todayOut },
+  };
+}

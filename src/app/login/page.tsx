@@ -12,7 +12,7 @@ export default async function LoginPage() {
     <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
       <section className="relative hidden flex-col justify-between bg-navy-800 p-12 text-white lg:flex">
         <div className="w-fit rounded-2xl bg-white px-6 py-4 shadow-lg">
-          <Image src="/brand/logo-full.png" alt="Super Drive Oil" width={900} height={456} className="h-20 w-auto" priority />
+          <Image src="/brand/logo-full.png" alt="Super Drive Oil" width={900} height={456} className="brand-logo h-20 w-auto" priority />
         </div>
         <div className="max-w-md">
           <p className="mb-3 h-1 w-12 rounded bg-oil-400" />
@@ -27,7 +27,7 @@ export default async function LoginPage() {
       <section className="flex items-center justify-center px-5 py-10">
         <div className="w-full max-w-sm">
           <div className="mb-8 lg:hidden">
-            <Image src="/brand/logo-full.png" alt="Super Drive Oil" width={900} height={456} className="mx-auto h-20 w-auto" priority />
+            <Image src="/brand/logo-full.png" alt="Super Drive Oil" width={900} height={456} className="brand-logo mx-auto h-20 w-auto" priority />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Sign in</h1>
           <p className="mt-1 text-sm text-slate-500">Use the username your manager gave you.</p>

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -16,9 +17,11 @@ export const viewport: Viewport = {
   themeColor: "#0e3d6e",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Dark is the default look; a person who switched to light keeps it (remembered in a cookie so there is no flash).
+  const dark = (await cookies()).get("sd-theme")?.value !== "light";
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${inter.variable}${dark ? " dark" : ""}`} suppressHydrationWarning>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

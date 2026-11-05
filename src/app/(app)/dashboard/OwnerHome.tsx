@@ -1,17 +1,16 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Banknote, Boxes, CalendarCheck, Handshake, HandCoins, Landmark, Package, ReceiptText, Scale, Smartphone, TrendingUp, Truck, Undo2, Users, Wallet, Receipt, Inbox, ChartColumn } from "lucide-react";
-import StatTile from "@/components/dashboard/StatTile";
-import { ColumnsChart, DonutChart, MoneyBarsChart, SalesTrendChart, TopProductsChart } from "@/components/dashboard/Charts";
+import { ArrowRight, Banknote, Boxes, CalendarCheck, ChartColumn, Handshake, HandCoins, Inbox, Landmark, Package, PiggyBank, Receipt, ReceiptText, ScrollText, ShoppingBag, Smartphone, TrendingUp, Truck, Wallet } from "lucide-react";
+import AttentionPanel, { type AttentionItem } from "@/components/dashboard/AttentionPanel";
+import { CHART_COLORS, ColumnsChart, DonutChart, InOutChart, MoneyBarsChart, YearChart } from "@/components/dashboard/Charts";
 import { SaleStatusBadge } from "../sales/StatusBadge";
 import { can } from "@/lib/auth/can";
 import type { SessionUser } from "@/lib/auth/session";
-import { businessDay, dayToDate, defaultLocationId, getBalances } from "@/lib/cash/ledger";
+import { businessDay, defaultLocationId, getBalances } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
-import { getOwnerDashboard, getOwnerExtras } from "@/lib/dashboard/owner";
-import { RANGES, resolveRange } from "@/lib/dashboard/range";
+import { getOwnerDashboard, getOwnerExtras, getOwnerOverview } from "@/lib/dashboard/owner";
+import { resolveRange } from "@/lib/dashboard/range";
 import { getStockAlerts } from "@/lib/inventory/alerts";
 import { formatMoney } from "@/lib/money";
-import { owedOf } from "@/lib/sales/owed";
 import { getBusinessProfile, getCurrency } from "@/lib/settings";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -19,19 +18,18 @@ const greeting = () => {
   const h = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Africa/Dar_es_Salaam" }).format(new Date()));
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 };
-const PALETTE = ["#0e3d6e", "#ed1c24", "#fdc400", "#4f85b9", "#16a34a", "#8b5cf6", "#94a3b8"];
 
-function Card({ title, hint, action, children, className, id }: { title: string; hint?: string; id?: string; action?: { href: string; label: string }; children: React.ReactNode; className?: string }) {
+function Section({ title, hint, action, children, className }: { title: string; hint?: string; action?: { href: string; label: string }; children: React.ReactNode; className?: string }) {
   return (
-    <section id={id} className={cn("card card-pad scroll-mt-20", className)}>
+    <section className={cn("card card-pad", className)}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
         </div>
         {action && (
-          <Link href={action.href} className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-navy-700 hover:underline">
-            {action.label} <ArrowRight size={14} />
+          <Link href={action.href} className="inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-navy-700 hover:underline">
+            {action.label} <ArrowRight size={13} />
           </Link>
         )}
       </div>
@@ -40,113 +38,201 @@ function Card({ title, hint, action, children, className, id }: { title: string;
   );
 }
 
-export default async function OwnerHome({ user, range: rangeKey }: { user: SessionUser; range?: string }) {
-  const range = resolveRange(rangeKey);
+const Heading = ({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) => (
+  <div className="mb-3 mt-8 flex items-center justify-between gap-3 first:mt-0">
+    <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{children}</h2>
+    {right}
+  </div>
+);
+
+const TONES = {
+  blue: { box: "border-sky-500/25 from-sky-500/[0.08]", icon: "bg-sky-500/15 text-sky-600 dark:text-sky-300", value: "text-sky-700 dark:text-sky-200" },
+  green: { box: "border-emerald-500/25 from-emerald-500/[0.08]", icon: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300", value: "text-emerald-700 dark:text-emerald-300" },
+  red: { box: "border-rose-500/25 from-rose-500/[0.08]", icon: "bg-rose-500/15 text-rose-600 dark:text-rose-300", value: "text-rose-700 dark:text-rose-300" },
+  amber: { box: "border-amber-500/30 from-amber-500/[0.09]", icon: "bg-amber-500/15 text-amber-600 dark:text-amber-300", value: "text-amber-700 dark:text-amber-300" },
+  violet: { box: "border-violet-500/25 from-violet-500/[0.08]", icon: "bg-violet-500/15 text-violet-600 dark:text-violet-300", value: "text-violet-700 dark:text-violet-200" },
+  slate: { box: "border-line from-slate-500/[0.06]", icon: "bg-slate-500/15 text-slate-600", value: "text-slate-900" },
+} as const;
+
+function Metric({ icon: Icon, label, value, hint, change, upIsGood = true, tone, href }: { icon: typeof Package; label: string; value: React.ReactNode; hint?: React.ReactNode; change?: number | null; upIsGood?: boolean; tone: keyof typeof TONES; href?: string }) {
+  const t = TONES[tone];
+  const good = change === null || change === undefined ? null : upIsGood ? change >= 0 : change <= 0;
+  const body = (
+    <div className={cn("@container h-full rounded-xl border bg-gradient-to-br to-transparent p-4 transition", t.box, href && "hover:-translate-y-0.5 hover:shadow-lg")}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-[13px] font-medium text-slate-600">
+          <span className={cn("grid h-8 w-8 place-items-center rounded-lg", t.icon)}>
+            <Icon size={16} />
+          </span>
+          {label}
+        </span>
+        {change !== null && change !== undefined && (
+          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", good ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-rose-500/15 text-rose-700 dark:text-rose-300")}>
+            {change >= 0 ? "+" : "−"}
+            {Math.abs(change).toFixed(Math.abs(change) >= 100 ? 0 : 1)}%
+          </span>
+        )}
+      </div>
+      <p className={cn("mt-3 whitespace-nowrap text-[clamp(1.2rem,9cqw,1.75rem)] font-bold leading-none tracking-tight", t.value)}>{value}</p>
+      {hint && <p className="mt-2 text-xs text-slate-500">{hint}</p>}
+    </div>
+  );
+  return href ? (
+    <Link href={href} className="block h-full">
+      {body}
+    </Link>
+  ) : (
+    body
+  );
+}
+
+const PILL = {
+  sky: "border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-400/40 dark:bg-sky-500/15 dark:text-sky-200 dark:hover:bg-sky-500/25",
+  emerald: "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-200 dark:hover:bg-emerald-500/25",
+  rose: "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-400/40 dark:bg-rose-500/15 dark:text-rose-200 dark:hover:bg-rose-500/25",
+  amber: "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/25",
+  violet: "border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:bg-violet-500/25",
+  navy: "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100",
+} as const;
+
+export default async function OwnerHome({ user }: { user: SessionUser }) {
+  const range = resolveRange("month");
+  const financials = can(user, "dashboard.financials");
   const locationId = await defaultLocationId(db);
-  const [currency, profile, data, extras, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, closingsToReview, lastClosing, resellerOverdue] = await Promise.all([
+  const [currency, profile, data, extras, overview, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, closingsToReview, resellerOverdue, shelf, away, imageProducts, closedToday] = await Promise.all([
     getCurrency(),
     getBusinessProfile(),
-    getOwnerDashboard(db, range, { financials: can(user, "dashboard.financials"), valuation: can(user, "inventory.valuation") }),
+    getOwnerDashboard(db, range, { financials, valuation: can(user, "inventory.valuation") }),
     getOwnerExtras(db, range, { resellers: can(user, "resellers.view"), expenses: can(user, "expenses.view") }),
+    getOwnerOverview(db, { financials }),
     getStockAlerts(db),
     can(user, "shipments.manage") ? db.shipment.count({ where: { issue: "OPEN" } }) : 0,
     can(user, "shipments.manage") ? db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] } } }) : 0,
     can(user, "cash.view") ? getBalances(db, locationId) : Promise.resolve([]),
-    can(user, "expenses.approve") ? db.expense.count({ where: { status: "PENDING" } }) : 0,
-    can(user, "closing.approve") ? db.dailyClosing.count({ where: { status: "NEEDS_REVIEW" } }) : 0,
-    can(user, "closing.approve") || can(user, "cash.view") ? db.dailyClosing.findFirst({ where: { locationId }, orderBy: { businessDate: "desc" }, select: { businessDate: true, difference: true } }) : null,
-    can(user, "resellers.view")
-      ? db.sale.findMany({ where: { channel: "RESELLER", status: "COMPLETED", dueDate: { lt: dayToDate(businessDay()) } }, select: { total: true, returnedTotal: true, amountPaid: true, refundedTotal: true } }).then((rows) => rows.reduce((s, x) => s + Math.max(0, owedOf(x).toNumber()), 0))
-      : 0,
+    can(user, "expenses.approve") ? db.expense.aggregate({ where: { status: "PENDING" }, _count: true, _sum: { amount: true } }) : null,
+    can(user, "closing.approve") ? db.dailyClosing.findMany({ where: { status: "NEEDS_REVIEW" }, select: { difference: true } }) : [],
+    can(user, "resellers.view") ? db.$queryRaw<{ v: number | null }[]>`SELECT SUM("total" - "returnedTotal" - "amountPaid" + "refundedTotal")::float AS v FROM "Sale" WHERE "channel" = 'RESELLER' AND "status" = 'COMPLETED' AND "dueDate" < ${businessDay()}::date AND ("total" - "returnedTotal" - "amountPaid" + "refundedTotal") > 0`.then((r) => Number(r[0]?.v ?? 0)) : 0,
+    can(user, "inventory.view") ? db.stockBalance.aggregate({ where: { location: { type: { not: "RESELLER" } } }, _sum: { quantity: true } }) : null,
+    can(user, "inventory.view") ? db.stockBalance.aggregate({ where: { location: { type: "RESELLER" } }, _sum: { quantity: true } }) : null,
+    db.product.findMany({ where: { status: "ACTIVE", image: { isNot: null } }, select: { id: true, name: true, image: { select: { updatedAt: true } } }, orderBy: { name: "asc" }, take: 40 }),
+    db.dailyClosing.findFirst({ where: { locationId, businessDate: new Date(`${businessDay()}T00:00:00.000Z`) }, select: { id: true } }),
   ]);
   const money = { symbol: currency.symbol, decimals: currency.decimals };
   const m = (v: number) => formatMoney(v, currency);
-  const compact = (v: number) => `${currency.symbol} ${Math.abs(v) >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : Math.abs(v) >= 10_000 ? `${Math.round(v / 1000)}k` : new Intl.NumberFormat("en-US").format(Math.round(v))}`;
-  const q = `from=${range.fromYmd}&to=${range.toYmd}`;
+  const compact = (v: number) => `${currency.symbol} ${Math.abs(v) >= 1_000_000 ? `${(v / 1_000_000).toFixed(v >= 100_000_000 ? 0 : 1)}M` : Math.abs(v) >= 10_000 ? `${Math.round(v / 1000)}k` : new Intl.NumberFormat("en-US").format(Math.round(v))}`;
   const k = data.kpi;
-  const attention = data.pendingApprovals + pendingExpenses + closingsToReview + shipmentIssues + (resellerOverdue > 0 ? 1 : 0) + (k.debt.overdue > 0 ? 1 : 0) + alerts.out.length + alerts.low.length;
-  const methodTotal = Object.values(k.cash.byMethod).reduce((s, v) => s + v, 0);
-  const expenseTotal = extras.expenses.reduce((s, e) => s + e.value, 0);
+  const o = overview;
+  const usable = balances.reduce((s, b) => s + b.balance.toNumber(), 0);
+  const hourNow = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Africa/Dar_es_Salaam" }).format(new Date()));
+  const firstName = user.name.split(" ")[0]!;
+  const todayLabel = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
+  const names = (rows: { name: string }[]) => rows.slice(0, 3).map((r) => r.name).join(", ") + (rows.length > 3 ? ` and ${rows.length - 3} more` : "");
+
+  // ── What needs the owner, most urgent first ──
+  const items: AttentionItem[] = [];
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  if (data.pendingApprovals > 0 && can(user, "returns.approve")) items.push({ id: "returns", group: "decisions", tone: "amber", icon: "returns", title: `${plural(data.pendingApprovals, "return or cancellation", "returns and cancellations")} waiting`, detail: "Stock and money wait for your yes.", href: "/approvals" });
+  if (pendingExpenses && pendingExpenses._count > 0) items.push({ id: "expenses", group: "decisions", tone: "amber", icon: "expense", title: `${plural(pendingExpenses._count, "expense", "expenses")} waiting for approval`, detail: "Nothing is paid out until you approve.", main: m(Number(pendingExpenses._sum.amount ?? 0)), href: "/approvals" });
+  if (closingsToReview.length > 0) items.push({ id: "closings", group: "decisions", tone: "red", icon: "closing", title: `${plural(closingsToReview.length, "daily closing", "daily closings")} where the cash did not match`, detail: "Look into the difference and sign it off.", main: m(closingsToReview.reduce((s, c) => s + Math.abs(c.difference.toNumber()), 0)), sub: "difference", href: "/approvals" });
+  if (shipmentIssues > 0) items.push({ id: "ship-issues", group: "decisions", tone: "amber", icon: "shipment", title: `${plural(shipmentIssues, "shipment", "shipments")} with damaged or missing goods`, detail: "Find out what went wrong and close the investigation.", href: "/shipments" });
+  if (k.debt.overdue > 0) items.push({ id: "overdue", group: "money", tone: "red", icon: "debt", title: "Customers owe money past the due date", detail: o.oldestOwed > 0 ? `The oldest unpaid bill is ${o.oldestOwed} days old.` : "Follow these up before they get older.", main: m(k.debt.overdue), sub: `of ${m(k.debt.value)} owed in all`, href: "/credit" });
+  if (resellerOverdue > 0) items.push({ id: "reseller-overdue", group: "money", tone: "red", icon: "reseller", title: "Resellers have not paid on time", detail: "Money is past the settlement date.", main: m(resellerOverdue), href: "/resellers" });
+  if (!closedToday && hourNow >= 19 && can(user, "closing.approve")) items.push({ id: "not-closed", group: "money", tone: "amber", icon: "clock", title: "The shop has not closed today yet", detail: "The WhatsApp report goes out once the day is closed.", href: "/closing" });
+  if (alerts.out.length > 0) items.push({ id: "out", group: "stock", tone: "red", icon: "stock", title: `${plural(alerts.out.length, "product", "products")} out of stock`, detail: names(alerts.out), href: "/inventory?status=out" });
+  if (alerts.low.length > 0) items.push({ id: "low", group: "stock", tone: "amber", icon: "stock", title: `${plural(alerts.low.length, "product", "products")} running low`, detail: names(alerts.low), href: "/inventory?status=low" });
+  if (shipmentsOnTheWay > 0) items.push({ id: "ship-way", group: "stock", tone: "blue", icon: "shipment", title: `${plural(shipmentsOnTheWay, "shipment", "shipments")} on the way`, detail: "The shop will count them when they arrive.", href: "/shipments" });
+
+  const pills = [
+    can(user, "cash.view") && { href: "/cash", label: "Cash & accounts", icon: Landmark, tone: "sky" as const },
+    can(user, "reports.view") && { href: "/reports", label: "Reports", icon: ChartColumn, tone: "emerald" as const },
+    (can(user, "returns.approve") || can(user, "expenses.approve") || can(user, "closing.approve")) && { href: "/approvals", label: "Approvals", icon: Inbox, tone: "navy" as const, badge: data.pendingApprovals + (pendingExpenses?._count ?? 0) + closingsToReview.length },
+    can(user, "shipments.manage") && { href: "/shipments", label: "Incoming stock", icon: Truck, tone: "amber" as const },
+    can(user, "resellers.view") && { href: "/resellers", label: "Resellers", icon: Handshake, tone: "violet" as const },
+    can(user, "sales.view_all") && { href: "/sales", label: "Sales history", icon: Receipt, tone: "rose" as const },
+    can(user, "audit.view") && { href: "/audit", label: "Audit log", icon: ScrollText, tone: "navy" as const },
+  ].filter(Boolean) as { href: string; label: string; icon: typeof Package; tone: keyof typeof PILL; badge?: number }[];
+
+  // pictures for the banner: the month's best sellers first
+  const top = new Set(o.products.map((p) => p.id));
+  const banner = [...imageProducts.filter((p) => top.has(p.id)), ...imageProducts.filter((p) => !top.has(p.id))].slice(0, 4);
+
   const stockRing = [
     { name: "In stock", value: Math.max(0, alerts.inStock - alerts.low.length) },
     { name: "Running low", value: alerts.low.length },
     { name: "Out of stock", value: alerts.out.length },
   ].filter((x) => x.value > 0);
-  const firstName = user.name.split(" ")[0]!;
-  const todayLabel = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
-  const links = [
-    can(user, "reports.view") && { href: "/reports", label: "Reports", icon: ChartColumn },
-    (can(user, "returns.approve") || can(user, "expenses.approve") || can(user, "closing.approve")) && { href: "/approvals", label: "Approvals", icon: Inbox, badge: data.pendingApprovals + pendingExpenses + closingsToReview },
-    can(user, "cash.view") && { href: "/cash", label: "Cash", icon: Banknote },
-    can(user, "shipments.manage") && { href: "/shipments", label: "Incoming stock", icon: Truck },
-    can(user, "resellers.view") && { href: "/resellers", label: "Resellers", icon: Handshake },
-  ].filter(Boolean) as { href: string; label: string; icon: typeof Package; badge?: number }[];
+  const tone = (v: number | null, good: number, ok: number, lowerIsBetter = false) => (v === null ? "text-slate-400" : (lowerIsBetter ? v <= good : v >= good) ? "text-emerald-600 dark:text-emerald-300" : (lowerIsBetter ? v <= ok : v >= ok) ? "text-amber-600 dark:text-amber-300" : "text-rose-600 dark:text-rose-300");
+  const pct = (v: number | null) => (v === null ? "—" : `${v.toFixed(1)}%`);
+  const health: { label: string; value: string; cls: string; note: string }[] = [
+    { label: "Money collected from sales", value: pct(o.month.collectionRate), cls: tone(o.month.collectionRate, 80, 50), note: "received ÷ sold this month" },
+    ...(o.month.margin !== null ? [{ label: "Profit margin", value: pct(o.month.margin), cls: tone(o.month.margin, 25, 10), note: "profit ÷ sales" }] : []),
+    { label: "Spent on expenses", value: pct(o.month.expenseRatio), cls: tone(o.month.expenseRatio, 10, 20, true), note: "expenses ÷ sales" },
+    { label: "Still owed to us", value: pct(o.outstandingRatio), cls: tone(o.outstandingRatio, 10, 25, true), note: "owed ÷ twelve months of sales" },
+    { label: "Sales growth", value: o.month.sales.change === null ? "—" : `${o.month.sales.change >= 0 ? "+" : "−"}${Math.abs(o.month.sales.change).toFixed(1)}%`, cls: tone(o.month.sales.change, 0, -10), note: `against ${o.prevMonthLabel}` },
+    ...(o.month.profit ? [{ label: "Profit growth", value: o.month.profit.change === null ? "—" : `${o.month.profit.change >= 0 ? "+" : "−"}${Math.abs(o.month.profit.change).toFixed(1)}%`, cls: tone(o.month.profit.change, 0, -10), note: `against ${o.prevMonthLabel}` }] : []),
+  ];
+  const agingMax = Math.max(1, ...o.aging.map((a) => a.value));
+  const agingColors = ["var(--c5)", "var(--c4)", "var(--c3)", "var(--c2)"];
+  const moneyIn = extras.moneyTrend.reduce((s, d) => s + d.cash + d.mobile + d.bank, 0);
 
   return (
     <>
       {/* ── Banner ── */}
-      <section className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-br from-navy-950 via-navy-800 to-navy-600 text-white shadow-[0_8px_28px_-12px_rgba(8,35,64,0.6)]">
-        <svg aria-hidden viewBox="0 0 400 200" preserveAspectRatio="xMaxYMin slice" className="pointer-events-none absolute right-0 top-0 h-[30%] w-40 sm:h-[68%] sm:w-[30rem] sm:max-w-[70%]">
-          <path d="M400 0 L400 200 L170 200 Q300 120 400 0 Z" fill="#ED1C24" opacity="0.95" />
-          <path d="M400 70 L400 200 L260 200 Q350 150 400 70 Z" fill="#FDC400" />
-        </svg>
-        <div className="pointer-events-none absolute -left-16 -top-20 h-56 w-56 rounded-full bg-white/5" aria-hidden />
-        <div className="pointer-events-none absolute left-1/3 top-1/2 h-40 w-40 rounded-full bg-white/[0.04]" aria-hidden />
+      <section className="@container relative mb-4 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_320px_at_85%_-10%,rgba(47,111,208,0.55),transparent_60%),radial-gradient(500px_260px_at_0%_110%,rgba(237,28,36,0.22),transparent_60%)]" aria-hidden />
+        {banner.length > 0 && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] items-center justify-end pr-6 @3xl:flex" aria-hidden>
+            <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-[#0a1a33] to-transparent" />
+            <div className="relative flex items-center">
+              {banner.map((p, i) => (
+                <span
+                  key={p.id}
+                  className="-ml-7 grid h-36 w-28 place-items-center overflow-hidden rounded-2xl bg-gradient-to-b from-white to-slate-200 p-2 shadow-[0_12px_30px_-8px_rgba(0,0,0,0.65)] ring-1 ring-white/30 first:ml-0 lg:h-44 lg:w-32"
+                  style={{ transform: `rotate(${(i - (banner.length - 1) / 2) * 5}deg) translateY(${Math.abs(i - (banner.length - 1) / 2) * 7}px)`, zIndex: 10 - i }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/product-image/${p.id}?size=thumb&v=${p.image!.updatedAt.getTime()}`} alt="" className="h-full w-full object-contain" />
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-r from-brand-red via-brand-red to-oil-400" aria-hidden />
 
-        <div className="relative px-5 pb-5 pt-5 sm:px-8 sm:pb-7 sm:pt-7">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-navy-200">{todayLabel}</p>
-          <h1 className="mt-1.5 text-[1.65rem] font-bold leading-tight tracking-tight sm:text-4xl">
+        <div className="relative px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8 @3xl:max-w-[58%]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-rose-300">Management · Owner</p>
+          <h1 className="mt-2 text-[1.7rem] font-bold leading-tight tracking-tight sm:text-4xl">
             {greeting()}, {firstName}
           </h1>
-          <p className="mt-1 max-w-md text-sm text-navy-100/90">Here is how {profile.name} is doing right now.</p>
-
-          <div className="mt-5 grid max-w-2xl grid-cols-3 gap-2 sm:gap-3">
-            <Link href="/sales" className="rounded-xl bg-white/10 px-3 py-2.5 ring-1 ring-white/15 transition hover:bg-white/15 sm:px-4 sm:py-3">
-              <p className="text-[11px] font-medium text-navy-100 sm:text-xs">Sold today</p>
-              <p className="mt-0.5 whitespace-nowrap text-[15px] font-bold tabular-nums sm:text-xl"><span className="sm:hidden">{compact(extras.today.sales)}</span><span className="hidden sm:inline">{m(extras.today.sales)}</span></p>
-              <p className="text-[11px] text-navy-200">{extras.today.count} sale{extras.today.count === 1 ? "" : "s"}</p>
-            </Link>
-            <Link href="/payments" className="rounded-xl bg-white/10 px-3 py-2.5 ring-1 ring-white/15 transition hover:bg-white/15 sm:px-4 sm:py-3">
-              <p className="text-[11px] font-medium text-navy-100 sm:text-xs">Money in</p>
-              <p className="mt-0.5 whitespace-nowrap text-[15px] font-bold tabular-nums sm:text-xl"><span className="sm:hidden">{compact(extras.today.money)}</span><span className="hidden sm:inline">{m(extras.today.money)}</span></p>
-              <p className="text-[11px] text-navy-200">received</p>
-            </Link>
-            <a href="#attention" className="rounded-xl bg-white/10 px-3 py-2.5 ring-1 ring-white/15 transition hover:bg-white/15 sm:px-4 sm:py-3">
-              <p className="text-[11px] font-medium text-navy-100 sm:text-xs">Needs you</p>
-              <p className="mt-0.5 whitespace-nowrap text-[15px] font-bold tabular-nums sm:text-xl">{attention}</p>
-              <p className="text-[11px] text-navy-200">{attention === 0 ? "all clear" : "item" + (attention === 1 ? "" : "s")}</p>
-            </a>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" aria-label="Shortcuts">
-              {links.map((l) => (
-                <Link key={l.href} href={l.href} className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-sm font-semibold text-navy-800 shadow-sm transition hover:bg-oil-400">
-                  <l.icon size={15} /> {l.label}
-                  {l.badge ? <span className="ml-0.5 rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-5 text-white">{l.badge}</span> : null}
-                </Link>
-              ))}
-            </nav>
-            <nav className="grid w-full grid-cols-4 gap-0.5 rounded-xl bg-navy-950/70 p-1 ring-1 ring-white/10 sm:inline-grid sm:w-fit" aria-label="Period">
-              {RANGES.map((r) => (
-                <Link key={r.key} href={`/dashboard?range=${r.key}`} aria-current={range.key === r.key ? "true" : undefined} className={cn("whitespace-nowrap rounded-lg px-2.5 py-1.5 text-center text-[13px] font-medium transition sm:px-3.5 sm:text-sm", range.key === r.key ? "bg-white text-navy-800 shadow-sm" : "text-navy-100 hover:bg-white/10")}>
-                  {r.key === "month" ? (
-                    <>
-                      <span className="sm:hidden">Month</span>
-                      <span className="hidden sm:inline">This month</span>
-                    </>
-                  ) : (
-                    r.label
-                  )}
-                </Link>
-              ))}
-            </nav>
-          </div>
+          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/85">
+            {balances.length > 0 ? (
+              <>
+                <strong className="text-white">{m(usable)}</strong> you can use right now ·{" "}
+              </>
+            ) : (
+              <>
+                <strong className="text-white">{m(extras.today.sales)}</strong> sold today ·{" "}
+              </>
+            )}
+            <strong className="text-emerald-300">{m(o.today.collected)}</strong> collected today · <strong className="text-oil-400">{m(k.debt.value)}</strong> owed by customers
+          </p>
+          <p className="mt-1.5 text-xs text-white/55">
+            {todayLabel} · {profile.name}
+          </p>
         </div>
       </section>
 
+      <nav className="-mx-1 mb-6 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" aria-label="Shortcuts">
+        {pills.map((l) => (
+          <Link key={l.href} href={l.href} className={cn("inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition", PILL[l.tone])}>
+            <l.icon size={15} /> {l.label}
+            {l.badge ? <span className="rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white">{l.badge}</span> : null}
+          </Link>
+        ))}
+      </nav>
+
       {alerts.active === 0 && (
-        <div className="card card-pad mb-5 border-oil-400/50 bg-oil-soft/60">
+        <div className="card card-pad mb-6 border-oil-400/50 bg-oil-soft/60">
           <p className="text-sm font-semibold text-slate-900">Your catalogue is empty</p>
           <p className="mt-0.5 text-sm text-slate-600">
             Add your products, set their selling prices, then announce your first shipment so the shop can receive it.{" "}
@@ -157,194 +243,319 @@ export default async function OwnerHome({ user, range: rangeKey }: { user: Sessi
         </div>
       )}
 
-      {/* ── Key figures ── */}
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
-        <StatTile icon={Receipt} tone="navy" label={`Sales · ${range.label.toLowerCase()}`} value={m(k.sales.value)} change={k.sales.change} hint={`${k.sales.count} sale${k.sales.count === 1 ? "" : "s"} · avg ${m(k.avgSale)}`} href={`/sales?${q}`} spark={data.trend.map((t) => t.sales)} />
-        <StatTile icon={Wallet} tone="green" label="Money received" value={m(k.cash.value)} change={k.cash.change} hint={`Cash ${m(k.cash.byMethod.CASH ?? 0)} · Mobile ${m(k.cash.byMethod.MOBILE_MONEY ?? 0)}`} href={`/payments?${q}`} spark={extras.moneyTrend.map((t) => t.cash + t.mobile + t.bank)} />
-        {k.profit ? (
-          <StatTile icon={TrendingUp} tone="yellow" label="Gross profit" value={m(k.profit.value)} change={k.profit.change} hint={`${k.profit.margin.toFixed(1)}% of sales`} />
-        ) : (
-          <StatTile icon={Users} tone="yellow" label="Staff selling" value={data.staff.length} hint="With sales in this period" />
-        )}
-        <StatTile icon={ReceiptText} tone="slate" label="Expenses" value={m(expenseTotal)} hint={extras.expenses[0] ? `Mostly ${extras.expenses[0].name.toLowerCase()}` : "Approved expenses"} href="/expenses" />
-        <StatTile icon={HandCoins} tone="red" label="Owed by customers" value={m(k.debt.value)} hint={k.debt.overdue > 0 ? `${m(k.debt.overdue)} overdue` : `${k.debt.open} open invoice${k.debt.open === 1 ? "" : "s"}`} href="/credit" />
-        {k.stockValue !== null ? (
-          <StatTile icon={Boxes} tone="navy" label="Stock value" value={m(k.stockValue)} hint={`${alerts.low.length + alerts.out.length} need restocking`} href="/inventory" />
-        ) : (
-          <StatTile icon={Boxes} tone="navy" label="Need restocking" value={alerts.low.length + alerts.out.length} hint={`${alerts.out.length} out of stock`} href="/inventory?status=low" />
-        )}
+      {/* ── Needs you ── */}
+      <Heading
+        right={
+          <Link href="/approvals" className="inline-flex items-center gap-1 text-[13px] font-medium text-navy-700 hover:underline">
+            Every decision <ArrowRight size={13} />
+          </Link>
+        }
+      >
+        Needs your attention <span className="ml-1.5 rounded-full bg-oil-400 px-2 py-0.5 text-[11px] font-bold tracking-normal text-navy-900">{items.length}</span>
+      </Heading>
+      <AttentionPanel items={items} />
+
+      {/* ── The money ── */}
+      <Heading>The money</Heading>
+      <section className="card overflow-hidden">
+        <div className="grid xl:grid-cols-[1.25fr_1fr]">
+          {balances.length > 0 ? (
+            <div className="grid items-center gap-5 p-4 sm:grid-cols-[170px_1fr] sm:p-5">
+              <div className="mx-auto h-40 w-40 sm:h-44 sm:w-44">
+                <DonutChart data={balances.map((b) => ({ name: b.name, value: Math.max(0, b.balance.toNumber()) })).filter((x) => x.value > 0)} money={money} centre={compact(usable)} centreLabel="in the accounts" empty="No money recorded yet" />
+              </div>
+              <ul className="space-y-3">
+                {balances.map((b, i) => {
+                  const Icon = b.method === "CASH" ? Banknote : b.method === "BANK" ? Landmark : Smartphone;
+                  return (
+                    <li key={b.method} className="flex items-center gap-3">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: CHART_COLORS[i] }} />
+                      <Icon size={16} className="shrink-0 text-slate-400" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] text-slate-500">{b.name}</span>
+                        <span className={cn("block text-base font-bold tabular-nums", b.balance.lt(0) ? "text-brand-red-dark" : "text-slate-900")}>{m(b.balance.toNumber())}</span>
+                      </span>
+                      <span className="hidden text-right text-[11px] text-slate-500 sm:block">
+                        +{m(b.inToday.toNumber())}
+                        <br />−{m(b.outToday.toNumber())} today
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : (
+            <div className="p-5 text-sm text-slate-500">Account balances are shown to people who may see cash and accounts.</div>
+          )}
+          <div className="border-t border-line p-4 sm:p-5 xl:border-l xl:border-t-0">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Today</p>
+              {balances.length > 0 && (
+                <Link href="/cash" className="text-[13px] font-medium text-navy-700 hover:underline">
+                  Open accounts
+                </Link>
+              )}
+            </div>
+            <dl className="divide-y divide-slate-100 text-sm">
+              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Sold today</dt><dd className="font-bold tabular-nums text-slate-900">{m(extras.today.sales)}</dd></div>
+              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Collected today</dt><dd className="font-bold tabular-nums text-emerald-600 dark:text-emerald-300">{m(o.today.collected)}</dd></div>
+              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Spent today</dt><dd className="font-bold tabular-nums text-slate-900">{m(o.today.spent)}</dd></div>
+              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Net cash today</dt><dd className={cn("font-bold tabular-nums", o.today.net < 0 ? "text-rose-600 dark:text-rose-300" : "text-emerald-600 dark:text-emerald-300")}>{o.today.net < 0 ? "−" : ""}{m(Math.abs(o.today.net))}</dd></div>
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      {/* ── This month against last month ── */}
+      <Heading
+        right={
+          <Link href="/reports" className="inline-flex items-center gap-1 text-[13px] font-medium text-navy-700 hover:underline">
+            Reports <ArrowRight size={13} />
+          </Link>
+        }
+      >
+        {o.monthLabel} · against {o.prevMonthLabel}
+      </Heading>
+      <div className="mb-3 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <Metric icon={Receipt} tone="blue" label="Sales" value={m(o.month.sales.value)} change={o.month.sales.change} hint={`${o.month.sales.count} sale${o.month.sales.count === 1 ? "" : "s"} so far`} href={`/sales?from=${range.fromYmd}&to=${range.toYmd}`} />
+        <Metric icon={Wallet} tone="green" label="Money received" value={m(o.month.money.value)} change={o.month.money.change} hint="Cash, mobile money and bank" href="/payments" />
+        <Metric icon={ReceiptText} tone="red" label="Expenses" value={m(o.month.spent.value)} change={o.month.spent.change} upIsGood={false} hint="Approved expenses" href="/expenses" />
+        {o.month.profit ? <Metric icon={TrendingUp} tone="amber" label="Gross profit" value={m(o.month.profit.value)} change={o.month.profit.change} hint={o.month.margin !== null ? `${o.month.margin.toFixed(1)}% of sales` : undefined} /> : <Metric icon={ShoppingBag} tone="amber" label="Items sold" value={Math.round(o.month.units.value).toLocaleString("en-US")} change={o.month.units.change} />}
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <Metric icon={HandCoins} tone="amber" label="Owed to us" value={m(o.owedTotal)} hint="On every unpaid bill, not just this month" href="/credit" />
+        <Metric icon={PiggyBank} tone="violet" label="Collected of what was sold" value={o.month.collectionRate === null ? "—" : `${Math.round(o.month.collectionRate)}%`} hint={`${m(o.month.money.value)} of ${m(o.month.sales.value)}`} />
+        <Metric icon={ShoppingBag} tone="blue" label="Items sold" value={Math.round(o.month.units.value).toLocaleString("en-US")} change={o.month.units.change} hint="Bottles and tins this month" />
+        <Metric icon={Boxes} tone="slate" label={k.stockValue !== null ? "Stock value" : "On the shelf"} value={k.stockValue !== null ? m(k.stockValue) : `${Math.round(Number(shelf?._sum.quantity ?? 0)).toLocaleString("en-US")} items`} hint={`${alerts.low.length + alerts.out.length} product${alerts.low.length + alerts.out.length === 1 ? "" : "s"} need restocking`} href="/inventory" />
+      </div>
+      <p className="mt-2 text-xs text-slate-500">Compared with the same days of {o.prevMonthLabel}. Sales are what was invoiced; money received is what actually came in.</p>
+
+      {/* ── The year and the health ── */}
+      <div className="mt-6 grid gap-4 xl:grid-cols-3">
+        <Section title={o.month.profit ? "Sales, costs and what was left" : "Sales and expenses"} hint="The last twelve months" className="xl:col-span-2">
+          <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+            {[["Sales", "var(--c1)"], ...(financials ? [["Costs", "var(--c2)"], ["What was left", "var(--c5)"]] : [["Expenses", "var(--c2)"]])].map(([l, c]) => (
+              <span key={l} className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ background: c }} />
+                {l}
+              </span>
+            ))}
+          </div>
+          <div className="h-60 sm:h-72">
+            <YearChart data={o.year} money={money} showCosts />
+          </div>
+        </Section>
+        <Section title="How the business is doing" hint="Simple rules of thumb: green is healthy">
+          <ul className="divide-y divide-slate-100">
+            {health.map((h) => (
+              <li key={h.label} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="min-w-0">
+                  <span className="block text-sm text-slate-800">{h.label}</span>
+                  <span className="block text-[11px] text-slate-500">{h.note}</span>
+                </span>
+                <span className={cn("shrink-0 text-lg font-bold tabular-nums", h.cls)}>{h.value}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
       </div>
 
-      {/* ── Sales ── */}
-      <div className="mb-5 grid gap-4 lg:grid-cols-3">
-        <Card title="Sales trend" hint="Daily sales after returns" className="lg:col-span-2">
-          <div className="h-56 sm:h-72">
-            <SalesTrendChart data={data.trend} money={money} />
+      {/* ── Products ── */}
+      <section className="card mt-4 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3 sm:px-5">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">What each product is making</h2>
+            <p className="text-xs text-slate-500">{o.monthLabel} so far. {financials ? "Cost is what the stock cost us." : ""}</p>
           </div>
-        </Card>
-        <Card title="Sales by category" action={{ href: "/reports?tab=sales", label: "Details" }}>
-          <div className="h-48 sm:h-52">
-            <DonutChart data={data.byCategory} money={money} centre={compact(k.sales.value)} />
+          <Link href="/reports?tab=sales" className="inline-flex items-center gap-1 text-[13px] font-medium text-navy-700 hover:underline">
+            All products <ArrowRight size={13} />
+          </Link>
+        </div>
+        {o.products.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-slate-500">Nothing sold this month yet.</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th className="hidden text-right sm:table-cell">Sold</th>
+                  <th className="text-right">Sales</th>
+                  {financials && <th className="hidden text-right sm:table-cell">Cost</th>}
+                  {financials && <th className="text-right">Profit</th>}
+                  {financials && <th className="hidden text-right md:table-cell">Margin</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {o.products.map((p) => {
+                  const margin = p.sales > 0 && p.profit !== null ? (p.profit / p.sales) * 100 : null;
+                  return (
+                    <tr key={p.id}>
+                      <td className="font-medium text-slate-900">{p.name}</td>
+                      <td className="hidden text-right tabular-nums sm:table-cell">{Math.round(p.units)}</td>
+                      <td className="text-right tabular-nums">{m(p.sales)}</td>
+                      {financials && <td className="hidden text-right tabular-nums text-rose-600 dark:text-rose-300 sm:table-cell">{m(p.cost ?? 0)}</td>}
+                      {financials && <td className="text-right font-semibold tabular-nums text-emerald-600 dark:text-emerald-300">{m(p.profit ?? 0)}</td>}
+                      {financials && <td className="hidden text-right tabular-nums text-slate-600 md:table-cell">{margin === null ? "—" : `${margin.toFixed(0)}%`}</td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* ── Where it comes from and goes ── */}
+      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Section title="By category" hint={`${o.monthLabel} so far`} action={{ href: "/reports?tab=sales", label: "Details" }}>
+          <div className="h-44">
+            <DonutChart data={data.byCategory} money={money} centre={compact(o.month.sales.value)} />
           </div>
           <ul className="mt-3 space-y-1.5 text-sm">
-            {data.byCategory.slice(0, 5).map((c, i) => (
+            {data.byCategory.slice(0, 4).map((c, i) => (
               <li key={c.name} className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2 text-slate-700">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} />
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
                   <span className="truncate">{c.name}</span>
                 </span>
                 <span className="shrink-0 font-medium text-slate-900">{m(c.value)}</span>
               </li>
             ))}
           </ul>
-        </Card>
-      </div>
-
-      <div className="mb-5 grid gap-4 lg:grid-cols-3">
-        <Card title="Money received" hint="Each day, by how it was paid" className="lg:col-span-2">
-          <div className="h-52 sm:h-60">
-            <MoneyBarsChart data={extras.moneyTrend} money={money} />
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-slate-600">
-            {[
-              ["Cash", "#0e3d6e", k.cash.byMethod.CASH ?? 0],
-              ["Mobile money", "#fdc400", k.cash.byMethod.MOBILE_MONEY ?? 0],
-              ["Bank", "#84add4", k.cash.byMethod.BANK ?? 0],
-            ].map(([label, colour, v]) => (
-              <span key={label as string} className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: colour as string }} />
-                {label as string}
-                <strong className="text-slate-900">{m(v as number)}</strong>
-                {methodTotal > 0 && <span className="text-slate-400">{Math.round(((v as number) / methodTotal) * 100)}%</span>}
-              </span>
-            ))}
-          </div>
-        </Card>
-        <Card title="Busiest days" hint="Sales by day of the week">
-          <div className="h-52 sm:h-60">
-            <ColumnsChart data={extras.weekday} money={money} />
-          </div>
-        </Card>
-      </div>
-
-      <div className="mb-5 grid gap-4 lg:grid-cols-3">
-        <Card title="Best-selling products" action={{ href: "/reports?tab=sales", label: "All" }} className="lg:col-span-2">
-          <div className="h-60 sm:h-64">
-            <TopProductsChart data={data.topProducts} money={money} />
-          </div>
-        </Card>
-        <Card id="attention" title="Needs your attention" hint={attention === 0 ? undefined : `${attention} thing${attention === 1 ? "" : "s"} to look at`}>
-          <ul className="space-y-2 text-sm">
-            <Attention href="/shipments" show={can(user, "shipments.manage")} count={shipmentIssues} icon={AlertTriangle} text="shipments with damaged or missing goods" />
-            <Attention href="/shipments" show={can(user, "shipments.manage")} count={shipmentsOnTheWay} icon={Truck} text="shipments on the way" calm />
-            <Attention href="/approvals" show={can(user, "returns.approve")} count={data.pendingApprovals} icon={Undo2} text="return or cancel requests" />
-            <Attention href="/approvals" show={can(user, "expenses.approve")} count={pendingExpenses} icon={ReceiptText} text="expenses waiting for approval" />
-            <Attention href="/approvals" show={can(user, "closing.approve")} count={closingsToReview} icon={CalendarCheck} text="closings where the cash did not match" />
-            <Attention href="/resellers" show={can(user, "resellers.view")} count={resellerOverdue > 0 ? 1 : 0} icon={Handshake} text={`${m(resellerOverdue)} overdue from resellers`} hideCount />
-            <Attention href="/credit" show count={k.debt.overdue > 0 ? 1 : 0} icon={AlertTriangle} text={`${m(k.debt.overdue)} owed past the due date`} hideCount />
-            <Attention href="/inventory?status=out" show count={alerts.out.length} icon={Package} text="products out of stock" />
-            <Attention href="/inventory?status=low" show count={alerts.low.length} icon={Scale} text="products running low" />
-            {attention === 0 && <li className="rounded-lg bg-emerald-50 px-3 py-3 text-emerald-800">Nothing needs your attention right now.</li>}
-          </ul>
-        </Card>
-      </div>
-
-      {/* ── Money and stock ── */}
-      <div className="mb-5 grid gap-4 lg:grid-cols-3">
-        {balances.length > 0 && (
-          <Card title="Where the money is" action={{ href: "/cash", label: "Cash & accounts" }} className="lg:col-span-2">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {balances.map((b) => {
-                const Icon = b.method === "CASH" ? Banknote : b.method === "BANK" ? Landmark : Smartphone;
-                return (
-                  <div key={b.method} className="rounded-xl border border-line p-3.5">
-                    <span className={cn("grid h-9 w-9 place-items-center rounded-lg", b.method === "CASH" ? "bg-oil-soft text-yellow-800" : b.method === "BANK" ? "bg-navy-50 text-navy-700" : "bg-emerald-50 text-emerald-700")}>
-                      <Icon size={18} />
-                    </span>
-                    <p className="mt-2.5 text-xs text-slate-500">{b.name}</p>
-                    <p className={cn("text-lg font-bold tabular-nums", b.balance.lt(0) ? "text-brand-red-dark" : "text-slate-900")}>{m(b.balance.toNumber())}</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
-                      +{m(b.inToday.toNumber())} · −{m(b.outToday.toNumber())} today
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-            <Link href="/closing" className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm transition hover:bg-slate-100">
-              <span className="flex items-center gap-2 text-slate-600">
-                <CalendarCheck size={16} /> Last day closed
-              </span>
-              <span className="font-semibold text-slate-900">
-                {lastClosing ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" }).format(lastClosing.businessDate) : "Not yet"}
-                {lastClosing && (
-                  <span className={cn("ml-2 text-xs font-medium", lastClosing.difference.isZero() ? "text-emerald-700" : lastClosing.difference.lt(0) ? "text-brand-red-dark" : "text-yellow-800")}>
-                    {lastClosing.difference.isZero() ? "matched" : `${lastClosing.difference.lt(0) ? "short" : "extra"} ${m(lastClosing.difference.abs().toNumber())}`}
+        </Section>
+        <Section title="Top customers" hint="Billed this month, and what they still owe">
+          {o.customers.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">Nothing billed to a named customer this month yet.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {o.customers.map((c) => (
+                <li key={c.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <Link href={`/customers/${c.id}`} className="min-w-0 truncate text-sm font-medium text-slate-800 hover:text-navy-700">
+                    {c.name}
+                  </Link>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-sm font-semibold tabular-nums text-slate-900">{m(c.billed)}</span>
+                    <span className={cn("block text-[11px] tabular-nums", c.owed > 0 ? "text-amber-600 dark:text-amber-300" : "text-slate-400")}>{c.owed > 0 ? `owes ${m(c.owed)}` : "paid up"}</span>
                   </span>
-                )}
-              </span>
-            </Link>
-          </Card>
-        )}
-        <Card title="Stock health" action={{ href: "/inventory", label: "Stock" }} className={balances.length === 0 ? "lg:col-span-3" : undefined}>
-          <div className="h-44">
-            <DonutChart data={stockRing} money={money} centre={String(alerts.active)} centreLabel="Products" colors={["#16a34a", "#fdc400", "#ed1c24"]} empty="No products yet" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+        <Section title="Where money is spent" hint={`${o.monthLabel} so far`} action={{ href: "/expenses", label: "Expenses" }}>
+          {extras.expenses.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500">No expenses recorded this month.</p>
+          ) : (
+            <>
+              <div className="h-44">
+                <DonutChart data={extras.expenses} money={money} centre={compact(o.month.spent.value)} centreLabel="spent" />
+              </div>
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {extras.expenses.slice(0, 4).map((e, i) => (
+                  <li key={e.name} className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2 text-slate-700">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                      <span className="truncate">{e.name}</span>
+                    </span>
+                    <span className="shrink-0 font-medium text-slate-900">{m(e.value)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Section>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Section title="Money in and out" hint="Every month, this year" action={{ href: "/cash", label: "Accounts" }}>
+          <div className="h-52">
+            <InOutChart data={o.year.map((y) => ({ label: y.label, in: y.in, out: y.out }))} money={money} />
           </div>
-          <ul className="mt-2 space-y-1 text-sm">
-            {stockRing.map((r, i) => (
+          <p className="mt-2 flex gap-4 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "var(--c5)" }} />Money in</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "var(--c2)" }} />Money out</span>
+          </p>
+        </Section>
+        <Section title="Who owes us, by age" hint="From the day the sale was made" action={{ href: "/credit", label: "Credit" }}>
+          <ul className="space-y-3.5">
+            {o.aging.map((a, i) => (
+              <li key={a.label}>
+                <div className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="text-slate-700">{a.label}</span>
+                  <span className="text-xs text-slate-500">
+                    {a.count} bill{a.count === 1 ? "" : "s"} · <strong className="text-sm tabular-nums text-slate-900">{m(a.value)}</strong>
+                  </span>
+                </div>
+                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full" style={{ width: `${(a.value / agingMax) * 100}%`, background: agingColors[i] }} />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 border-t border-line pt-3 text-xs text-slate-500">
+            Owed in all <strong className="tabular-nums text-slate-800">{m(o.owedTotal)}</strong>
+            {o.oldestOwed > 0 && <> · oldest {o.oldestOwed} days</>}
+          </p>
+        </Section>
+        <Section title="Where the stock is" action={{ href: "/inventory", label: "Stock" }}>
+          <div className="h-40">
+            <DonutChart data={stockRing} money={money} centre={String(alerts.active)} centreLabel="products" colors={["var(--c5)", "var(--c3)", "var(--c2)"]} empty="No products yet" />
+          </div>
+          <ul className="mt-3 space-y-1.5 text-sm">
+            {stockRing.map((r) => (
               <li key={r.name} className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-slate-700">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: ["#16a34a", "#fdc400", "#ed1c24"][["In stock", "Running low", "Out of stock"].indexOf(r.name)] ?? PALETTE[i] }} />
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: ["var(--c5)", "var(--c3)", "var(--c2)"][["In stock", "Running low", "Out of stock"].indexOf(r.name)] }} />
                   {r.name}
                 </span>
                 <strong className="text-slate-900">{r.value}</strong>
               </li>
             ))}
           </ul>
-        </Card>
+          {shelf && away && (
+            <p className="mt-3 flex justify-between border-t border-line pt-3 text-xs text-slate-500">
+              <span>On the shelf <strong className="text-slate-800">{Math.round(Number(shelf._sum.quantity ?? 0)).toLocaleString("en-US")}</strong></span>
+              <span>With resellers <strong className="text-slate-800">{Math.round(Number(away._sum.quantity ?? 0)).toLocaleString("en-US")}</strong></span>
+            </p>
+          )}
+        </Section>
       </div>
 
-      {(alerts.out.length + alerts.low.length > 0 || extras.resellers) && (
-        <div className="mb-5 grid gap-4 lg:grid-cols-3">
-          {alerts.out.length + alerts.low.length > 0 && (
-            <Card title="Restock soon" action={{ href: "/inventory?status=low", label: "See all" }} className="lg:col-span-2">
-              <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
-                {[...alerts.out.map((a) => ({ ...a, out: true })), ...alerts.low.map((a) => ({ ...a, out: false }))].slice(0, 8).map((a) => (
-                  <li key={a.id} className="flex items-center gap-3 border-b border-slate-100 py-2">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-gradient-to-b from-white to-slate-100">
-                      {a.imageV ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={`/api/product-image/${a.id}?size=thumb&v=${a.imageV}`} alt="" loading="lazy" className="h-full w-full object-contain" />
-                      ) : (
-                        <Package size={18} className="text-slate-300" />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{a.name}</span>
-                    <span className={a.out ? "badge-red" : "badge-yellow"}>{a.out ? "Out" : `${Number(a.qty)} left`}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-          {extras.resellers && (
-            <Card title="Resellers" action={{ href: "/resellers", label: "Open" }} className={alerts.out.length + alerts.low.length === 0 ? "lg:col-span-3" : undefined}>
-              <dl className="space-y-3 text-sm">
-                <div className="flex items-center justify-between"><dt className="text-slate-600">Active resellers</dt><dd className="font-semibold">{extras.resellers.count}</dd></div>
-                <div className="flex items-center justify-between"><dt className="text-slate-600">Stock they hold</dt><dd className="font-semibold tabular-nums">{m(extras.resellers.held)}</dd></div>
-                <div className="flex items-center justify-between"><dt className="text-slate-600">They owe us</dt><dd className="font-semibold tabular-nums">{m(extras.resellers.owed)}</dd></div>
-                {extras.resellers.overdue > 0 && <div className="flex items-center justify-between rounded-lg bg-brand-red-soft px-3 py-2 text-brand-red-dark"><dt>Overdue</dt><dd className="font-bold tabular-nums">{m(extras.resellers.overdue)}</dd></div>}
-              </dl>
-            </Card>
-          )}
-        </div>
-      )}
+      {/* ── Daily rhythm, people, resellers ── */}
+      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Section title="Money received each day" hint={`${o.monthLabel} so far, by how it was paid`} className="xl:col-span-2">
+          <div className="h-52 sm:h-60">
+            <MoneyBarsChart data={extras.moneyTrend} money={money} />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-slate-600">
+            {[
+              ["Cash", "var(--c1)", k.cash.byMethod.CASH ?? 0],
+              ["Mobile money", "var(--c3)", k.cash.byMethod.MOBILE_MONEY ?? 0],
+              ["Bank", "var(--c4)", k.cash.byMethod.BANK ?? 0],
+            ].map(([label, colour, v]) => (
+              <span key={label as string} className="inline-flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: colour as string }} />
+                {label as string}
+                <strong className="text-slate-900">{m(v as number)}</strong>
+                {moneyIn > 0 && <span className="text-slate-400">{Math.round(((v as number) / moneyIn) * 100)}%</span>}
+              </span>
+            ))}
+          </div>
+        </Section>
+        <Section title="Busiest days" hint="Sales by day of the week">
+          <div className="h-52 sm:h-60">
+            <ColumnsChart data={extras.weekday} money={money} />
+          </div>
+        </Section>
+      </div>
 
-      {/* ── People and records ── */}
-      <div className="grid items-start gap-4 lg:grid-cols-3">
-        <section className="card overflow-hidden lg:col-span-2">
+      <div className="mt-4 grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section className="card overflow-hidden xl:col-span-2">
           <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
             <h2 className="text-base font-semibold text-slate-900">Latest sales</h2>
-            <Link href="/sales" className="inline-flex items-center gap-1 text-sm font-medium text-navy-700 hover:underline">
-              View all <ArrowRight size={14} />
+            <Link href="/sales" className="inline-flex items-center gap-1 text-[13px] font-medium text-navy-700 hover:underline">
+              View all <ArrowRight size={13} />
             </Link>
           </div>
           {data.recent.length === 0 ? (
@@ -372,89 +583,71 @@ export default async function OwnerHome({ user, range: rangeKey }: { user: Sessi
         </section>
 
         <div className="space-y-4">
-          <Card title="Staff performance">
+          <Section title="Staff performance" hint={`${o.monthLabel} so far`}>
             {data.staff.length === 0 ? (
-              <p className="text-sm text-slate-500">No sales in this period.</p>
+              <p className="text-sm text-slate-500">No sales this month yet.</p>
             ) : (
               <ul className="space-y-3.5">
                 {data.staff.map((s, i) => {
-                  const pct = data.staff[0]!.sales > 0 ? (s.sales / data.staff[0]!.sales) * 100 : 0;
+                  const w = data.staff[0]!.sales > 0 ? (s.sales / data.staff[0]!.sales) * 100 : 0;
                   return (
                     <li key={s.id}>
-                      <Link href={`/sales?seller=${s.id}&${q}`} className="block">
-                        <div className="flex items-center gap-3">
-                          <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold", i === 0 ? "bg-oil-400 text-navy-900" : "bg-navy-50 text-navy-700")}>
-                            {s.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
+                      <Link href={`/sales?seller=${s.id}&from=${range.fromYmd}&to=${range.toYmd}`} className="flex items-center gap-3">
+                        <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold", i === 0 ? "bg-oil-400 text-navy-900" : "bg-navy-50 text-navy-700")}>
+                          {s.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center justify-between text-sm">
+                            <span className="truncate font-medium text-slate-800">{s.name}</span>
+                            <span className="font-semibold tabular-nums text-slate-900">{m(s.sales)}</span>
                           </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-center justify-between text-sm">
-                              <span className="truncate font-medium text-slate-800">{s.name}</span>
-                              <span className="font-semibold text-slate-900">{m(s.sales)}</span>
-                            </span>
-                            <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-slate-100">
-                              <span className="block h-full rounded-full bg-navy-600" style={{ width: `${pct}%` }} />
-                            </span>
-                            <span className="mt-0.5 block text-xs text-slate-500">{s.count} sale{s.count === 1 ? "" : "s"}</span>
+                          <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-slate-100">
+                            <span className="block h-full rounded-full" style={{ width: `${w}%`, background: "var(--c1)" }} />
                           </span>
-                        </div>
+                          <span className="mt-0.5 block text-xs text-slate-500">{s.count} sale{s.count === 1 ? "" : "s"}</span>
+                        </span>
                       </Link>
                     </li>
                   );
                 })}
               </ul>
             )}
-          </Card>
-          {data.debtors.length > 0 && (
-            <Card title="Who owes the most" action={{ href: "/credit", label: "Credit" }}>
-              <ul className="space-y-2.5 text-sm">
-                {data.debtors.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between gap-2">
-                    <Link href={`/customers/${d.id}`} className="truncate text-navy-700 hover:underline">
-                      {d.name}
-                    </Link>
-                    <span className="shrink-0 font-semibold text-brand-red-dark">{m(d.owed)}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-          {extras.expenses.length > 0 && (
-            <Card title="Where the money went" hint="Approved expenses in this period" action={{ href: "/expenses", label: "Expenses" }}>
-              <div className="h-40">
-                <DonutChart data={extras.expenses} money={money} centre={compact(expenseTotal)} centreLabel="Spent" />
-              </div>
-              <ul className="mt-2 space-y-1.5 text-sm">
-                {extras.expenses.slice(0, 4).map((e, i) => (
-                  <li key={e.name} className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-2 text-slate-700">
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} />
-                      <span className="truncate">{e.name}</span>
-                    </span>
-                    <span className="shrink-0 font-medium text-slate-900">{m(e.value)}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
+          </Section>
+          {extras.resellers && (
+            <Section title="Resellers" action={{ href: "/resellers", label: "Open" }}>
+              <dl className="space-y-3 text-sm">
+                <div className="flex items-center justify-between"><dt className="text-slate-600">Active resellers</dt><dd className="font-semibold">{extras.resellers.count}</dd></div>
+                <div className="flex items-center justify-between"><dt className="text-slate-600">Stock they hold</dt><dd className="font-semibold tabular-nums">{m(extras.resellers.held)}</dd></div>
+                <div className="flex items-center justify-between"><dt className="text-slate-600">They owe us</dt><dd className="font-semibold tabular-nums">{m(extras.resellers.owed)}</dd></div>
+                {extras.resellers.overdue > 0 && (
+                  <div className="flex items-center justify-between rounded-lg bg-brand-red-soft px-3 py-2 text-brand-red-dark"><dt>Overdue</dt><dd className="font-bold tabular-nums">{m(extras.resellers.overdue)}</dd></div>
+                )}
+              </dl>
+            </Section>
           )}
         </div>
       </div>
-    </>
-  );
-}
 
-function Attention({ href, show, count, icon: Icon, text, hideCount, calm }: { href: string; show: boolean; count: number; icon: typeof Package; text: string; hideCount?: boolean; calm?: boolean }) {
-  if (!show || count === 0) return null;
-  return (
-    <li>
-      <Link href={href} className="flex items-center gap-3 rounded-lg border border-line px-3 py-2.5 transition hover:border-navy-200 hover:bg-slate-50">
-        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", calm ? "bg-navy-50 text-navy-700" : "bg-brand-red-soft text-brand-red-dark")}>
-          <Icon size={18} />
-        </span>
-        <span className="text-slate-700">
-          {!hideCount && <strong className="mr-1 text-slate-900">{count}</strong>}
-          {text}
-        </span>
-      </Link>
-    </li>
+      {alerts.out.length + alerts.low.length > 0 && (
+        <Section title="Restock soon" action={{ href: "/inventory?status=low", label: "See all" }} className="mt-4">
+          <ul className="grid gap-x-8 gap-y-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3">
+            {[...alerts.out.map((a) => ({ ...a, out: true })), ...alerts.low.map((a) => ({ ...a, out: false }))].slice(0, 9).map((a) => (
+              <li key={a.id} className="flex items-center gap-3 border-b border-slate-100 py-2">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-gradient-to-b from-white to-slate-100">
+                  {a.imageV ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`/api/product-image/${a.id}?size=thumb&v=${a.imageV}`} alt="" loading="lazy" className="h-full w-full object-contain" />
+                  ) : (
+                    <Package size={18} className="text-slate-300" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{a.name}</span>
+                <span className={a.out ? "badge-red" : "badge-yellow"}>{a.out ? "Out" : `${Number(a.qty)} left`}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </>
   );
 }

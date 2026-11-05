@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Bell, KeyRound, LogOut, Menu, X } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import { NAV } from "./nav";
 
@@ -48,7 +49,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <Link href="/dashboard" className="block" aria-label={`${businessName} home`}>
-          <Image src="/brand/logo-full.png" alt={businessName} width={900} height={456} className="h-12 w-auto" priority />
+          <Image src="/brand/logo-full.png" alt={businessName} width={900} height={456} className="brand-logo h-12 w-auto" priority />
         </Link>
         <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
           <X size={16} />
@@ -114,6 +115,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-700 text-xs font-semibold text-white" aria-hidden>
             {initials(user.name)}
           </span>
+          <ThemeToggle />
           <Link href="/notifications" className="btn-secondary btn-sm relative" title="Notifications">
             <Bell size={15} />
             <span className="sr-only">Notifications{unread > 0 ? `, ${unread} unread` : ""}</span>

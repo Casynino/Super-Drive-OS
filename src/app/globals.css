@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* "dark:" utilities follow the app's own dark look (the class on <html>), not the phone's setting */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Brand palette taken from the Super Drive Oil logo: navy, signal red, oil yellow. */
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -30,6 +33,18 @@
 
 html {
   color-scheme: light;
+  /* chart colours (the dark theme swaps these) */
+  --card: #ffffff;
+  --chart-grid: #e2e7ee;
+  --chart-text: #64748b;
+  --chart-label: #334155;
+  --c1: #0e3d6e;
+  --c2: #ed1c24;
+  --c3: #fdc400;
+  --c4: #4f85b9;
+  --c5: #16a34a;
+  --c6: #8b5cf6;
+  --c7: #94a3b8;
 }
 
 body {
@@ -134,4 +149,73 @@ body {
   .card {
     box-shadow: none;
   }
+}
+
+/* ───────────── Dark theme (screen only: printing and receipts always stay light) ─────────────
+   The app's colours are the slate scale plus a few tints, so the dark theme swaps those and leaves everything else alone. */
+@media screen {
+  html.dark {
+    color-scheme: dark;
+    --color-surface: #0a1220;
+    --color-line: #1b2a44;
+    --card: #101a2d;
+    --color-slate-50: #0e1829;
+    --color-slate-100: #132039;
+    --color-slate-200: #1c2c49;
+    --color-slate-300: #2a3e61;
+    --color-slate-400: #6f86ab;
+    --color-slate-500: #8fa3c2;
+    --color-slate-600: #aab9d2;
+    --color-slate-700: #c5d1e4;
+    --color-slate-800: #dce5f2;
+    --color-slate-900: #eef3fa;
+    --chart-grid: #1f2f4d;
+    --chart-text: #8fa3c2;
+    --chart-label: #c5d1e4;
+    --c1: #4f8fe0;
+    --c2: #ff5a61;
+    --c3: #fdc400;
+    --c4: #86b6f0;
+    --c5: #34d399;
+    --c6: #a78bfa;
+    --c7: #7a8daa;
+  }
+  html.dark body { background: var(--color-surface); color: #e6edf7; }
+  html.dark .bg-white, html.dark .card { background-color: var(--card); }
+  html.dark .bg-white\/95, html.dark .bg-white\/90 { background-color: color-mix(in srgb, var(--card) 92%, transparent); }
+  html.dark .card { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px -16px rgba(0, 0, 0, 0.6); }
+  html.dark .input { background-color: #0b1526; border-color: var(--color-slate-300); color: var(--color-slate-900); }
+  html.dark .input:focus { border-color: #4f8fe0; --tw-ring-color: rgba(79, 143, 224, 0.35); }
+  html.dark .btn-primary { background-color: #2563b8; color: #fff; }
+  html.dark .btn-primary:hover { background-color: #1f56a2; }
+  html.dark .btn-secondary { background-color: var(--card); }
+  html.dark .badge-green { background-color: rgba(52, 211, 153, 0.14); color: #6ee7b7; --tw-ring-color: rgba(52, 211, 153, 0.3); }
+  html.dark .badge-red { background-color: rgba(237, 28, 36, 0.16); color: #ff8b90; --tw-ring-color: rgba(237, 28, 36, 0.35); }
+  html.dark .badge-yellow { background-color: rgba(253, 196, 0, 0.13); color: #fcd34d; --tw-ring-color: rgba(253, 196, 0, 0.35); }
+  html.dark .badge-blue { background-color: rgba(79, 143, 224, 0.18); color: #8db8ea; --tw-ring-color: rgba(79, 143, 224, 0.35); }
+  html.dark .btn-danger { border-color: rgba(237, 28, 36, 0.4); background-color: transparent; }
+  html.dark .btn-secondary:hover { background-color: var(--color-slate-100); }
+  html.dark .bg-navy-700 { background-color: #2563b8; }
+  html.dark .hover\:bg-navy-800:hover, html.dark .active\:bg-navy-900:active { background-color: #1f56a2; }
+  /* soft tints */
+  html.dark .bg-navy-50, html.dark .bg-navy-50\/40 { background-color: rgba(79, 143, 224, 0.14); }
+  html.dark .bg-navy-100 { background-color: rgba(79, 143, 224, 0.22); }
+  html.dark .bg-emerald-50, html.dark .bg-emerald-50\/60 { background-color: rgba(52, 211, 153, 0.12); }
+  html.dark .bg-brand-red-soft, html.dark .bg-brand-red-soft\/40, html.dark .bg-red-50 { background-color: rgba(237, 28, 36, 0.14); }
+  html.dark .bg-oil-soft, html.dark .bg-oil-soft\/50, html.dark .bg-oil-soft\/60 { background-color: rgba(253, 196, 0, 0.11); }
+  html.dark .text-navy-600, html.dark .text-navy-700, html.dark .text-navy-800, html.dark .text-navy-900, html.dark .text-navy-950 { color: #8db8ea; }
+  html.dark .text-emerald-600, html.dark .text-emerald-700, html.dark .text-emerald-800, html.dark .text-emerald-900 { color: #6ee7b7; }
+  html.dark .text-brand-red-dark { color: #ff8b90; }
+  html.dark .text-yellow-700, html.dark .text-yellow-800, html.dark .text-yellow-900, html.dark .text-yellow-950 { color: #fcd34d; }
+  html.dark .border-emerald-200, html.dark .ring-emerald-200 { border-color: rgba(52, 211, 153, 0.3); --tw-ring-color: rgba(52, 211, 153, 0.3); }
+  html.dark .border-red-200, html.dark .ring-red-200, html.dark .ring-red-100 { border-color: rgba(237, 28, 36, 0.35); --tw-ring-color: rgba(237, 28, 36, 0.35); }
+  html.dark .border-amber-200, html.dark .border-yellow-300, html.dark .ring-yellow-200, html.dark .border-oil-400\/50 { border-color: rgba(253, 196, 0, 0.35); --tw-ring-color: rgba(253, 196, 0, 0.35); }
+  html.dark .border-navy-100, html.dark .border-navy-200, html.dark .ring-navy-100, html.dark .ring-navy-200 { border-color: rgba(79, 143, 224, 0.35); --tw-ring-color: rgba(79, 143, 224, 0.3); }
+  /* white plates for pictures and the logo stay light */
+  html.dark .to-slate-100 { --tw-gradient-to: #e6ecf5; }
+  html.dark .brand-logo { background: #fff; padding: 4px 10px; border-radius: 10px; }
+  /* charts */
+  html.dark .recharts-tooltip-wrapper .recharts-default-tooltip { background-color: var(--card) !important; border-color: var(--chart-grid) !important; }
+  html.dark .recharts-default-tooltip .recharts-tooltip-label, html.dark .recharts-default-tooltip .recharts-tooltip-item { color: var(--chart-label) !important; }
+  html.dark .recharts-pie .recharts-sector { stroke: var(--card); }
 }

@@ -3,7 +3,7 @@
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 // Brand-led palette: navy, red, oil yellow, then supporting tones.
-export const CHART_COLORS = ["#0e3d6e", "#ed1c24", "#fdc400", "#4f85b9", "#16a34a", "#8b5cf6", "#94a3b8"];
+export const CHART_COLORS = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)", "var(--c6)", "var(--c7)"];
 
 type Money = { symbol: string; decimals: number };
 const fmt = (n: number, m: Money) => `${m.symbol} ${new Intl.NumberFormat("en-US", { maximumFractionDigits: m.decimals }).format(n)}`;
@@ -20,20 +20,20 @@ export function SalesTrendChart({ data, money }: { data: { label: string; sales:
       <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#0e3d6e" stopOpacity={0.28} />
-            <stop offset="100%" stopColor="#0e3d6e" stopOpacity={0.02} />
+            <stop offset="0%" stopColor="var(--c1)" stopOpacity={0.28} />
+            <stop offset="100%" stopColor="var(--c1)" stopOpacity={0.02} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 4" stroke="#e2e7ee" vertical={false} />
-        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#64748b" }} interval="preserveStartEnd" />
-        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#64748b" }} tickFormatter={short} width={44} />
+        <CartesianGrid strokeDasharray="3 4" stroke="var(--chart-grid)" vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--chart-text)" }} interval="preserveStartEnd" />
+        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--chart-text)" }} tickFormatter={short} width={44} />
         <Tooltip
-          cursor={{ stroke: "#0e3d6e", strokeDasharray: 4 }}
+          cursor={{ stroke: "var(--c1)", strokeDasharray: 4 }}
           formatter={(v) => [fmt(Number(v), money), "Sales"]}
           labelFormatter={(l, p) => `${l} · ${p?.[0]?.payload?.count ?? 0} sale(s)`}
-          contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee", boxShadow: "0 6px 20px rgba(15,27,45,.08)" }}
+          contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)", boxShadow: "0 6px 20px rgba(15,27,45,.12)" }}
         />
-        <Area type="monotone" dataKey="sales" stroke="#0e3d6e" strokeWidth={2.5} fill="url(#trendFill)" activeDot={{ r: 5, fill: "#fdc400", stroke: "#0e3d6e", strokeWidth: 2 }} />
+        <Area type="monotone" dataKey="sales" stroke="var(--c1)" strokeWidth={2.5} fill="url(#trendFill)" activeDot={{ r: 5, fill: "#fdc400", stroke: "var(--c1)", strokeWidth: 2 }} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -50,7 +50,7 @@ export function DonutChart({ data, money, centre, colors = CHART_COLORS, centreL
               <Cell key={i} fill={colors[i % colors.length]} />
             ))}
           </Pie>
-          <Tooltip formatter={(v) => fmt(Number(v), money)} contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee" }} />
+          <Tooltip formatter={(v) => fmt(Number(v), money)} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
@@ -66,13 +66,13 @@ export function TopProductsChart({ data, money, empty = "No product sales in thi
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} layout="vertical" margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 4" stroke="#e2e7ee" horizontal={false} />
-        <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#64748b" }} tickFormatter={short} />
-        <YAxis type="category" dataKey="name" width={112} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#334155" }} tickFormatter={(v: string) => (v.length > 17 ? `${v.slice(0, 16)}…` : v)} />
-        <Tooltip cursor={{ fill: "#f1f5f9" }} formatter={(v) => [fmt(Number(v), money), label]} contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee" }} />
+        <CartesianGrid strokeDasharray="3 4" stroke="var(--chart-grid)" horizontal={false} />
+        <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--chart-text)" }} tickFormatter={short} />
+        <YAxis type="category" dataKey="name" width={112} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "var(--chart-label)" }} tickFormatter={(v: string) => (v.length > 17 ? `${v.slice(0, 16)}…` : v)} />
+        <Tooltip cursor={{ fill: "var(--color-slate-100)" }} formatter={(v) => [fmt(Number(v), money), label]} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
         <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={16}>
           {data.map((_, i) => (
-            <Cell key={i} fill={i === 0 ? "#0e3d6e" : "#4f85b9"} />
+            <Cell key={i} fill={i === 0 ? "var(--c1)" : "var(--c4)"} />
           ))}
         </Bar>
       </BarChart>
@@ -86,13 +86,13 @@ export function MoneyBarsChart({ data, money }: { data: { label: string; cash: n
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 4" stroke="#e2e7ee" vertical={false} />
-        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#64748b" }} interval="preserveStartEnd" />
-        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#64748b" }} tickFormatter={short} width={40} />
-        <Tooltip cursor={{ fill: "#f1f5f9" }} formatter={(v, name) => [fmt(Number(v), money), String(name)]} contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee" }} />
-        <Bar dataKey="cash" name="Cash" stackId="m" fill="#0e3d6e" />
-        <Bar dataKey="mobile" name="Mobile money" stackId="m" fill="#fdc400" />
-        <Bar dataKey="bank" name="Bank" stackId="m" fill="#84add4" radius={[4, 4, 0, 0]} />
+        <CartesianGrid strokeDasharray="3 4" stroke="var(--chart-grid)" vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} interval="preserveStartEnd" />
+        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} tickFormatter={short} width={40} />
+        <Tooltip cursor={{ fill: "var(--color-slate-100)" }} formatter={(v, name) => [fmt(Number(v), money), String(name)]} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
+        <Bar dataKey="cash" name="Cash" stackId="m" fill="var(--c1)" />
+        <Bar dataKey="mobile" name="Mobile money" stackId="m" fill="var(--c3)" />
+        <Bar dataKey="bank" name="Bank" stackId="m" fill="var(--c4)" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -105,15 +105,58 @@ export function ColumnsChart({ data, money, label = "Sales" }: { data: { name: s
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 4" stroke="#e2e7ee" vertical={false} />
-        <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#64748b" }} />
-        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#64748b" }} tickFormatter={short} width={40} />
-        <Tooltip cursor={{ fill: "#f1f5f9" }} formatter={(v) => [fmt(Number(v), money), label]} contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee" }} />
+        <CartesianGrid strokeDasharray="3 4" stroke="var(--chart-grid)" vertical={false} />
+        <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} />
+        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} tickFormatter={short} width={40} />
+        <Tooltip cursor={{ fill: "var(--color-slate-100)" }} formatter={(v) => [fmt(Number(v), money), label]} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
         <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={36}>
           {data.map((d, i) => (
-            <Cell key={i} fill={d.value === max ? "#fdc400" : "#4f85b9"} />
+            <Cell key={i} fill={d.value === max ? "var(--c3)" : "var(--c4)"} />
           ))}
         </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Twelve months of sales, costs and what was left, as smooth areas. */
+export function YearChart({ data, money, showCosts = true }: { data: { label: string; sales: number; costs: number; left: number }[]; money: Money; showCosts?: boolean }) {
+  if (data.every((d) => d.sales === 0 && d.costs === 0)) return <Empty text="Nothing recorded in the last twelve months yet" />;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <defs>
+          {[["ySales", "var(--c1)"], ["yCosts", "var(--c2)"], ["yLeft", "var(--c5)"]].map(([id, col]) => (
+            <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={col} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={col} stopOpacity={0.02} />
+            </linearGradient>
+          ))}
+        </defs>
+        <CartesianGrid strokeDasharray="3 4" stroke="var(--chart-grid)" vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} interval="preserveStartEnd" />
+        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} tickFormatter={short} width={44} />
+        <Tooltip formatter={(v, name) => [fmt(Number(v), money), String(name)]} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
+        <Area type="monotone" dataKey="sales" name="Sales" stroke="var(--c1)" strokeWidth={2.4} fill="url(#ySales)" />
+        {showCosts && <Area type="monotone" dataKey="costs" name="Costs" stroke="var(--c2)" strokeWidth={2} fill="url(#yCosts)" />}
+        {showCosts && <Area type="monotone" dataKey="left" name="What was left" stroke="var(--c5)" strokeWidth={2} fill="url(#yLeft)" />}
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Money coming in against money going out, month by month. */
+export function InOutChart({ data, money }: { data: { label: string; in: number; out: number }[]; money: Money }) {
+  if (data.every((d) => d.in === 0 && d.out === 0)) return <Empty text="No money has moved yet" />;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barGap={2}>
+        <CartesianGrid strokeDasharray="3 4" stroke="var(--chart-grid)" vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--chart-text)" }} interval="preserveStartEnd" minTickGap={14} />
+        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} tickFormatter={short} width={40} />
+        <Tooltip cursor={{ fill: "var(--color-slate-100)" }} formatter={(v, name) => [fmt(Number(v), money), String(name)]} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
+        <Bar dataKey="in" name="Money in" fill="var(--c5)" radius={[3, 3, 0, 0]} maxBarSize={14} />
+        <Bar dataKey="out" name="Money out" fill="var(--c2)" radius={[3, 3, 0, 0]} maxBarSize={14} />
       </BarChart>
     </ResponsiveContainer>
   );

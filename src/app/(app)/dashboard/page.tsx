@@ -27,7 +27,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const user = await requireUser();
   const sp = await searchParams;
   // The people who run the business see the management dashboard; shop staff get the shop dashboard.
-  return can(user, "dashboard.view") ? <OwnerHome user={user} range={sp.range} /> : <ShopDashboard user={user} />;
+  return can(user, "dashboard.view") ? <OwnerHome user={user} /> : <ShopDashboard user={user} />;
 }
 
 // ───────────────────────── Shop attendant ─────────────────────────
