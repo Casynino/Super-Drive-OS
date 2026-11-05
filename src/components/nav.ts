@@ -47,7 +47,7 @@ export const NAV: NavGroup[] = [
       { label: "Sales / POS", href: "/pos", icon: ShoppingCart, permissions: ["sales.pos"], ready: true },
       { label: "Sales History", href: "/sales", icon: Receipt, permissions: ["sales.view_own", "sales.view_all"], ready: true },
       { label: "Customers", href: "/customers", icon: Users, permissions: ["customers.view"], ready: true },
-      { label: "Credit Management", href: "/credit", icon: HandCoins, permissions: ["credit.view"], ready: false },
+      { label: "Credit Management", href: "/credit", icon: HandCoins, permissions: ["credit.view"], ready: true },
     ],
   },
   {
@@ -64,7 +64,7 @@ export const NAV: NavGroup[] = [
   {
     label: "Finance",
     items: [
-      { label: "Payments", href: "/payments", icon: Wallet, permissions: ["payments.view", "payments.record"], ready: false },
+      { label: "Payments", href: "/payments", icon: Wallet, permissions: ["payments.view"], ready: true },
       { label: "Expenses", href: "/expenses", icon: ReceiptText, permissions: ["expenses.view"], ready: false },
       { label: "Supplier Accounts", href: "/suppliers", icon: Truck, permissions: ["suppliers.view", "suppliers.manage"], ready: true },
       { label: "Financial Overview", href: "/finance", icon: Landmark, permissions: ["finance.view"], ready: false },

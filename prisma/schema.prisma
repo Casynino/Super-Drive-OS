@@ -86,6 +86,7 @@ model User {
   creditApprovals    Sale[]            @relation("SaleCreditApprover")
   paymentsReceived   Payment[]
   customersCreated   Customer[]
+  creditApplications CreditApplication[]
 
   @@index([roleId])
 }
@@ -493,6 +494,7 @@ model Customer {
   updatedAt        DateTime     @updatedAt
   sales            Sale[]
   payments         Payment[]
+  creditApplications CreditApplication[]
 
   @@index([name])
   @@index([phone])
@@ -569,6 +571,7 @@ model Payment {
   receivedById String
   receivedBy   User          @relation(fields: [receivedById], references: [id])
   receivedAt   DateTime      @default(now())
+  submissionKey String?      @unique // set on debt collections: blocks duplicate form submissions
   allocations  PaymentAllocation[]
 
   @@index([receivedAt])
@@ -576,14 +579,36 @@ model Payment {
   @@index([method, receivedAt])
 }
 
+// One slice of a payment applied to one invoice. A payment can be spread over several invoices, and the
+// part of a payment that is not allocated is the customer's advance credit.
+// creditApplicationId is set when the allocation uses previously unallocated credit rather than new cash.
 model PaymentAllocation {
-  id        String  @id @default(cuid())
-  paymentId String
-  payment   Payment @relation(fields: [paymentId], references: [id])
-  saleId    String
-  sale      Sale    @relation(fields: [saleId], references: [id])
-  amount    Decimal @db.Decimal(14, 2)
+  id                  String             @id @default(cuid())
+  paymentId           String
+  payment             Payment            @relation(fields: [paymentId], references: [id])
+  saleId              String
+  sale                Sale               @relation(fields: [saleId], references: [id])
+  amount              Decimal            @db.Decimal(14, 2)
+  creditApplicationId String?
+  creditApplication   CreditApplication? @relation(fields: [creditApplicationId], references: [id], onDelete: Restrict)
 
-  @@unique([paymentId, saleId])
+  @@index([paymentId])
   @@index([saleId])
+  @@index([creditApplicationId])
+}
+
+// Using a customer's advance credit to pay invoices. No new money arrives, so it is not a Payment.
+model CreditApplication {
+  id            String              @id @default(cuid())
+  customerId    String
+  customer      Customer            @relation(fields: [customerId], references: [id])
+  amount        Decimal             @db.Decimal(14, 2)
+  notes         String?
+  submissionKey String              @unique
+  createdById   String
+  createdBy     User                @relation(fields: [createdById], references: [id])
+  createdAt     DateTime            @default(now())
+  allocations   PaymentAllocation[]
+
+  @@index([customerId])
 }
