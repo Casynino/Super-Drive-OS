@@ -16,12 +16,14 @@ type Props = {
   /** server errors keyed "line.<index>" */
   errors?: Record<string, string>;
   currencySymbol?: string;
+  /** replaces the "Total cost" caption of the extra box (e.g. a price field on a reseller report) */
+  costLabel?: string;
   disabled?: boolean;
 };
 
 const trim = (n: number) => String(Number(n.toFixed(3)));
 
-export default function StockLinesEditor({ products, lines, onChange, showCost, quantityLabel = "Quantity", onHand, errors = {}, currencySymbol = "", disabled }: Props) {
+export default function StockLinesEditor({ products, lines, onChange, showCost, quantityLabel = "Quantity", onHand, errors = {}, currencySymbol = "", costLabel, disabled }: Props) {
   const byId = new Map(products.map((p) => [p.id, p]));
 
   const add = (p: PickerProduct) => {
@@ -95,7 +97,7 @@ export default function StockLinesEditor({ products, lines, onChange, showCost, 
                   {showCost && (
                     <div>
                       <label className="label" htmlFor={`cost-${i}`}>
-                        Total cost {currencySymbol && `(${currencySymbol})`}
+                        {costLabel ?? `Total cost${currencySymbol ? ` (${currencySymbol})` : ""}`}
                       </label>
                       <input id={`cost-${i}`} className="input" inputMode="decimal" value={l.totalCost} disabled={disabled} onChange={(e) => update(i, { totalCost: e.target.value })} placeholder="0" />
                     </div>

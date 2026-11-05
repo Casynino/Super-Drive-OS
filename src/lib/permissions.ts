@@ -60,6 +60,11 @@ export const PERMISSIONS = [
   { key: "suppliers.manage", module: "Suppliers", label: "Add and edit suppliers" },
   { key: "suppliers.pay", module: "Suppliers", label: "Record supplier payments" },
 
+  // Resellers / consignment
+  { key: "resellers.view", module: "Resellers", label: "View resellers and their stock accounts" },
+  { key: "resellers.manage", module: "Resellers", label: "Register, edit and deactivate resellers" },
+  { key: "resellers.operate", module: "Resellers", label: "Issue stock to resellers, record what they sold and what they return" },
+
   // Returns
   { key: "returns.create", module: "Returns", label: "Record returns and exchanges" },
   { key: "returns.approve", module: "Returns", label: "Approve returns and refunds" },
@@ -111,6 +116,7 @@ export const SHOP_FLOOR_PERMISSIONS: ReadonlySet<string> = new Set<PermissionKey
   "returns.create",
   "closing.submit",
   "deposits.record",
+  "resellers.operate",
 ]);
 
 export const PERMISSION_KEYS: readonly string[] = PERMISSIONS.map((p) => p.key);
@@ -162,6 +168,9 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "closing.submit",
       "closing.approve",
       "deposits.record",
+      "resellers.view",
+      "resellers.manage",
+      "resellers.operate",
       "reports.view",
       "employees.view",
     ],
@@ -187,6 +196,8 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "expenses.create",
       "closing.submit",
       "deposits.record",
+      "resellers.view",
+      "resellers.operate",
     ],
   },
   {
@@ -228,6 +239,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "expenses.view",
       "expenses.create",
       "cash.view",
+      "resellers.view",
       "finance.view",
       "finance.reconcile",
       "reports.view",

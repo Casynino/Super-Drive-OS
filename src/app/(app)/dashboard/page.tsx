@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarCheck, Truck, Banknote, Boxes, HandCoins, Landmark, Package, PackageCheck, Receipt, ReceiptText, Scale, ShoppingCart, Smartphone, TrendingUp, Undo2, Users, Wallet } from "lucide-react";
+import { AlertTriangle, CalendarCheck, Handshake, Truck, Banknote, Boxes, HandCoins, Landmark, Package, PackageCheck, Receipt, ReceiptText, Scale, ShoppingCart, Smartphone, TrendingUp, Undo2, Users, Wallet } from "lucide-react";
 import StatTile from "@/components/dashboard/StatTile";
 import { DonutChart, SalesTrendChart, TopProductsChart } from "@/components/dashboard/Charts";
 import { SaleStatusBadge } from "../sales/StatusBadge";
@@ -37,7 +37,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 async function OwnerDashboard({ user, range: rangeKey }: { user: SessionUser; range?: string }) {
   const range = resolveRange(rangeKey);
   const locationId = await defaultLocationId(db);
-  const [currency, data, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, closingsToReview, lastClosing, spent] = await Promise.all([
+  const [currency, data, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, closingsToReview, lastClosing, spent, resellerOverdue] = await Promise.all([
     getCurrency(),
     getOwnerDashboard(db, range, { financials: can(user, "dashboard.financials"), valuation: can(user, "inventory.valuation") }),
     getStockAlerts(db),
@@ -48,6 +48,9 @@ async function OwnerDashboard({ user, range: rangeKey }: { user: SessionUser; ra
     can(user, "closing.approve") ? db.dailyClosing.count({ where: { status: "NEEDS_REVIEW" } }) : 0,
     can(user, "closing.approve") || can(user, "cash.view") ? db.dailyClosing.findFirst({ where: { locationId }, orderBy: { businessDate: "desc" }, select: { id: true, businessDate: true, difference: true, status: true } }) : null,
     can(user, "expenses.view") ? db.expense.aggregate({ where: { status: "APPROVED", expenseDate: { gte: dayToDate(range.fromYmd), lte: dayToDate(range.toYmd) } }, _sum: { amount: true } }) : null,
+    can(user, "resellers.view")
+      ? db.sale.findMany({ where: { channel: "RESELLER", status: "COMPLETED", dueDate: { lt: dayToDate(businessDay()) } }, select: { total: true, returnedTotal: true, amountPaid: true, refundedTotal: true } }).then((rows) => rows.reduce((s, x) => s + Math.max(0, owedOf(x).toNumber()), 0))
+      : 0,
   ]);
   const money = { symbol: currency.symbol, decimals: currency.decimals };
   const m = (v: number) => formatMoney(v, currency);
@@ -189,10 +192,11 @@ async function OwnerDashboard({ user, range: rangeKey }: { user: SessionUser; ra
             <Attention href="/approvals" show={can(user, "returns.approve")} count={data.pendingApprovals} icon={Undo2} text="return / cancel requests to approve" />
             <Attention href="/approvals" show={can(user, "expenses.approve")} count={pendingExpenses} icon={ReceiptText} text="expenses waiting for your approval" />
             <Attention href="/approvals" show={can(user, "closing.approve")} count={closingsToReview} icon={CalendarCheck} text="daily closings where the cash did not match" />
+            <Attention href="/resellers" show={can(user, "resellers.view")} count={resellerOverdue > 0 ? 1 : 0} icon={Handshake} text={`${m(resellerOverdue)} overdue from resellers`} hideCount />
             <Attention href="/credit" show count={k.debt.overdue > 0 ? 1 : 0} icon={AlertTriangle} text={`${m(k.debt.overdue)} owed past the due date`} hideCount />
             <Attention href="/inventory?status=out" show count={alerts.out.length} icon={Package} text="products out of stock" />
             <Attention href="/inventory?status=low" show count={alerts.low.length} icon={Scale} text="products running low" />
-            {data.pendingApprovals + pendingExpenses + closingsToReview + alerts.out.length + alerts.low.length + shipmentIssues === 0 && k.debt.overdue === 0 && <li className="rounded-lg bg-emerald-50 px-3 py-2.5 text-emerald-800">Nothing needs attention right now.</li>}
+            {data.pendingApprovals + pendingExpenses + closingsToReview + (resellerOverdue > 0 ? 1 : 0) + alerts.out.length + alerts.low.length + shipmentIssues === 0 && k.debt.overdue === 0 && <li className="rounded-lg bg-emerald-50 px-3 py-2.5 text-emerald-800">Nothing needs attention right now.</li>}
           </ul>
         </section>
       </div>
@@ -330,6 +334,7 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
     can(user, "sales.pos") && { href: "/pos", icon: ShoppingCart, title: "New sale", text: "Sell to a customer", primary: true },
     can(user, "payments.record") && { href: "/customers", icon: Banknote, title: "Take a payment", text: "A customer pays a debt" },
     can(user, "shipments.receive") && { href: "/shipments", icon: PackageCheck, title: "Incoming stock", text: incoming > 0 ? `${incoming} ${incoming === 1 ? "delivery" : "deliveries"} to count` : "Count a delivery" },
+    can(user, "resellers.operate") && { href: "/resellers", icon: Handshake, title: "Resellers", text: "Issue stock, record what they sold" },
     can(user, "returns.create") && { href: "/sales", icon: Undo2, title: "Return an item", text: "Open the sale first" },
     can(user, "expenses.create") && { href: "/expenses", icon: ReceiptText, title: "Record an expense", text: pendingExpensesMine > 0 ? `${pendingExpensesMine} waiting for the owner` : "Money spent for the shop" },
     can(user, "closing.submit") && { href: "/closing", icon: CalendarCheck, title: closedToday ? "Today is closed" : "Close the day", text: closedToday ? "See today's closing" : "Count the cash and finish" },

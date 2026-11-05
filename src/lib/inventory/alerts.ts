@@ -9,7 +9,7 @@ export type StockAlert = { id: string; name: string; qty: string; min: string; s
 export async function getStockAlerts(db: Pick<Db, "product" | "stockBalance">) {
   const [products, balances] = await Promise.all([
     db.product.findMany({ where: { status: "ACTIVE" }, select: { id: true, name: true, minStock: true, baseUnit: { select: { symbol: true } }, image: { select: { updatedAt: true } } }, orderBy: { name: "asc" } }),
-    db.stockBalance.groupBy({ by: ["productId"], _sum: { quantity: true } }),
+    db.stockBalance.groupBy({ by: ["productId"], where: { location: { type: { not: "RESELLER" } } }, _sum: { quantity: true } }), // stock with resellers is not on the shelf
   ]);
   const qty = new Map(balances.map((b) => [b.productId, b._sum.quantity ?? new D(0)]));
   const out: StockAlert[] = [];

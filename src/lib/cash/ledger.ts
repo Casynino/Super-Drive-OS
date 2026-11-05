@@ -45,7 +45,7 @@ export const TX_LABEL: Record<CashTxType, string> = {
 };
 
 export async function defaultLocationId(tx: Pick<Tx, "location">) {
-  const l = (await tx.location.findFirst({ where: { isDefault: true }, select: { id: true } })) ?? (await tx.location.findFirst({ where: { status: "ACTIVE" }, orderBy: { createdAt: "asc" }, select: { id: true } }));
+  const l = (await tx.location.findFirst({ where: { isDefault: true }, select: { id: true } })) ?? (await tx.location.findFirst({ where: { status: "ACTIVE", type: { not: "RESELLER" } }, orderBy: { createdAt: "asc" }, select: { id: true } }));
   if (!l) throw new CashError("No stock location is set up.");
   return l.id;
 }

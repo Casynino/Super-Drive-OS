@@ -27,22 +27,26 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const q = sp.q?.trim().toLowerCase() ?? "";
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
 
-  const [products, balances, locations, categories] = await Promise.all([
+  const [products, balances, locations, categories, custody] = await Promise.all([
     db.product.findMany({
       where: { status: "ACTIVE" },
       orderBy: { name: "asc" },
       include: { category: { select: { name: true } }, baseUnit: { select: { symbol: true } }, units: { include: { unit: { select: { symbol: true } } } } },
     }),
-    db.stockBalance.groupBy({ by: ["productId"], where: locationId ? { locationId } : {}, _sum: { quantity: true } }),
+    // Without a location chosen this is the shop shelf only; stock held by resellers is shown separately.
+    db.stockBalance.groupBy({ by: ["productId"], where: locationId ? { locationId } : { location: { type: { not: "RESELLER" } } }, _sum: { quantity: true } }),
     db.location.findMany({ where: { status: "ACTIVE" }, orderBy: [{ isDefault: "desc" }, { name: "asc" }], select: { id: true, name: true } }),
     db.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    locationId ? Promise.resolve([]) : db.stockBalance.groupBy({ by: ["productId"], where: { location: { type: "RESELLER" } }, _sum: { quantity: true } }),
   ]);
 
   const qtyOf = new Map(balances.map((b) => [b.productId, b._sum.quantity ?? new D(0)]));
+  const withResellers = new Map(custody.map((b) => [b.productId, b._sum.quantity ?? new D(0)]));
   const rows = products.map((p) => {
     const qty = qtyOf.get(p.id) ?? new D(0);
+    const away = withResellers.get(p.id) ?? new D(0);
     const status = qty.lte(0) ? "out" : p.minStock.gt(0) && qty.lte(p.minStock) ? "low" : "ok";
-    return { p, qty, status, value: qty.mul(p.avgCost) };
+    return { p, qty, away, status, value: qty.plus(away).mul(p.avgCost) }; // what we own: the shelf plus what resellers hold
   });
 
   // Headline figures cover the whole catalogue at the chosen location (not the search filter).
@@ -221,14 +225,15 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                 <tr>
                   <th>Product</th>
                   <th className="hidden sm:table-cell">Category</th>
-                  <th className="text-right">On hand</th>
+                  <th className="text-right">On the shelf</th>
+                  {!locationId && <th className="hidden text-right md:table-cell">With resellers</th>}
                   <th className="hidden text-right md:table-cell">Minimum</th>
                   <th>Status</th>
                   {canValue && <th className="hidden text-right lg:table-cell">Value</th>}
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map(({ p, qty, status, value }) => {
+                {pageRows.map(({ p, qty, away, status, value }) => {
                   const pack = packBreakdown(qty, p.baseUnit.symbol, p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
                   return (
                     <tr key={p.id}>
@@ -243,6 +248,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                         </span>
                         {pack && <span className="block text-xs text-slate-500">{pack}</span>}
                       </td>
+                      {!locationId && <td className="hidden text-right text-slate-600 md:table-cell">{away.gt(0) ? `${away.toString()} ${p.baseUnit.symbol}` : "—"}</td>}
                       <td className="hidden text-right text-slate-600 md:table-cell">{p.minStock.gt(0) ? `${p.minStock.toString()} ${p.baseUnit.symbol}` : "—"}</td>
                       <td>{status === "out" ? <span className="badge-red">Out of stock</span> : status === "low" ? <span className="badge-yellow">Low</span> : <span className="badge-green">In stock</span>}</td>
                       {canValue && <td className="hidden text-right lg:table-cell">{formatMoney(value, currency)}</td>}

@@ -53,7 +53,7 @@ export default async function SettingsPage() {
     db.category.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { products: true } } } }),
     db.brand.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { products: true } } } }),
     db.unit.findMany({ orderBy: { name: "asc" } }),
-    db.location.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
+    db.location.findMany({ where: { type: { not: "RESELLER" } }, orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
     getBusinessProfile(),
     getCurrency(),
     db.product.groupBy({ by: ["baseUnitId"], where: { status: "ACTIVE" }, _count: { _all: true } }),

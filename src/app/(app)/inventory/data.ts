@@ -22,7 +22,7 @@ export async function getPickerProducts(): Promise<PickerProduct[]> {
 }
 
 export async function getActiveLocations(): Promise<LocationOption[]> {
-  const rows = await db.location.findMany({ where: { status: "ACTIVE" }, orderBy: [{ isDefault: "desc" }, { name: "asc" }], select: { id: true, name: true, isDefault: true } });
+  const rows = await db.location.findMany({ where: { status: "ACTIVE", type: { not: "RESELLER" } }, orderBy: [{ isDefault: "desc" }, { name: "asc" }], select: { id: true, name: true, isDefault: true } });
   return rows;
 }
 

@@ -24,6 +24,7 @@ enum LocationType {
   WAREHOUSE
   SHOP
   OTHER
+  RESELLER // stock held by a reseller (custody): still ours, but not available on the shop shelf
 }
 
 // ───────────── Access control ─────────────
@@ -103,6 +104,9 @@ model User {
   closingsSubmitted   DailyClosing[]      @relation("ClosingSubmitter")
   closingsReviewed    DailyClosing[]      @relation("ClosingReviewer")
   attachments         Attachment[]
+  resellersCreated    Reseller[]
+  resellerIssues      ResellerIssue[]
+  resellerReturns     ResellerReturn[]
 
   @@index([roleId])
 }
@@ -134,18 +138,23 @@ model Location {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  balances     StockBalance[]
-  movements    StockMovement[]
-  receipts     StockReceipt[]
-  transfersOut StockTransfer[]   @relation("TransferFrom")
-  transfersIn  StockTransfer[]   @relation("TransferTo")
-  adjustments  StockAdjustment[]
-  sales        Sale[]
-  shipments    Shipment[]
-  cashAccounts CashAccount[]
-  expenses     Expense[]
-  bankDeposits BankDeposit[]
-  closings     DailyClosing[]
+  balances            StockBalance[]
+  movements           StockMovement[]
+  receipts            StockReceipt[]
+  transfersOut        StockTransfer[]   @relation("TransferFrom")
+  transfersIn         StockTransfer[]   @relation("TransferTo")
+  adjustments         StockAdjustment[]
+  sales               Sale[]
+  shipments           Shipment[]
+  cashAccounts        CashAccount[]
+  expenses            Expense[]
+  bankDeposits        BankDeposit[]
+  closings            DailyClosing[]
+  reseller            Reseller?
+  resellerIssuesFrom  ResellerIssue[]   @relation("IssueFrom")
+  resellerIssuesTo    ResellerIssue[]   @relation("IssueTo")
+  resellerReturnsFrom ResellerReturn[]  @relation("ReturnFrom")
+  resellerReturnsTo   ResellerReturn[]  @relation("ReturnTo")
 }
 
 model Setting {
@@ -177,58 +186,62 @@ model Brand {
 }
 
 model Unit {
-  id             String                  @id @default(cuid())
-  name           String                  @unique // Litre
-  symbol         String                  @unique // L
-  allowsDecimal  Boolean                 @default(false) // litres: true, pieces/cartons: false
-  status         RecordStatus            @default(ACTIVE)
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  baseProducts   Product[]
-  productUnits   ProductUnit[]
-  receiptItems   StockReceiptItem[]
-  transferItems  StockTransferItem[]
-  adjustItems    StockAdjustmentItem[]
-  saleItems      SaleItem[]
-  shipmentItems  ShipmentItem[]
-  receivingItems ShipmentReceivingItem[]
+  id                  String                  @id @default(cuid())
+  name                String                  @unique // Litre
+  symbol              String                  @unique // L
+  allowsDecimal       Boolean                 @default(false) // litres: true, pieces/cartons: false
+  status              RecordStatus            @default(ACTIVE)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  baseProducts        Product[]
+  productUnits        ProductUnit[]
+  receiptItems        StockReceiptItem[]
+  transferItems       StockTransferItem[]
+  adjustItems         StockAdjustmentItem[]
+  saleItems           SaleItem[]
+  shipmentItems       ShipmentItem[]
+  resellerIssueItems  ResellerIssueItem[]
+  resellerReturnItems ResellerReturnItem[]
+  receivingItems      ShipmentReceivingItem[]
 }
 
 model Product {
-  id             String                  @id @default(cuid())
-  sku            String                  @unique // stored uppercase
-  barcode        String?                 @unique
-  name           String
-  description    String?
-  categoryId     String
-  category       Category                @relation(fields: [categoryId], references: [id])
-  brandId        String?
-  brand          Brand?                  @relation(fields: [brandId], references: [id])
-  packagingType  String?
-  baseUnitId     String
-  baseUnit       Unit                    @relation(fields: [baseUnitId], references: [id])
-  purchasePrice  Decimal                 @db.Decimal(14, 2) // per base unit (default/last cost)
-  sellingPrice   Decimal                 @db.Decimal(14, 2) // per base unit
-  wholesalePrice Decimal?                @db.Decimal(14, 2) // per base unit
-  minStock       Decimal                 @default(0) @db.Decimal(14, 3) // in base units
-  avgCost        Decimal                 @default(0) @db.Decimal(16, 4) // weighted-average cost per base unit, maintained by stock receipts
-  imageUrl       String?
-  status         RecordStatus            @default(ACTIVE)
-  createdById    String?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  units          ProductUnit[]
-  balances       StockBalance[]
-  movements      StockMovement[]
-  receiptItems   StockReceiptItem[]
-  transferItems  StockTransferItem[]
-  adjustItems    StockAdjustmentItem[]
-  saleItems      SaleItem[]
-  image          ProductImage?
-  reversalItems  ReversalItem[]
-  shipmentItems  ShipmentItem[]
-  receivingItems ShipmentReceivingItem[]
-  priceHistory   ProductPriceHistory[]
+  id                  String                  @id @default(cuid())
+  sku                 String                  @unique // stored uppercase
+  barcode             String?                 @unique
+  name                String
+  description         String?
+  categoryId          String
+  category            Category                @relation(fields: [categoryId], references: [id])
+  brandId             String?
+  brand               Brand?                  @relation(fields: [brandId], references: [id])
+  packagingType       String?
+  baseUnitId          String
+  baseUnit            Unit                    @relation(fields: [baseUnitId], references: [id])
+  purchasePrice       Decimal                 @db.Decimal(14, 2) // per base unit (default/last cost)
+  sellingPrice        Decimal                 @db.Decimal(14, 2) // per base unit
+  wholesalePrice      Decimal?                @db.Decimal(14, 2) // per base unit
+  minStock            Decimal                 @default(0) @db.Decimal(14, 3) // in base units
+  avgCost             Decimal                 @default(0) @db.Decimal(16, 4) // weighted-average cost per base unit, maintained by stock receipts
+  imageUrl            String?
+  status              RecordStatus            @default(ACTIVE)
+  createdById         String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  units               ProductUnit[]
+  balances            StockBalance[]
+  movements           StockMovement[]
+  receiptItems        StockReceiptItem[]
+  transferItems       StockTransferItem[]
+  adjustItems         StockAdjustmentItem[]
+  saleItems           SaleItem[]
+  image               ProductImage?
+  reversalItems       ReversalItem[]
+  shipmentItems       ShipmentItem[]
+  resellerIssueItems  ResellerIssueItem[]
+  resellerReturnItems ResellerReturnItem[]
+  receivingItems      ShipmentReceivingItem[]
+  priceHistory        ProductPriceHistory[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -524,6 +537,7 @@ model Customer {
   updatedAt          DateTime            @updatedAt
   sales              Sale[]
   payments           Payment[]
+  reseller           Reseller?
   creditApplications CreditApplication[]
 
   @@index([name])
@@ -556,6 +570,9 @@ model Sale {
   creditApprovedBy      User?               @relation("SaleCreditApprover", fields: [creditApprovedById], references: [id])
   creditExceptionReason String?
   discountReason        String? // required whenever a discount was given
+  channel               SaleChannel         @default(SHOP)
+  resellerId            String?
+  reseller              Reseller?           @relation(fields: [resellerId], references: [id])
   submissionKey         String              @unique
   createdAt             DateTime            @default(now())
   items                 SaleItem[]
@@ -567,6 +584,7 @@ model Sale {
   @@index([salespersonId, createdAt])
   @@index([paymentStatus])
   @@index([locationId])
+  @@index([resellerId])
 }
 
 model SaleItem {
@@ -1050,4 +1068,113 @@ model DailyClosing {
 
   @@unique([locationId, businessDate])
   @@index([status])
+}
+
+// ───────────── Resellers / consignment ─────────────
+// A reseller takes stock to sell elsewhere. ISSUING is a custody transfer (shop -> the reseller's own RESELLER location):
+// no sale, no cash, no receivable. When the reseller REPORTS what was sold, a normal credit invoice (channel RESELLER) is
+// created against the reseller's customer account, taking the stock from custody. Money brought in is an ordinary
+// payment allocated to those invoices. Revenue is recognised once, at the sold report.
+
+enum SaleChannel {
+  SHOP
+  RESELLER
+}
+
+model Reseller {
+  id             String           @id @default(cuid())
+  name           String
+  businessName   String?
+  phone          String
+  altPhone       String?
+  address        String?
+  salesLocation  String? // where they sell
+  idInfo         String? // ID / licence number (optional)
+  notes          String?
+  settlementDays Int              @default(14) // how long after a sold report the money is due
+  status         RecordStatus     @default(ACTIVE)
+  customerId     String           @unique // the account that holds their invoices and payments
+  customer       Customer         @relation(fields: [customerId], references: [id])
+  locationId     String           @unique // where their stock is kept (custody)
+  location       Location         @relation(fields: [locationId], references: [id])
+  registeredAt   DateTime         @default(now())
+  createdById    String
+  createdBy      User             @relation(fields: [createdById], references: [id])
+  issues         ResellerIssue[]
+  returns        ResellerReturn[]
+  sales          Sale[]
+}
+
+model ResellerIssue {
+  id             String              @id @default(cuid())
+  issueNo        String              @unique
+  resellerId     String
+  reseller       Reseller            @relation(fields: [resellerId], references: [id])
+  fromLocationId String
+  fromLocation   Location            @relation("IssueFrom", fields: [fromLocationId], references: [id])
+  toLocationId   String
+  toLocation     Location            @relation("IssueTo", fields: [toLocationId], references: [id])
+  expectedValue  Decimal             @db.Decimal(14, 2) // what the stock is worth at the agreed prices
+  notes          String?
+  createdById    String
+  createdBy      User                @relation(fields: [createdById], references: [id])
+  createdAt      DateTime            @default(now())
+  submissionKey  String              @unique
+  items          ResellerIssueItem[]
+
+  @@index([resellerId, createdAt])
+}
+
+model ResellerIssueItem {
+  id            String        @id @default(cuid())
+  issueId       String
+  issue         ResellerIssue @relation(fields: [issueId], references: [id])
+  productId     String
+  product       Product       @relation(fields: [productId], references: [id])
+  enteredQty    Decimal       @db.Decimal(14, 3)
+  enteredUnitId String
+  enteredUnit   Unit          @relation(fields: [enteredUnitId], references: [id])
+  factor        Decimal       @db.Decimal(14, 4)
+  quantity      Decimal       @db.Decimal(14, 3) // base units
+  unitPrice     Decimal       @db.Decimal(14, 2) // agreed price per ENTERED unit, snapshot
+  basePrice     Decimal       @db.Decimal(14, 4) // agreed price per BASE unit (what later sold reports are charged at)
+  lineValue     Decimal       @db.Decimal(14, 2)
+
+  @@index([issueId])
+  @@index([productId])
+}
+
+model ResellerReturn {
+  id             String               @id @default(cuid())
+  returnNo       String               @unique
+  resellerId     String
+  reseller       Reseller             @relation(fields: [resellerId], references: [id])
+  fromLocationId String
+  fromLocation   Location             @relation("ReturnFrom", fields: [fromLocationId], references: [id])
+  toLocationId   String
+  toLocation     Location             @relation("ReturnTo", fields: [toLocationId], references: [id])
+  notes          String?
+  createdById    String
+  createdBy      User                 @relation(fields: [createdById], references: [id])
+  createdAt      DateTime             @default(now())
+  submissionKey  String               @unique
+  items          ResellerReturnItem[]
+
+  @@index([resellerId, createdAt])
+}
+
+model ResellerReturnItem {
+  id            String          @id @default(cuid())
+  returnId      String
+  return        ResellerReturn  @relation(fields: [returnId], references: [id])
+  productId     String
+  product       Product         @relation(fields: [productId], references: [id])
+  enteredQty    Decimal         @db.Decimal(14, 3)
+  enteredUnitId String
+  enteredUnit   Unit            @relation(fields: [enteredUnitId], references: [id])
+  factor        Decimal         @db.Decimal(14, 4)
+  quantity      Decimal         @db.Decimal(14, 3)
+  condition     ReturnCondition
+
+  @@index([returnId])
 }

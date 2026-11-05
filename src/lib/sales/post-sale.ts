@@ -50,6 +50,11 @@ export type SaleInput = {
   /** unitPrice "" means "charge the list price" */
   lines: { productId: string; unitId: string; quantity: string; unitPrice: string }[];
   creditException: { reason: string } | null;
+  /**
+   * A reseller's sold report: an invoice on the reseller's account for goods taken from their custody location, at the
+   * prices agreed when the stock was issued (per BASE unit). Credit limits do not apply: the exposure is the stock already issued.
+   */
+  reseller?: { id: string; basePrices: Map<string, Dec> };
   submissionKey: string;
   currencyDecimals: number;
   creditTermsDays: number;
@@ -68,7 +73,8 @@ export async function postSale(tx: Tx, input: SaleInput) {
   const dp = input.currencyDecimals;
 
   // 1. Payment mode sanity (cheap checks first, nothing locked yet)
-  if (input.mode !== "FULL" && !input.can.credit) throw new SaleError("You are not allowed to record credit or part-payment sales.", { payment: "Not allowed for your role." });
+  if (input.reseller && (input.mode !== "CREDIT" || !input.customerId)) throw new SaleError("A reseller's sold report is invoiced on the reseller's account.");
+  if (input.mode !== "FULL" && !input.can.credit && !input.reseller) throw new SaleError("You are not allowed to record credit or part-payment sales.", { payment: "Not allowed for your role." });
   if (input.mode !== "CREDIT" && !input.method) throw new SaleError("Choose how the customer paid.", { method: "Choose cash, mobile money or bank." });
   if (input.mode !== "FULL" && !input.customerId) throw new SaleError("Choose the customer. Credit and part-payment sales must be linked to a customer.", { customer: "Choose a customer for credit sales." });
   if (input.lines.length === 0) throw new SaleError("Add at least one product.", { lines: "Add at least one product." });
@@ -96,7 +102,17 @@ export async function postSale(tx: Tx, input: SaleInput) {
   const wholesale = isWholesaleType(customer?.type);
   const errors: Record<string, string> = {};
   const priced = resolved.lines.flatMap((l) => {
-    const list = listPrice(l, wholesale);
+    let list: Dec;
+    if (input.reseller) {
+      const agreed = input.reseller.basePrices.get(l.productId);
+      if (!agreed) {
+        errors[`line.${l.index}`] = `${l.productName} was never issued to this reseller.`;
+        return [];
+      }
+      list = money(agreed.mul(l.factor), dp);
+    } else {
+      list = listPrice(l, wholesale);
+    }
     if (list.lte(0)) {
       errors[`line.${l.index}`] = `No selling price is set for ${l.productName}.`;
       return [];
@@ -149,7 +165,7 @@ export async function postSale(tx: Tx, input: SaleInput) {
   // 5. Credit limit (customer row is locked, so two cashiers can't both slip under the limit)
   let creditApprovedById: string | null = null;
   let creditExceptionReason: string | null = null;
-  if (onCredit.gt(0)) {
+  if (onCredit.gt(0) && !input.reseller) {
     const outstanding = await customerOutstanding(tx, customer!.id);
     const limit = customer!.creditLimit;
     if (outstanding.plus(onCredit).gt(limit)) {
@@ -185,6 +201,8 @@ export async function postSale(tx: Tx, input: SaleInput) {
       discountReason: discountTotal.gt(0) ? discountReason : null,
       creditApprovedById,
       creditExceptionReason,
+      channel: input.reseller ? "RESELLER" : "SHOP",
+      resellerId: input.reseller?.id ?? null,
       submissionKey: input.submissionKey, // a duplicate submission fails here, before stock is touched
       items: {
         create: sorted.map(({ l, list, price, discount, lineTotal, costTotal }) => ({
