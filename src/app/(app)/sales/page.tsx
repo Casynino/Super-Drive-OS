@@ -9,7 +9,8 @@ import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { formatDateTime } from "@/lib/utils";
-import { PaymentStatusBadge } from "./StatusBadge";
+import { owedOf } from "@/lib/sales/owed";
+import { SaleStatusBadge } from "./StatusBadge";
 
 export const metadata = { title: "Sales history" };
 
@@ -49,12 +50,14 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       include: { customer: { select: { name: true } }, salesperson: { select: { name: true } } },
     }),
     db.sale.count({ where }),
-    db.sale.aggregate({ where, _sum: { total: true, amountPaid: true } }),
+    db.sale.aggregate({ where, _sum: { total: true, amountPaid: true, returnedTotal: true, refundedTotal: true } }),
     viewAll ? db.user.findMany({ where: { sales: { some: {} } }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : [],
   ]);
 
-  const sumTotal = totals._sum.total ?? new Prisma.Decimal(0);
-  const sumPaid = totals._sum.amountPaid ?? new Prisma.Decimal(0);
+  const zero = new Prisma.Decimal(0);
+  // after returns and refunds
+  const sumTotal = (totals._sum.total ?? zero).minus(totals._sum.returnedTotal ?? zero);
+  const sumPaid = (totals._sum.amountPaid ?? zero).minus(totals._sum.refundedTotal ?? zero);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilters = Boolean(q || sp.customer || sp.status || sp.seller || sp.from || sp.to);
   const href = (p: number) => {
@@ -137,7 +140,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
                 </thead>
                 <tbody>
                   {sales.map((s) => {
-                    const balance = s.total.minus(s.amountPaid);
+                    const balance = s.status === "CANCELLED" ? new Prisma.Decimal(0) : owedOf(s);
                     return (
                       <tr key={s.id}>
                         <td>
@@ -148,11 +151,14 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
                         <td className="whitespace-nowrap text-slate-600">{formatDateTime(s.createdAt)}</td>
                         <td className="hidden sm:table-cell">{s.customer?.name ?? <span className="text-slate-400">Walk-in</span>}</td>
                         {viewAll && <td className="hidden text-slate-600 lg:table-cell">{s.salesperson.name}</td>}
-                        <td className="text-right font-medium">{formatMoney(s.total, currency)}</td>
-                        <td className="hidden text-right md:table-cell">{formatMoney(s.amountPaid, currency)}</td>
+                        <td className={`text-right font-medium ${s.status === "CANCELLED" ? "text-slate-400 line-through" : ""}`}>
+                          {formatMoney(s.total, currency)}
+                          {s.returnedTotal.gt(0) && s.status !== "CANCELLED" && <span className="block text-[11px] font-normal text-slate-500 no-underline">after returns {formatMoney(s.total.minus(s.returnedTotal), currency)}</span>}
+                        </td>
+                        <td className="hidden text-right md:table-cell">{formatMoney(s.amountPaid.minus(s.refundedTotal), currency)}</td>
                         <td className={`hidden text-right md:table-cell ${balance.gt(0) ? "font-medium text-brand-red-dark" : "text-slate-400"}`}>{balance.gt(0) ? formatMoney(balance, currency) : "—"}</td>
                         <td>
-                          <PaymentStatusBadge status={s.paymentStatus} />
+                          <SaleStatusBadge status={s.status} paymentStatus={s.paymentStatus} />
                         </td>
                       </tr>
                     );
@@ -165,7 +171,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
                 {total} sale{total === 1 ? "" : "s"} in this view
               </span>
               <span className="font-medium text-slate-900">
-                Total {formatMoney(sumTotal, currency)} · Paid {formatMoney(sumPaid, currency)} · Unpaid {formatMoney(sumTotal.minus(sumPaid), currency)}
+                Sales after returns {formatMoney(sumTotal, currency)} · Paid {formatMoney(sumPaid, currency)} · Unpaid {formatMoney(sumTotal.minus(sumPaid), currency)}
               </span>
             </div>
           </>

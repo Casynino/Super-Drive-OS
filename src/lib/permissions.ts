@@ -83,6 +83,26 @@ export const PERMISSIONS = [
 
 export type PermissionKey = (typeof PERMISSIONS)[number]["key"];
 
+/**
+ * SEPARATION OF DUTIES. These are the shop's day-to-day jobs: selling, taking payments, receiving stock,
+ * recording expenses, requesting returns, closing the day. They belong to the Shop Attendant (and to a Manager
+ * if the owner chooses). The business owner does NOT get them automatically, even as Super Admin: his job is to
+ * buy stock, set prices, watch the numbers, approve and manage people. A Super Admin only holds one of these
+ * if it is explicitly granted to his role.
+ */
+export const SHOP_FLOOR_PERMISSIONS: ReadonlySet<string> = new Set<PermissionKey>([
+  "sales.pos",
+  "sales.discount",
+  "sales.credit",
+  "payments.record",
+  "inventory.receive",
+  "inventory.report_damage",
+  "inventory.count",
+  "expenses.create",
+  "returns.create",
+  "closing.submit",
+]);
+
 export const PERMISSION_KEYS: readonly string[] = PERMISSIONS.map((p) => p.key);
 
 export type DefaultRole = {
@@ -134,16 +154,23 @@ export const DEFAULT_ROLES: DefaultRole[] = [
   },
   {
     key: "SALESPERSON",
-    name: "Salesperson",
-    description: "Records daily sales. Credit sales and recording payments must be enabled by the owner.",
+    name: "Shop Attendant",
+    description: "Runs the shop day to day: sells, receives stock, takes payments, records expenses and closes the day. Never sees costs, profit or business-wide finances.",
     permissions: [
       "sales.pos",
       "sales.view_own",
+      "sales.discount",
+      "sales.credit",
       "customers.view",
       "customers.create",
+      "credit.view",
+      "payments.record",
       "products.view",
       "inventory.view",
+      "inventory.receive",
+      "inventory.report_damage",
       "returns.create",
+      "expenses.create",
       "closing.submit",
     ],
   },

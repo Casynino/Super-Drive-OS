@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Alert } from "@/components/ui";
+import { Prisma } from "@/generated/prisma/client";
 import PrintButton from "@/components/PrintButton";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -9,11 +10,14 @@ import { formatMoney } from "@/lib/money";
 import { methodLabel } from "@/lib/sales/types";
 import { getBusinessProfile, getCurrency } from "@/lib/settings";
 import { formatDate, formatDateTime } from "@/lib/utils";
-import { PaymentStatusBadge } from "../StatusBadge";
+import DecisionForm from "@/components/sales/DecisionForm";
+import { owedOf } from "@/lib/sales/owed";
+import { SaleStatusBadge } from "../StatusBadge";
+import { decideReversal } from "../reversal-actions";
 
 export const metadata = { title: "Sale" };
 
-export default async function SalePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
+export default async function SalePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; reversal?: string }> }) {
   const user = await requireUser();
   if (!canAny(user, ["sales.view_own", "sales.view_all"])) redirect("/forbidden");
   const { id } = await params;
@@ -28,6 +32,7 @@ export default async function SalePage({ params, searchParams }: { params: Promi
       creditApprovedBy: { select: { name: true } },
       items: { orderBy: { id: "asc" }, include: { product: { select: { name: true, sku: true } }, enteredUnit: { select: { symbol: true } } } },
       allocations: { include: { payment: true }, orderBy: { id: "asc" } },
+      reversals: { orderBy: { requestedAt: "desc" }, include: { requestedBy: { select: { name: true } }, decidedBy: { select: { name: true } }, items: { include: { product: { select: { name: true } } } } } },
     },
   });
   // Someone who may only see their own sales gets "not found" for anyone else's.
@@ -35,7 +40,9 @@ export default async function SalePage({ params, searchParams }: { params: Promi
 
   const [profile, currency] = await Promise.all([getBusinessProfile(), getCurrency()]);
   const money = (v: Parameters<typeof formatMoney>[0]) => formatMoney(v, currency);
-  const balance = sale.total.minus(sale.amountPaid);
+  const cancelled = sale.status === "CANCELLED";
+  const balance = cancelled ? new Prisma.Decimal(0) : owedOf(sale);
+  const canApprove = can(user, "returns.approve");
   const showProfit = can(user, "dashboard.financials");
   const isCredit = sale.paymentStatus !== "PAID";
 
@@ -51,9 +58,19 @@ export default async function SalePage({ params, searchParams }: { params: Promi
               New sale
             </Link>
           )}
+          {can(user, "returns.create") && !cancelled && (
+            <Link href={`/sales/${sale.id}/return`} className="btn-secondary">
+              Return / cancel
+            </Link>
+          )}
           <PrintButton label="Print receipt" />
         </div>
       </div>
+      {sp.reversal && (
+        <div className="mb-4 print:hidden">
+          <Alert kind="success">{sp.reversal === "done" ? "Done. Stock and the customer's account have been updated." : "Request sent. A manager or the owner has been notified and must approve it before anything changes."}</Alert>
+        </div>
+      )}
       {sp.created && (
         <div className="mb-4 print:hidden">
           <Alert kind="success">Sale completed. Stock has been updated{sale.amountPaid.gt(0) ? " and the payment recorded" : ""}.</Alert>
@@ -72,7 +89,7 @@ export default async function SalePage({ params, searchParams }: { params: Promi
             <p className="text-lg font-semibold text-navy-800">{sale.saleNo}</p>
             <p className="text-sm text-slate-600">{formatDateTime(sale.createdAt)}</p>
             <div className="mt-1 print:hidden">
-              <PaymentStatusBadge status={sale.paymentStatus} />
+              <SaleStatusBadge status={sale.status} paymentStatus={sale.paymentStatus} />
             </div>
           </div>
         </header>
@@ -148,6 +165,18 @@ export default async function SalePage({ params, searchParams }: { params: Promi
               <dd>{money(a.amount)}</dd>
             </div>
           ))}
+          {sale.returnedTotal.gt(0) && (
+            <div className="flex justify-between text-slate-600">
+              <dt>Goods returned</dt>
+              <dd>−{money(sale.returnedTotal)}</dd>
+            </div>
+          )}
+          {sale.refundedTotal.gt(0) && (
+            <div className="flex justify-between text-slate-600">
+              <dt>Refunded to customer</dt>
+              <dd>{money(sale.refundedTotal)}</dd>
+            </div>
+          )}
           <div className={`flex justify-between text-base font-semibold ${balance.gt(0) ? "text-brand-red-dark" : "text-emerald-700"}`}>
             <dt>Balance due</dt>
             <dd>{money(balance)}</dd>
@@ -176,6 +205,42 @@ export default async function SalePage({ params, searchParams }: { params: Promi
               Cost of goods {money(sale.cogsTotal)} · Gross profit <span className="font-medium">{money(sale.total.minus(sale.cogsTotal))}</span>
             </p>
           )}
+        </section>
+      )}
+
+      {sale.reversals.length > 0 && (
+        <section className="card mx-auto mt-5 max-w-3xl overflow-hidden print:hidden">
+          <h2 className="border-b border-line px-5 py-3 text-base font-semibold text-slate-900">Returns and cancellations</h2>
+          <ul className="divide-y divide-slate-100 text-sm">
+            {sale.reversals.map((r) => (
+              <li key={r.id} className="space-y-1.5 px-5 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-slate-900">
+                    {r.reversalNo} · {r.kind === "CANCEL" ? "Cancellation" : "Return"}
+                  </span>
+                  <span className={r.status === "COMPLETED" ? "badge-green" : r.status === "REJECTED" ? "badge-red" : "badge-yellow"}>{r.status === "COMPLETED" ? "Done" : r.status === "REJECTED" ? "Rejected" : "Waiting for approval"}</span>
+                </div>
+                <p className="text-slate-600">
+                  {r.items.map((i) => `${i.enteredQty.toString()} × ${i.product.name}${i.condition === "DAMAGED" ? " (damaged)" : ""}`).join(", ")}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Asked by {r.requestedBy.name} on {formatDateTime(r.requestedAt)}: “{r.reason}”
+                  {r.decidedBy && ` · ${r.status === "REJECTED" ? "Rejected" : "Approved"} by ${r.decidedBy.name}${r.decisionNote ? `: “${r.decisionNote}”` : ""}`}
+                </p>
+                {r.status === "COMPLETED" && (
+                  <p className="text-xs font-medium text-slate-700">
+                    Goods returned {money(r.returnValue)}
+                    {r.refundAmount.gt(0) && ` · refunded ${money(r.refundAmount)}${r.refundMethod ? ` by ${methodLabel(r.refundMethod)}` : ""}`}
+                  </p>
+                )}
+                {r.status === "PENDING" && canApprove && (
+                  <div className="pt-2">
+                    <DecisionForm reversalId={r.id} action={decideReversal} />
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </>

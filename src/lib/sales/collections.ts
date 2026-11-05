@@ -6,6 +6,7 @@
 import { Prisma, type PaymentMethod, type PaymentStatus } from "@/generated/prisma/client";
 import { nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
 import { parseMoney } from "@/lib/money";
+import { netPaid, netTotal, owedOf } from "./owed";
 
 const D = Prisma.Decimal;
 
@@ -19,7 +20,8 @@ export class CollectionError extends Error {
   }
 }
 
-export const statusFor = (total: Dec, paid: Dec): PaymentStatus => (paid.gte(total) ? "PAID" : paid.isZero() ? "UNPAID" : "PARTIALLY_PAID");
+/** Pass the NET figures: (total - returned) and (paid - refunded). */
+export const statusFor = (netTotalAmount: Dec, netPaidAmount: Dec): PaymentStatus => (netPaidAmount.gte(netTotalAmount) ? "PAID" : netPaidAmount.isZero() ? "UNPAID" : "PARTIALLY_PAID");
 
 /** Advance credit: money received from the customer that is not (yet) allocated to any invoice. */
 export async function customerCredit(tx: Pick<Tx, "$queryRaw">, customerId: string): Promise<Dec> {
@@ -61,24 +63,25 @@ async function loadAllocations(tx: Tx, customerId: string, raw: RawAllocation[],
 
   const ids = parsed.map((p) => p.saleId).sort();
   await tx.$queryRaw`SELECT "id" FROM "Sale" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR UPDATE`;
-  const sales = await tx.sale.findMany({ where: { id: { in: ids } }, select: { id: true, saleNo: true, customerId: true, status: true, total: true, amountPaid: true } });
+  const sales = await tx.sale.findMany({ where: { id: { in: ids } }, select: { id: true, saleNo: true, customerId: true, status: true, total: true, amountPaid: true, returnedTotal: true, refundedTotal: true } });
   const byId = new Map(sales.map((s) => [s.id, s]));
 
   return parsed.map((p) => {
     const s = byId.get(p.saleId);
     if (!s || s.customerId !== customerId) throw new CollectionError("An invoice does not belong to this customer.", { [`alloc.${p.saleId}`]: "Not this customer's invoice." });
     if (s.status !== "COMPLETED") throw new CollectionError(`${s.saleNo} is not an active invoice.`, { [`alloc.${p.saleId}`]: "Not an active invoice." });
-    const owed = s.total.minus(s.amountPaid);
+    const owed = owedOf(s);
     if (owed.lte(0)) throw new CollectionError(`${s.saleNo} is already fully paid.`, { [`alloc.${p.saleId}`]: "Already fully paid." });
     if (p.amount.gt(owed)) throw new CollectionError(`${s.saleNo}: the payment is more than the balance of ${owed.toString()}.`, { [`alloc.${p.saleId}`]: `More than the balance (${owed.toString()}).` });
     return { sale: s, amount: p.amount };
   });
 }
 
-async function bumpSales(tx: Tx, rows: { sale: { id: string; total: Dec; amountPaid: Dec }; amount: Dec }[]) {
+async function bumpSales(tx: Tx, rows: { sale: { id: string; total: Dec; amountPaid: Dec; returnedTotal: Dec; refundedTotal: Dec }; amount: Dec }[]) {
   for (const { sale, amount } of rows) {
     const paid = sale.amountPaid.plus(amount);
-    await tx.sale.update({ where: { id: sale.id }, data: { amountPaid: paid, paymentStatus: statusFor(sale.total, paid) } });
+    const next = { ...sale, amountPaid: paid };
+    await tx.sale.update({ where: { id: sale.id }, data: { amountPaid: paid, paymentStatus: statusFor(netTotal(next), netPaid(next)) } });
   }
 }
 

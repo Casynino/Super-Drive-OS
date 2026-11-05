@@ -6,6 +6,7 @@ import { canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
+import { owedOf } from "@/lib/sales/owed";
 import { methodLabel } from "@/lib/sales/types";
 import { getBusinessProfile, getCurrency } from "@/lib/settings";
 import { formatDateTime } from "@/lib/utils";
@@ -23,7 +24,7 @@ export default async function PaymentPage({ params, searchParams }: { params: Pr
     include: {
       customer: true,
       receivedBy: { select: { name: true } },
-      allocations: { include: { sale: { select: { id: true, saleNo: true, total: true, amountPaid: true } } }, orderBy: { id: "asc" } },
+      allocations: { include: { sale: { select: { id: true, saleNo: true, total: true, amountPaid: true, returnedTotal: true, refundedTotal: true } } }, orderBy: { id: "asc" } },
     },
   });
   if (!p) notFound();
@@ -95,7 +96,7 @@ export default async function PaymentPage({ params, searchParams }: { params: Pr
                   <tr key={a.id}>
                     <td className="font-medium">{a.sale.saleNo}</td>
                     <td className="text-right">{money(a.amount)}</td>
-                    <td className="text-right text-slate-600">{money(a.sale.total.minus(a.sale.amountPaid))}</td>
+                    <td className="text-right text-slate-600">{money(owedOf(a.sale))}</td>
                   </tr>
                 ))}
               </tbody>

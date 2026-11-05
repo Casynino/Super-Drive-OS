@@ -3,6 +3,7 @@ import { HandCoins } from "lucide-react";
 import { EmptyState, PageHeader, Stat } from "@/components/ui";
 import { Prisma } from "@/generated/prisma/client";
 import { requirePagePermission } from "@/lib/auth/guard";
+import { owedSql } from "@/lib/sales/owed";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { PaymentStatusBadge } from "../sales/StatusBadge";
@@ -22,8 +23,8 @@ export default async function CreditPage() {
 
   const [totals, aging, debtors, advance, recentCredit, recentCollections] = await Promise.all([
     db.$queryRaw<{ status: string; n: bigint; owed: Prisma.Decimal | string }[]>`
-      SELECT "paymentStatus"::text AS status, COUNT(*) AS n, SUM("total" - "amountPaid") AS owed
-        FROM "Sale" WHERE "status" = 'COMPLETED' AND "total" > "amountPaid" GROUP BY "paymentStatus"`,
+      SELECT "paymentStatus"::text AS status, COUNT(*) AS n, SUM(${owedSql()}) AS owed
+        FROM "Sale" WHERE "status" = 'COMPLETED' AND ${owedSql()} > 0 GROUP BY "paymentStatus"`,
     db.$queryRaw<{ bucket: string; n: bigint; owed: Prisma.Decimal | string }[]>`
       SELECT CASE
                WHEN "dueDate" IS NULL OR "dueDate" >= ${today}::date THEN 'current'
@@ -31,14 +32,14 @@ export default async function CreditPage() {
                WHEN ${today}::date - "dueDate" <= 60 THEN 'd31_60'
                WHEN ${today}::date - "dueDate" <= 90 THEN 'd61_90'
                ELSE 'd90_plus' END AS bucket,
-             COUNT(*) AS n, SUM("total" - "amountPaid") AS owed
-        FROM "Sale" WHERE "status" = 'COMPLETED' AND "total" > "amountPaid" GROUP BY 1`,
+             COUNT(*) AS n, SUM(${owedSql()}) AS owed
+        FROM "Sale" WHERE "status" = 'COMPLETED' AND ${owedSql()} > 0 GROUP BY 1`,
     db.$queryRaw<{ id: string; name: string; owed: Prisma.Decimal | string; overdue: Prisma.Decimal | string; invoices: bigint }[]>`
-      SELECT c."id", c."name", SUM(s."total" - s."amountPaid") AS owed,
-             SUM(CASE WHEN s."dueDate" < ${today}::date THEN s."total" - s."amountPaid" ELSE 0 END) AS overdue,
+      SELECT c."id", c."name", SUM(${owedSql("s")}) AS owed,
+             SUM(CASE WHEN s."dueDate" < ${today}::date THEN ${owedSql("s")} ELSE 0 END) AS overdue,
              COUNT(*) AS invoices
         FROM "Sale" s JOIN "Customer" c ON c."id" = s."customerId"
-       WHERE s."status" = 'COMPLETED' AND s."total" > s."amountPaid"
+       WHERE s."status" = 'COMPLETED' AND ${owedSql("s")} > 0
        GROUP BY c."id", c."name" ORDER BY owed DESC LIMIT 8`,
     db.$queryRaw<{ s: Prisma.Decimal | string | null }[]>`
       SELECT COALESCE(SUM(p."amount" - COALESCE(a."s", 0)), 0) AS s

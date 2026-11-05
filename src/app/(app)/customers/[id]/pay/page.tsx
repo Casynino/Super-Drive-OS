@@ -5,6 +5,7 @@ import CollectPaymentForm, { type OpenInvoice } from "@/components/pos/CollectPa
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { customerCredit } from "@/lib/sales/collections";
+import { owedOf } from "@/lib/sales/owed";
 import { getCurrency } from "@/lib/settings";
 import { formatDate } from "@/lib/utils";
 import { applyCustomerCredit, recordCollection } from "../../../payments/actions";
@@ -29,10 +30,10 @@ export default async function CustomerPayPage({ params }: { params: Promise<{ id
     date: formatDate(s.createdAt),
     dueDate: s.dueDate ? formatDate(s.dueDate) : null,
     total: s.total.toString(),
-    owed: s.total.minus(s.amountPaid).toString(),
+    owed: owedOf(s).toString(),
     overdue: Boolean(s.dueDate && s.dueDate.toISOString().slice(0, 10) < today),
   }));
-  const owedTotal = sales.reduce((s, x) => s + Number(x.total.minus(x.amountPaid)), 0);
+  const owedTotal = sales.reduce((s, x) => s + Number(owedOf(x)), 0);
   const cur = { symbol: currency.symbol, decimals: currency.decimals };
   const nf = new Intl.NumberFormat("en-US", { maximumFractionDigits: currency.decimals });
 

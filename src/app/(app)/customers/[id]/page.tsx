@@ -8,6 +8,7 @@ import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { customerCredit } from "@/lib/sales/collections";
+import { owedOf } from "@/lib/sales/owed";
 import { customerOutstanding } from "@/lib/sales/outstanding";
 import { PaymentStatusBadge } from "../../sales/StatusBadge";
 import { getCurrency } from "@/lib/settings";
@@ -38,7 +39,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
       ])
     : [[], []];
   const isOverdue = (due: Date | null) => Boolean(due && due.toISOString().slice(0, 10) < today);
-  const overdueAmount = openInvoices.filter((i) => isOverdue(i.dueDate)).reduce((s, i) => s.plus(i.total).minus(i.amountPaid), new Prisma.Decimal(0));
+  const overdueAmount = openInvoices.filter((i) => isOverdue(i.dueDate)).reduce((s, i) => s.plus(owedOf(i)), new Prisma.Decimal(0));
 
   return (
     <>
@@ -123,7 +124,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
                           {isOverdue(i.dueDate) && <span className="badge-red ml-2">Overdue</span>}
                         </td>
                         <td className="hidden text-right md:table-cell">{formatMoney(i.total, currency)}</td>
-                        <td className="text-right font-semibold">{formatMoney(i.total.minus(i.amountPaid), currency)}</td>
+                        <td className="text-right font-semibold">{formatMoney(owedOf(i), currency)}</td>
                         <td>
                           <PaymentStatusBadge status={i.paymentStatus} />
                         </td>

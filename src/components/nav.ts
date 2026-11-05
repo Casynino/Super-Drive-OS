@@ -9,6 +9,7 @@ import {
   PackageCheck,
   Receipt,
   ReceiptText,
+  Inbox,
   ScrollText,
   Shuffle,
   Settings,
@@ -74,6 +75,7 @@ export const NAV: NavGroup[] = [
     label: "Management",
     items: [
       { label: "Employees", href: "/employees", icon: UserCog, permissions: ["employees.view", "employees.manage"], ready: true },
+      { label: "Approvals", href: "/approvals", icon: Inbox, permissions: ["returns.approve"], ready: true },
       { label: "Daily Closing", href: "/closing", icon: CalendarCheck, permissions: ["closing.submit", "closing.approve"], ready: false },
       { label: "Reports", href: "/reports", icon: ChartColumn, permissions: ["reports.view", "reports.financial"], ready: false },
       { label: "Audit Logs", href: "/audit", icon: ScrollText, permissions: ["audit.view"], ready: true },

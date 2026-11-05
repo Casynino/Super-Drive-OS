@@ -83,9 +83,23 @@ Closing: attendant counts cash → system shows expected → difference stored �
 ## 10. Design direction
 Adopt the reference layouts: soft rounded cards with icon tiles and trend chips, donut and area charts, POS as a product-card grid with category pills and a live cart, receipt preview. Keep Super Drive Oil's identity (navy `#0E3D6E`, red `#ED1C24`, oil yellow `#FDC400`) rather than the references' purple/teal. Attendant screens: large touch targets, minimal text, no accounting words.
 
+## 10b. Separation of duties (decided 2026-11-05, Nino)
+The owner and the shop attendant do **different jobs from different screens**; both sign in on the same page with their own accounts.
+- **Owner (Super Admin)** holds every *management* permission but **not** the shop-floor jobs: no POS, no recording payments, no receiving/counting stock, no expenses, no daily closing, no return requests (`SHOP_FLOOR_PERMISSIONS` in `src/lib/permissions.ts`; `can()` enforces it on the server). The owner can still *grant* those permissions to staff (`canGrant`). Owner's work: buy stock and announce shipments, add products and pictures, set prices, manage staff and settings, watch dashboards, approve/reject, investigate problems.
+- **Shop Attendant** gets the shop-floor permissions and **never** costs, profit, valuation, other people's sales, approvals, staff or settings. Dashboard = big action buttons + own day.
+- Dashboards: owner = KPI tiles (change vs previous period, click-through), sales trend, sales by category, best sellers, staff performance, "needs attention", debtors; shop = quick actions, own sales/money today, stock to watch.
+
+### Shipments / receiving document (next to build; the "Target Express" flow)
+1. **Owner** creates an *incoming shipment*: supplier, reference/tracking, expected date, lines (existing product, or **new product created right there** with category, brand, packaging and picture), expected quantity, landed cost (TZS). Nothing changes in stock.
+2. **Attendant** sees it under "Incoming stock". When it arrives they open the **receiving document**: per line *expected / received good / damaged*, *missing* is calculated, plus a note; they can add an unexpected item. It is a **draft they can edit** until they confirm; partial deliveries are separate sessions.
+3. **Confirm** locks the session: good quantity enters stock (cost from the owner's line, hidden from the attendant), damaged is written off, missing is recorded.
+4. Any damaged / missing / unexpected line sends the shipment to the owner as **"needs investigation"** (notification + report). The owner records the outcome (supplier claim, accept loss, recount). A clean receipt just completes.
+Direct receiving (opening stock) goes through the same document so the owner never touches stock himself.
+
 ## 11. Roadmap (re-sequenced; recommendation in bold)
 Done: foundation, inventory, POS/sales, customers & credit (spec v2 phases 1–4).
-- **5. Alignment**: *done so far:* product images (DB), price history, POS product cards, discount reason, the catalogue import. *Still to do:* attendant role defaults (rename + wider permissions), approvals + notifications (for expenses/closing, not discounts), sale cancel/return (reversals).
+- **5. Alignment — done:** product images, price history, POS product cards, discount reason, catalogue import, sale return/cancel with owner approval + refunds, notifications bell, Shop Attendant role, separation of duties, owner and shop dashboards.
+- **5b. Shipments / receiving document** (see 10b) — **next**, ahead of cash and closing because it is the owner's main daily job.
 - **6. Cash & closing**: cash accounts + ledger (hooked into payments), expenses (limits/approval), bank deposits, daily closing + carry-forward. *Recommended before resellers* so reseller money lands in the cash ledger from day one.
 - **7. Shipments**: owner-created expected shipments and attendant confirmation.
 - **8. Resellers / consignment** (section 7).

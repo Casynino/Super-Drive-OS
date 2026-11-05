@@ -87,6 +87,9 @@ model User {
   paymentsReceived   Payment[]
   customersCreated   Customer[]
   creditApplications CreditApplication[]
+  notifications      Notification[]
+  reversalsRequested SaleReversal[]    @relation("ReversalRequester")
+  reversalsDecided   SaleReversal[]    @relation("ReversalDecider")
 
   @@index([roleId])
 }
@@ -202,6 +205,7 @@ model Product {
   adjustItems    StockAdjustmentItem[]
   saleItems      SaleItem[]
   image          ProductImage?
+  reversalItems  ReversalItem[]
   priceHistory   ProductPriceHistory[]
 
   @@index([categoryId])
@@ -517,7 +521,9 @@ model Sale {
   subtotal              Decimal           @db.Decimal(14, 2) // at list prices
   discountTotal         Decimal           @default(0) @db.Decimal(14, 2)
   total                 Decimal           @db.Decimal(14, 2) // subtotal - discountTotal
-  amountPaid            Decimal           @default(0) @db.Decimal(14, 2) // = sum of payment allocations
+  amountPaid            Decimal           @default(0) @db.Decimal(14, 2) // = sum of payment allocations (money received, never reduced)
+  returnedTotal         Decimal           @default(0) @db.Decimal(14, 2) // value of goods returned / cancelled (credit note)
+  refundedTotal         Decimal           @default(0) @db.Decimal(14, 2) // money paid back to the customer
   paymentStatus         PaymentStatus
   dueDate               DateTime?         @db.Date
   cogsTotal             Decimal           @db.Decimal(14, 2) // cost of goods sold, snapshot at sale time
@@ -530,6 +536,7 @@ model Sale {
   createdAt             DateTime          @default(now())
   items                 SaleItem[]
   allocations           PaymentAllocation[]
+  reversals             SaleReversal[]
 
   @@index([createdAt])
   @@index([customerId, status])
@@ -555,6 +562,7 @@ model SaleItem {
   lineTotal     Decimal @db.Decimal(14, 2)
   unitCost      Decimal @db.Decimal(16, 4) // average cost per base unit at sale time
   costTotal     Decimal @db.Decimal(14, 2)
+  reversalItems ReversalItem[]
 
   @@index([saleId])
   @@index([productId])
@@ -645,4 +653,83 @@ model ProductPriceHistory {
   createdAt   DateTime @default(now())
 
   @@index([productId, createdAt])
+}
+
+// ───────────── Phase 5: returns, cancellations, notifications ─────────────
+
+enum ReversalKind {
+  CANCEL // the whole sale is undone
+  RETURN // some items come back
+}
+
+enum ReversalStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+}
+
+enum ReturnCondition {
+  RESELLABLE // goes back on the shelf
+  DAMAGED // comes back but is written off, never returns to sellable stock
+}
+
+// A return or cancellation. The original sale is never edited: it gets credit-note totals
+// (Sale.returnedTotal / refundedTotal) and this record explains why. PENDING until a manager approves.
+model SaleReversal {
+  id              String          @id @default(cuid())
+  reversalNo      String          @unique
+  saleId          String
+  sale            Sale            @relation(fields: [saleId], references: [id])
+  kind            ReversalKind
+  status          ReversalStatus  @default(PENDING)
+  reason          String
+  refundMethod    PaymentMethod? // how any money goes back to the customer
+  refundReference String?
+  returnValue     Decimal         @default(0) @db.Decimal(14, 2) // value of goods returned, set when completed
+  refundAmount    Decimal         @default(0) @db.Decimal(14, 2) // money actually paid back, set when completed
+  requestedById   String
+  requestedBy     User            @relation("ReversalRequester", fields: [requestedById], references: [id])
+  requestedAt     DateTime        @default(now())
+  decidedById     String?
+  decidedBy       User?           @relation("ReversalDecider", fields: [decidedById], references: [id])
+  decidedAt       DateTime?
+  decisionNote    String?
+  submissionKey   String          @unique
+  items           ReversalItem[]
+
+  @@index([saleId])
+  @@index([status, requestedAt])
+}
+
+model ReversalItem {
+  id          String          @id @default(cuid())
+  reversalId  String
+  reversal    SaleReversal    @relation(fields: [reversalId], references: [id])
+  saleItemId  String
+  saleItem    SaleItem        @relation(fields: [saleItemId], references: [id])
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id])
+  enteredQty  Decimal         @db.Decimal(14, 3) // in the unit it was sold in
+  factor      Decimal         @db.Decimal(14, 4)
+  quantity    Decimal         @db.Decimal(14, 3) // base units
+  condition   ReturnCondition
+  returnValue Decimal         @default(0) @db.Decimal(14, 2) // price charged for these units, set when completed
+  costValue   Decimal         @default(0) @db.Decimal(14, 2) // cost restored to stock (0 when damaged), set when completed
+
+  @@index([reversalId])
+  @@index([saleItemId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  type      String // e.g. reversal.requested
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
 }

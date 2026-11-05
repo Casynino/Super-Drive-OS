@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { KeyRound, LogOut, Menu, X } from "lucide-react";
+import { Bell, KeyRound, LogOut, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV } from "./nav";
 
@@ -14,6 +14,7 @@ type Props = {
   /** hrefs the signed-in user may see (computed on the server from permissions) */
   visibleHrefs: string[];
   logoutAction: () => Promise<void>;
+  unread: number;
   children: React.ReactNode;
 };
 
@@ -26,7 +27,7 @@ function initials(name: string) {
     .join("");
 }
 
-export default function AppShell({ businessName, user, visibleHrefs, logoutAction, children }: Props) {
+export default function AppShell({ businessName, user, visibleHrefs, logoutAction, unread, children }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -113,6 +114,11 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-700 text-xs font-semibold text-white" aria-hidden>
             {initials(user.name)}
           </span>
+          <Link href="/notifications" className="btn-secondary btn-sm relative" title="Notifications">
+            <Bell size={15} />
+            <span className="sr-only">Notifications{unread > 0 ? `, ${unread} unread` : ""}</span>
+            {unread > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
+          </Link>
           <Link href="/account" className="btn-secondary btn-sm" title="Change password">
             <KeyRound size={15} />
             <span className="sr-only">Change password</span>
