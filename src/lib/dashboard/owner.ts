@@ -3,7 +3,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import type { Db } from "@/lib/db";
 import { owedSql } from "@/lib/sales/owed";
-import type { DateRange } from "./range";
+import { todayYmd, type DateRange } from "./range";
 
 const D = Prisma.Decimal;
 type Dec = Prisma.Decimal;
@@ -101,5 +101,60 @@ export async function getOwnerDashboard(db: Db, range: DateRange, opts: { financ
     recent,
     pendingApprovals,
     debtors: debtors.map((d) => ({ id: d.id, name: d.name, owed: n(d.owed) })),
+  };
+}
+
+// ───────────── Extra figures for the home page ─────────────
+
+export type OwnerExtras = Awaited<ReturnType<typeof getOwnerExtras>>;
+
+/**
+ * What the home page needs beyond the headline numbers: today at a glance, money received by day and method,
+ * sales by weekday, expenses by category and the stock held by resellers. Everything is read from real records.
+ */
+export async function getOwnerExtras(db: Db, range: DateRange, opts: { resellers: boolean; expenses: boolean }) {
+  const today = todayYmd();
+  const todayStart = new Date(`${today}T00:00:00+03:00`);
+  const todayEnd = new Date(todayStart.getTime() + 86_400_000 - 1);
+  const day = (col: string) => Prisma.raw(`("${col}" AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Dar_es_Salaam')::date`);
+
+  const [todaySales, todayMoney, money, weekday, expenses, resellers] = await Promise.all([
+    db.$queryRaw<{ sales: Dec | null; n: bigint }[]>`SELECT SUM("total" - "returnedTotal") AS sales, COUNT(*) AS n FROM "Sale" WHERE "status" = 'COMPLETED' AND "createdAt" >= ${todayStart} AND "createdAt" <= ${todayEnd}`,
+    db.payment.aggregate({ where: { receivedAt: { gte: todayStart, lte: todayEnd } }, _sum: { amount: true } }),
+    db.$queryRaw<{ d: string; method: string; v: Dec | null }[]>`
+      SELECT to_char(${day("receivedAt")}, 'YYYY-MM-DD') AS d, "method"::text AS method, SUM("amount") AS v
+        FROM "Payment" WHERE "receivedAt" >= ${range.from} AND "receivedAt" <= ${range.to} GROUP BY 1, 2`,
+    db.$queryRaw<{ dow: number; v: Dec | null }[]>`
+      SELECT EXTRACT(DOW FROM ${day("createdAt")})::int AS dow, SUM("total" - "returnedTotal") AS v
+        FROM "Sale" WHERE "status" = 'COMPLETED' AND "createdAt" >= ${range.from} AND "createdAt" <= ${range.to} GROUP BY 1`,
+    opts.expenses
+      ? db.$queryRaw<{ name: string; v: Dec | null }[]>`
+          SELECT c."name", SUM(e."amount") AS v FROM "Expense" e JOIN "ExpenseCategory" c ON c."id" = e."categoryId"
+           WHERE e."status" = 'APPROVED' AND e."expenseDate" >= ${range.fromYmd}::date AND e."expenseDate" <= ${range.toYmd}::date GROUP BY c."name" ORDER BY v DESC`
+      : Promise.resolve([] as { name: string; v: Dec | null }[]),
+    opts.resellers
+      ? db.$queryRaw<{ held: Dec | null; owed: Dec | null; overdue: Dec | null; n: bigint }[]>`
+          SELECT (SELECT COUNT(*) FROM "Reseller" WHERE "status" = 'ACTIVE') AS n,
+                 (SELECT SUM(b."quantity" * COALESCE((SELECT i."basePrice" FROM "ResellerIssueItem" i JOIN "ResellerIssue" s ON s."id" = i."issueId" WHERE s."resellerId" = r."id" AND i."productId" = b."productId" ORDER BY s."createdAt" DESC LIMIT 1), 0))
+                    FROM "Reseller" r JOIN "StockBalance" b ON b."locationId" = r."locationId") AS held,
+                 (SELECT SUM(${owedSql()}) FROM "Sale" WHERE "channel" = 'RESELLER' AND "status" = 'COMPLETED') AS owed,
+                 (SELECT SUM(${owedSql()}) FROM "Sale" WHERE "channel" = 'RESELLER' AND "status" = 'COMPLETED' AND "dueDate" < ${today}::date) AS overdue`
+      : Promise.resolve([] as { held: Dec | null; owed: Dec | null; overdue: Dec | null; n: bigint }[]),
+  ]);
+
+  const byDay = new Map<string, { CASH: number; MOBILE_MONEY: number; BANK: number }>();
+  for (const r of money) {
+    const row = byDay.get(r.d) ?? { CASH: 0, MOBILE_MONEY: 0, BANK: 0 };
+    row[r.method as "CASH" | "MOBILE_MONEY" | "BANK"] += n(r.v);
+    byDay.set(r.d, row);
+  }
+  const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const order = [1, 2, 3, 4, 5, 6, 0]; // week starts on Monday
+  return {
+    today: { sales: n(todaySales[0]?.sales), count: Number(todaySales[0]?.n ?? 0), money: n(todayMoney._sum.amount) },
+    moneyTrend: range.days.map((d) => ({ label: d.slice(8) + "/" + d.slice(5, 7), cash: byDay.get(d)?.CASH ?? 0, mobile: byDay.get(d)?.MOBILE_MONEY ?? 0, bank: byDay.get(d)?.BANK ?? 0 })),
+    weekday: order.map((i) => ({ name: names[i]!, value: n(weekday.find((w) => w.dow === i)?.v) })),
+    expenses: expenses.map((e) => ({ name: e.name, value: n(e.v) })).filter((e) => e.value > 0),
+    resellers: resellers[0] ? { count: Number(resellers[0].n), held: n(resellers[0].held), owed: n(resellers[0].owed), overdue: n(resellers[0].overdue) } : null,
   };
 }

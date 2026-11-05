@@ -39,22 +39,22 @@ export function SalesTrendChart({ data, money }: { data: { label: string; sales:
   );
 }
 
-export function DonutChart({ data, money, centre }: { data: { name: string; value: number }[]; money: Money; centre: string }) {
-  if (data.length === 0) return <Empty text="Nothing sold in this period yet" />;
+export function DonutChart({ data, money, centre, colors = CHART_COLORS, centreLabel = "Total", empty = "Nothing sold in this period yet" }: { data: { name: string; value: number }[]; money: Money; centre: string; colors?: string[]; centreLabel?: string; empty?: string }) {
+  if (data.length === 0) return <Empty text={empty} />;
   return (
     <div className="relative h-full w-full">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="88%" paddingAngle={2} stroke="none">
             {data.map((_, i) => (
-              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+              <Cell key={i} fill={colors[i % colors.length]} />
             ))}
           </Pie>
           <Tooltip formatter={(v) => fmt(Number(v), money)} contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee" }} />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-xs text-slate-500">Total</span>
+        <span className="text-xs text-slate-500">{centreLabel}</span>
         <span className="text-base font-semibold text-slate-900">{centre}</span>
       </div>
     </div>
@@ -68,11 +68,50 @@ export function TopProductsChart({ data, money, empty = "No product sales in thi
       <BarChart data={data} layout="vertical" margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 4" stroke="#e2e7ee" horizontal={false} />
         <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#64748b" }} tickFormatter={short} />
-        <YAxis type="category" dataKey="name" width={132} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#334155" }} />
+        <YAxis type="category" dataKey="name" width={112} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#334155" }} tickFormatter={(v: string) => (v.length > 17 ? `${v.slice(0, 16)}…` : v)} />
         <Tooltip cursor={{ fill: "#f1f5f9" }} formatter={(v) => [fmt(Number(v), money), label]} contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee" }} />
         <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={16}>
           {data.map((_, i) => (
             <Cell key={i} fill={i === 0 ? "#0e3d6e" : "#4f85b9"} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Money received each day, stacked by how it was paid. */
+export function MoneyBarsChart({ data, money }: { data: { label: string; cash: number; mobile: number; bank: number }[]; money: Money }) {
+  if (data.every((d) => d.cash + d.mobile + d.bank === 0)) return <Empty text="No money received in this period yet" />;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 4" stroke="#e2e7ee" vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#64748b" }} interval="preserveStartEnd" />
+        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#64748b" }} tickFormatter={short} width={40} />
+        <Tooltip cursor={{ fill: "#f1f5f9" }} formatter={(v, name) => [fmt(Number(v), money), String(name)]} contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee" }} />
+        <Bar dataKey="cash" name="Cash" stackId="m" fill="#0e3d6e" />
+        <Bar dataKey="mobile" name="Mobile money" stackId="m" fill="#fdc400" />
+        <Bar dataKey="bank" name="Bank" stackId="m" fill="#84add4" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Plain vertical bars (sales by weekday); the strongest bar is shown in oil yellow. */
+export function ColumnsChart({ data, money, label = "Sales" }: { data: { name: string; value: number }[]; money: Money; label?: string }) {
+  if (data.every((d) => d.value === 0)) return <Empty text="No sales in this period yet" />;
+  const max = Math.max(...data.map((d) => d.value));
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 4" stroke="#e2e7ee" vertical={false} />
+        <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#64748b" }} />
+        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#64748b" }} tickFormatter={short} width={40} />
+        <Tooltip cursor={{ fill: "#f1f5f9" }} formatter={(v) => [fmt(Number(v), money), label]} contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee" }} />
+        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={36}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={d.value === max ? "#fdc400" : "#4f85b9"} />
           ))}
         </Bar>
       </BarChart>

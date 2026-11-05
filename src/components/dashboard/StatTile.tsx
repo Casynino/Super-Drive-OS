@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Sparkline from "./Sparkline";
 
 const TONES = {
   navy: "bg-navy-50 text-navy-700",
@@ -9,6 +10,8 @@ const TONES = {
   green: "bg-emerald-50 text-emerald-700",
   slate: "bg-slate-100 text-slate-600",
 } as const;
+
+const TONE_LINE = { navy: "text-navy-600", red: "text-brand-red", yellow: "text-oil-500", green: "text-emerald-600", slate: "text-slate-500" } as const;
 
 /** A KPI card: coloured icon tile, label, big number, change vs the previous period, and a link to the records behind it. */
 export default function StatTile({
@@ -19,6 +22,7 @@ export default function StatTile({
   hint,
   change,
   href,
+  spark,
 }: {
   icon: LucideIcon;
   tone?: keyof typeof TONES;
@@ -28,6 +32,8 @@ export default function StatTile({
   /** % change vs the previous period; null/undefined = nothing to compare */
   change?: number | null;
   href?: string;
+  /** a small trend line along the bottom (one value per day) */
+  spark?: number[];
 }) {
   const body = (
     <div className={cn("@container card card-pad h-full transition", href && "hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md")}>
@@ -45,6 +51,7 @@ export default function StatTile({
       <p className="mt-3 text-[13px] font-medium text-slate-500">{label}</p>
       <p className="mt-0.5 whitespace-nowrap text-[clamp(1.05rem,12cqw,1.5rem)] font-bold leading-tight tracking-tight text-slate-900">{value}</p>
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {spark && <div className="mt-2.5 -mb-1"><Sparkline values={spark} className={TONE_LINE[tone]} /></div>}
     </div>
   );
   return href ? (

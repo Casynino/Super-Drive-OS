@@ -14,3 +14,5 @@ coverage
 # Client source assets (kept locally, not in the repo)
 LOGO/
 PRODUCTS */
+
+.next-preview

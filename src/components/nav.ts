@@ -43,7 +43,7 @@ export type NavGroup = { label: string; items: NavItem[] };
 export const NAV: NavGroup[] = [
   {
     label: "Overview",
-    items: [{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permissions: [], ready: true }],
+    items: [{ label: "Home", href: "/dashboard", icon: LayoutDashboard, permissions: [], ready: true }],
   },
   {
     label: "Operations",
