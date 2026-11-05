@@ -134,7 +134,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 print:max-w-none print:p-0">{children}</main>
+      <main className="mx-auto w-full max-w-[1920px] px-4 py-6 sm:px-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
     </div>
   );
 }

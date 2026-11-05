@@ -177,26 +177,50 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_320px_at_85%_-10%,rgba(47,111,208,0.55),transparent_60%),radial-gradient(500px_260px_at_0%_110%,rgba(237,28,36,0.22),transparent_60%)]" aria-hidden />
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-r from-brand-red via-brand-red to-oil-400" aria-hidden />
 
-        <div className="relative px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-rose-300">Management · Owner</p>
-          <h1 className="mt-2 text-[1.7rem] font-bold leading-tight tracking-tight sm:text-4xl">
-            {greeting()}, {firstName}
-          </h1>
-          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/85">
-            {balances.length > 0 ? (
-              <>
-                <strong className="text-white">{m(usable)}</strong> you can use right now ·{" "}
-              </>
-            ) : (
-              <>
-                <strong className="text-white">{m(extras.today.sales)}</strong> sold today ·{" "}
-              </>
-            )}
-            <strong className="text-emerald-300">{m(o.today.collected)}</strong> collected today · <strong className="text-oil-400">{m(k.debt.value)}</strong> owed by customers
-          </p>
-          <p className="mt-1.5 text-xs text-white/55">
-            {todayLabel} · {profile.name}
-          </p>
+        <div className="relative flex flex-col gap-6 px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-rose-300">Management · Owner</p>
+            <h1 className="mt-2 text-[1.7rem] font-bold leading-tight tracking-tight sm:text-4xl">
+              {greeting()}, {firstName}
+            </h1>
+            <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/85">
+              {balances.length > 0 && (
+                <>
+                  <strong className="text-white">{m(usable)}</strong> you can use right now ·{" "}
+                </>
+              )}
+              <strong className="text-oil-400">{m(k.debt.value)}</strong> owed by customers
+            </p>
+            <p className="mt-1.5 text-xs text-white/55">
+              {todayLabel} · {profile.name}
+            </p>
+          </div>
+
+          <div className="grid w-full max-w-xl grid-cols-3 gap-2 sm:gap-3 xl:w-[26rem] xl:shrink-0">
+            <Link href="/sales" className="rounded-xl bg-white/10 px-3 py-2.5 ring-1 ring-white/15 transition hover:bg-white/15 sm:px-4 sm:py-3">
+              <p className="text-[11px] font-medium text-white/70 sm:text-xs">Sold today</p>
+              <p className="mt-0.5 whitespace-nowrap text-[15px] font-bold tabular-nums sm:text-lg">
+                <span className="sm:hidden">{compact(extras.today.sales)}</span>
+                <span className="hidden sm:inline">{m(extras.today.sales)}</span>
+              </p>
+              <p className="text-[11px] text-white/55">
+                {extras.today.count} sale{extras.today.count === 1 ? "" : "s"}
+              </p>
+            </Link>
+            <Link href="/payments" className="rounded-xl bg-white/10 px-3 py-2.5 ring-1 ring-white/15 transition hover:bg-white/15 sm:px-4 sm:py-3">
+              <p className="text-[11px] font-medium text-white/70 sm:text-xs">Collected</p>
+              <p className="mt-0.5 whitespace-nowrap text-[15px] font-bold tabular-nums text-emerald-300 sm:text-lg">
+                <span className="sm:hidden">{compact(o.today.collected)}</span>
+                <span className="hidden sm:inline">{m(o.today.collected)}</span>
+              </p>
+              <p className="text-[11px] text-white/55">today</p>
+            </Link>
+            <a href="#attention" className="rounded-xl bg-white/10 px-3 py-2.5 ring-1 ring-white/15 transition hover:bg-white/15 sm:px-4 sm:py-3">
+              <p className="text-[11px] font-medium text-white/70 sm:text-xs">Needs you</p>
+              <p className={cn("mt-0.5 text-[15px] font-bold tabular-nums sm:text-lg", items.length > 0 ? "text-oil-400" : "text-emerald-300")}>{items.length}</p>
+              <p className="text-[11px] text-white/55">{items.length === 0 ? "all clear" : `item${items.length === 1 ? "" : "s"}`}</p>
+            </a>
+          </div>
         </div>
       </section>
 
