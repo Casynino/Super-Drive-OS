@@ -99,7 +99,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   const range = resolveRange("month");
   const financials = can(user, "dashboard.financials");
   const locationId = await defaultLocationId(db);
-  const [currency, profile, data, extras, overview, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, closingsToReview, resellerOverdue, shelf, away, imageProducts, closedToday] = await Promise.all([
+  const [currency, profile, data, extras, overview, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, closingsToReview, resellerOverdue, shelf, away, closedToday] = await Promise.all([
     getCurrency(),
     getBusinessProfile(),
     getOwnerDashboard(db, range, { financials, valuation: can(user, "inventory.valuation") }),
@@ -114,7 +114,6 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
     can(user, "resellers.view") ? db.$queryRaw<{ v: number | null }[]>`SELECT SUM("total" - "returnedTotal" - "amountPaid" + "refundedTotal")::float AS v FROM "Sale" WHERE "channel" = 'RESELLER' AND "status" = 'COMPLETED' AND "dueDate" < ${businessDay()}::date AND ("total" - "returnedTotal" - "amountPaid" + "refundedTotal") > 0`.then((r) => Number(r[0]?.v ?? 0)) : 0,
     can(user, "inventory.view") ? db.stockBalance.aggregate({ where: { location: { type: { not: "RESELLER" } } }, _sum: { quantity: true } }) : null,
     can(user, "inventory.view") ? db.stockBalance.aggregate({ where: { location: { type: "RESELLER" } }, _sum: { quantity: true } }) : null,
-    db.product.findMany({ where: { status: "ACTIVE", image: { isNot: null } }, select: { id: true, name: true, image: { select: { updatedAt: true } } }, orderBy: { name: "asc" }, take: 40 }),
     db.dailyClosing.findFirst({ where: { locationId, businessDate: new Date(`${businessDay()}T00:00:00.000Z`) }, select: { id: true } }),
   ]);
   const money = { symbol: currency.symbol, decimals: currency.decimals };
@@ -152,10 +151,6 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
     can(user, "audit.view") && { href: "/audit", label: "Audit log", icon: ScrollText, tone: "navy" as const },
   ].filter(Boolean) as { href: string; label: string; icon: typeof Package; tone: keyof typeof PILL; badge?: number }[];
 
-  // pictures for the banner: the month's best sellers first
-  const top = new Set(o.products.map((p) => p.id));
-  const banner = [...imageProducts.filter((p) => top.has(p.id)), ...imageProducts.filter((p) => !top.has(p.id))].slice(0, 4);
-
   const stockRing = [
     { name: "In stock", value: Math.max(0, alerts.inStock - alerts.low.length) },
     { name: "Running low", value: alerts.low.length },
@@ -178,28 +173,11 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   return (
     <>
       {/* ── Banner ── */}
-      <section className="@container relative mb-4 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
+      <section className="relative mb-4 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_320px_at_85%_-10%,rgba(47,111,208,0.55),transparent_60%),radial-gradient(500px_260px_at_0%_110%,rgba(237,28,36,0.22),transparent_60%)]" aria-hidden />
-        {banner.length > 0 && (
-          <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[42%] items-center justify-end pr-6 @3xl:flex" aria-hidden>
-            <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-[#0a1a33] to-transparent" />
-            <div className="relative flex items-center">
-              {banner.map((p, i) => (
-                <span
-                  key={p.id}
-                  className="-ml-7 grid h-36 w-28 place-items-center overflow-hidden rounded-2xl bg-gradient-to-b from-white to-slate-200 p-2 shadow-[0_12px_30px_-8px_rgba(0,0,0,0.65)] ring-1 ring-white/30 first:ml-0 lg:h-44 lg:w-32"
-                  style={{ transform: `rotate(${(i - (banner.length - 1) / 2) * 5}deg) translateY(${Math.abs(i - (banner.length - 1) / 2) * 7}px)`, zIndex: 10 - i }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/api/product-image/${p.id}?size=thumb&v=${p.image!.updatedAt.getTime()}`} alt="" className="h-full w-full object-contain" />
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-r from-brand-red via-brand-red to-oil-400" aria-hidden />
 
-        <div className="relative px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8 @3xl:max-w-[58%]">
+        <div className="relative px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-rose-300">Management · Owner</p>
           <h1 className="mt-2 text-[1.7rem] font-bold leading-tight tracking-tight sm:text-4xl">
             {greeting()}, {firstName}
