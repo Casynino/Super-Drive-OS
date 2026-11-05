@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Package,
   PackageCheck,
+  PackageOpen,
   Receipt,
   ReceiptText,
   Inbox,
@@ -55,6 +56,7 @@ export const NAV: NavGroup[] = [
     label: "Inventory",
     items: [
       { label: "Products", href: "/products", icon: Package, permissions: ["products.view"], ready: true },
+      { label: "Incoming Stock", href: "/shipments", icon: PackageOpen, permissions: ["shipments.manage", "shipments.receive"], ready: true },
       { label: "Stock Overview", href: "/inventory", icon: Boxes, permissions: ["inventory.view"], ready: true },
       { label: "Stock Receiving", href: "/inventory/receiving", icon: PackageCheck, permissions: ["inventory.receive", "inventory.movements", "purchasing.view"], ready: true },
       { label: "Stock Transfers", href: "/inventory/transfers", icon: Shuffle, permissions: ["inventory.transfer", "inventory.movements"], ready: true },

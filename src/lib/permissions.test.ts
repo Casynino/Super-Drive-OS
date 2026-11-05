@@ -20,11 +20,11 @@ describe("permission registry", () => {
     // and can neither approve things nor manage people and settings.
     for (const forbidden of [
       "inventory.adjust", "products.cost", "products.price", "inventory.valuation", "reports.financial", "dashboard.financials", "finance.view",
-      "returns.approve", "credit.approve_exception", "credit.set_limit", "sales.view_all", "audit.view", "employees.manage", "roles.manage", "settings.manage", "suppliers.pay",
+      "returns.approve", "shipments.manage", "credit.approve_exception", "credit.set_limit", "sales.view_all", "audit.view", "employees.manage", "roles.manage", "settings.manage", "suppliers.pay",
     ]) {
       expect(sales).not.toContain(forbidden);
     }
-    for (const needed of ["sales.pos", "payments.record", "inventory.receive", "expenses.create", "closing.submit", "returns.create"]) expect(sales).toContain(needed);
+    for (const needed of ["sales.pos", "payments.record", "shipments.receive", "expenses.create", "closing.submit", "returns.create"]) expect(sales).toContain(needed);
     const keeper = DEFAULT_ROLES.find((r) => r.key === "STOREKEEPER")!.permissions;
     for (const forbidden of ["sales.pos", "products.price", "payments.record", "inventory.adjust"]) {
       expect(keeper).not.toContain(forbidden);

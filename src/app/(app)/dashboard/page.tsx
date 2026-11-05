@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Banknote, Boxes, HandCoins, Package, PackageCheck, Receipt, Scale, ShoppingCart, TrendingUp, Undo2, Users, Wallet } from "lucide-react";
+import { AlertTriangle, Truck, Banknote, Boxes, HandCoins, Package, PackageCheck, Receipt, Scale, ShoppingCart, TrendingUp, Undo2, Users, Wallet } from "lucide-react";
 import StatTile from "@/components/dashboard/StatTile";
 import { DonutChart, SalesTrendChart, TopProductsChart } from "@/components/dashboard/Charts";
 import { SaleStatusBadge } from "../sales/StatusBadge";
@@ -35,10 +35,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
 async function OwnerDashboard({ user, range: rangeKey }: { user: SessionUser; range?: string }) {
   const range = resolveRange(rangeKey);
-  const [currency, data, alerts] = await Promise.all([
+  const [currency, data, alerts, shipmentIssues, shipmentsOnTheWay] = await Promise.all([
     getCurrency(),
     getOwnerDashboard(db, range, { financials: can(user, "dashboard.financials"), valuation: can(user, "inventory.valuation") }),
     getStockAlerts(db),
+    can(user, "shipments.manage") ? db.shipment.count({ where: { issue: "OPEN" } }) : 0,
+    can(user, "shipments.manage") ? db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] } } }) : 0,
   ]);
   const money = { symbol: currency.symbol, decimals: currency.decimals };
   const m = (v: number) => formatMoney(v, currency);
@@ -131,11 +133,13 @@ async function OwnerDashboard({ user, range: rangeKey }: { user: SessionUser; ra
         <section className="card card-pad">
           <h2 className="mb-3 text-base font-semibold text-slate-900">Needs your attention</h2>
           <ul className="space-y-2.5 text-sm">
+            <Attention href="/shipments" show={can(user, "shipments.manage")} count={shipmentIssues} icon={AlertTriangle} text="shipments with damaged or missing goods to investigate" />
+            <Attention href="/shipments" show={can(user, "shipments.manage")} count={shipmentsOnTheWay} icon={Truck} text="shipments on the way" />
             <Attention href="/approvals" show={can(user, "returns.approve")} count={data.pendingApprovals} icon={Undo2} text="return / cancel requests to approve" />
             <Attention href="/credit" show count={k.debt.overdue > 0 ? 1 : 0} icon={AlertTriangle} text={`${m(k.debt.overdue)} owed past the due date`} hideCount />
             <Attention href="/inventory?status=out" show count={alerts.out.length} icon={Package} text="products out of stock" />
             <Attention href="/inventory?status=low" show count={alerts.low.length} icon={Scale} text="products running low" />
-            {data.pendingApprovals + alerts.out.length + alerts.low.length === 0 && k.debt.overdue === 0 && <li className="rounded-lg bg-emerald-50 px-3 py-2.5 text-emerald-800">Nothing needs attention right now.</li>}
+            {data.pendingApprovals + alerts.out.length + alerts.low.length + shipmentIssues === 0 && k.debt.overdue === 0 && <li className="rounded-lg bg-emerald-50 px-3 py-2.5 text-emerald-800">Nothing needs attention right now.</li>}
           </ul>
         </section>
       </div>
@@ -253,6 +257,7 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
   const to = new Date(`${today}T23:59:59.999+03:00`);
   const sells = can(user, "sales.pos") || can(user, "sales.view_own") || can(user, "sales.view_all");
 
+  const incoming = can(user, "shipments.receive") ? await db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] } } }) : 0;
   const [mySales, myPayments, pendingMine, alerts] = await Promise.all([
     sells ? db.sale.findMany({ where: { salespersonId: user.id, createdAt: { gte: from, lte: to } }, orderBy: { createdAt: "desc" }, include: { customer: { select: { name: true } } } }) : [],
     can(user, "payments.record") || sells ? db.payment.groupBy({ by: ["method"], where: { receivedById: user.id, receivedAt: { gte: from, lte: to } }, _sum: { amount: true } }) : [],
@@ -269,7 +274,7 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
   const actions = [
     can(user, "sales.pos") && { href: "/pos", icon: ShoppingCart, title: "New sale", text: "Sell to a customer", primary: true },
     can(user, "payments.record") && { href: "/customers", icon: Banknote, title: "Take a payment", text: "A customer pays a debt" },
-    can(user, "inventory.receive") && { href: "/inventory/receiving", icon: PackageCheck, title: "Receive stock", text: "Check in a delivery" },
+    can(user, "shipments.receive") && { href: "/shipments", icon: PackageCheck, title: "Incoming stock", text: incoming > 0 ? `${incoming} ${incoming === 1 ? "delivery" : "deliveries"} to count` : "Count a delivery" },
     can(user, "returns.create") && { href: "/sales", icon: Undo2, title: "Return an item", text: "Open the sale first" },
     can(user, "inventory.view") && { href: "/inventory", icon: Boxes, title: "View stock", text: "What is on the shelf" },
     can(user, "customers.view") && { href: "/customers", icon: Users, title: "Customers", text: "Find or add a customer" },

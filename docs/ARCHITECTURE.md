@@ -89,19 +89,19 @@ The owner and the shop attendant do **different jobs from different screens**; b
 - **Shop Attendant** gets the shop-floor permissions and **never** costs, profit, valuation, other people's sales, approvals, staff or settings. Dashboard = big action buttons + own day.
 - Dashboards: owner = KPI tiles (change vs previous period, click-through), sales trend, sales by category, best sellers, staff performance, "needs attention", debtors; shop = quick actions, own sales/money today, stock to watch.
 
-### Shipments / receiving document (next to build; the "Target Express" flow)
+### Shipments / receiving document (BUILT 2026-11-05; the "Target Express" flow)
+*Implementation notes:* `Shipment` / `ShipmentItem` / `ShipmentCount` (+ lines) in the `…_shipments` migration; logic in `src/lib/shipments/engine.ts`; statuses EXPECTED → PARTIAL → RECEIVED (or CANCELLED before any count); `issue` OPEN/RESOLVED; permissions `shipments.manage` (owner/manager) and `shipments.receive` (attendant/storekeeper, shop-floor). Unexpected items enter stock at cost 0 (no `avgCost` effect) until the owner sets a cost. The approval-threshold idea below was replaced by the simpler "needs investigation" step. Opening stock / quick receipts stay on `/inventory/receiving` for whoever holds `inventory.receive` (the owner does not).
 1. **Owner** creates an *incoming shipment*: supplier, reference/tracking, expected date, lines (existing product, or **new product created right there** with category, brand, packaging and picture), expected quantity, landed cost (TZS). Nothing changes in stock.
 2. **Attendant** sees it under "Incoming stock". When it arrives they open the **receiving document**: per line *expected / received good / damaged*, *missing* is calculated, plus a note; they can add an unexpected item. It is a **draft they can edit** until they confirm; partial deliveries are separate sessions.
 3. **Confirm** locks the session: good quantity enters stock (cost from the owner's line, hidden from the attendant), damaged is written off, missing is recorded.
 4. Any damaged / missing / unexpected line sends the shipment to the owner as **"needs investigation"** (notification + report). The owner records the outcome (supplier claim, accept loss, recount). A clean receipt just completes.
-Direct receiving (opening stock) goes through the same document so the owner never touches stock himself.
 
 ## 11. Roadmap (re-sequenced; recommendation in bold)
 Done: foundation, inventory, POS/sales, customers & credit (spec v2 phases 1–4).
 - **5. Alignment — done:** product images, price history, POS product cards, discount reason, catalogue import, sale return/cancel with owner approval + refunds, notifications bell, Shop Attendant role, separation of duties, owner and shop dashboards.
-- **5b. Shipments / receiving document** (see 10b) — **next**, ahead of cash and closing because it is the owner's main daily job.
+- **5b. Shipments / receiving document** (see 10b) — **done.**
 - **6. Cash & closing**: cash accounts + ledger (hooked into payments), expenses (limits/approval), bank deposits, daily closing + carry-forward. *Recommended before resellers* so reseller money lands in the cash ledger from day one.
-- **7. Shipments**: owner-created expected shipments and attendant confirmation.
+- ~~7. Shipments~~ — built as 5b.
 - **8. Resellers / consignment** (section 7).
 - **9. Dashboards & analytics**: owner (drill-down, trends, insights, forecasts labelled as estimates), attendant dashboard.
 - **10. CallMeBot reporting**.

@@ -61,7 +61,8 @@ export async function postReceipt(
   await lockProducts(tx, lines.map((l) => l.productId));
   for (const l of lines) {
     const unitCost = l.lineTotal.div(l.quantity).toDecimalPlaces(4);
-    await applyIncomingCost(tx, l.productId, l.quantity, unitCost); // before the quantity moves in
+    // A line with no cost known (0) must not drag the average cost down, so it is left out of the average.
+    if (l.lineTotal.gt(0)) await applyIncomingCost(tx, l.productId, l.quantity, unitCost); // before the quantity moves in
     await moveStock(tx, {
       productId: l.productId,
       locationId: input.locationId,

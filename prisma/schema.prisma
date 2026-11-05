@@ -88,6 +88,11 @@ model User {
   customersCreated   Customer[]
   creditApplications CreditApplication[]
   notifications      Notification[]
+  shipmentsCreated   Shipment[]        @relation("ShipmentCreator")
+  shipmentsResolved  Shipment[]        @relation("ShipmentResolver")
+  shipmentsClosed    Shipment[]        @relation("ShipmentCloser")
+  receivingsStarted  ShipmentReceiving[] @relation("ReceivingStarter")
+  receivingsConfirmed ShipmentReceiving[] @relation("ReceivingConfirmer")
   reversalsRequested SaleReversal[]    @relation("ReversalRequester")
   reversalsDecided   SaleReversal[]    @relation("ReversalDecider")
 
@@ -128,6 +133,7 @@ model Location {
   transfersIn    StockTransfer[]   @relation("TransferTo")
   adjustments    StockAdjustment[]
   sales          Sale[]
+  shipments      Shipment[]
 }
 
 model Setting {
@@ -172,6 +178,8 @@ model Unit {
   transferItems StockTransferItem[]
   adjustItems   StockAdjustmentItem[]
   saleItems     SaleItem[]
+  shipmentItems ShipmentItem[]
+  receivingItems ShipmentReceivingItem[]
 }
 
 model Product {
@@ -206,6 +214,8 @@ model Product {
   saleItems      SaleItem[]
   image          ProductImage?
   reversalItems  ReversalItem[]
+  shipmentItems  ShipmentItem[]
+  receivingItems ShipmentReceivingItem[]
   priceHistory   ProductPriceHistory[]
 
   @@index([categoryId])
@@ -293,6 +303,7 @@ model Supplier {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   receipts      StockReceipt[]
+  shipments     Shipment[]
 }
 
 // Atomic sequence for human-readable document numbers (GRN-2026-000001, TRF-…, ADJ-…, later INV-…).
@@ -358,6 +369,7 @@ model StockReceipt {
   receivedBy      User               @relation(fields: [receivedById], references: [id])
   createdAt       DateTime           @default(now())
   items           StockReceiptItem[]
+  receiving       ShipmentReceiving?
 
   @@index([createdAt])
   @@index([supplierId])
@@ -732,4 +744,122 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt, createdAt])
+}
+
+// ───────────── Phase 5b: incoming shipments and the receiving document ─────────────
+//
+// The OWNER announces stock that is on its way (Shipment). Nothing changes in inventory.
+// The SHOP counts it on a receiving document (ShipmentReceiving): editable as a DRAFT, then CONFIRMED,
+// which is the only moment stock increases. Damaged / missing / unexpected goods are flagged for the owner.
+
+enum ShipmentStatus {
+  EXPECTED // announced, nothing counted yet
+  PARTIAL // some of it counted, more still to come
+  RECEIVED // everything accounted for, or the shop closed it as "nothing more is coming"
+  CANCELLED
+}
+
+enum ShipmentIssue {
+  NONE
+  OPEN // damaged / missing / extra goods: the owner must look into it
+  RESOLVED
+}
+
+enum ReceivingStatus {
+  DRAFT
+  CONFIRMED
+}
+
+model Shipment {
+  id             String              @id @default(cuid())
+  shipmentNo     String              @unique
+  supplierId     String?
+  supplier       Supplier?           @relation(fields: [supplierId], references: [id])
+  reference      String? // tracking number / container / supplier invoice
+  expectedDate   DateTime?           @db.Date
+  locationId     String
+  location       Location            @relation(fields: [locationId], references: [id])
+  notes          String?
+  status         ShipmentStatus      @default(EXPECTED)
+  issue          ShipmentIssue       @default(NONE)
+  resolutionNote String?
+  resolvedById   String?
+  resolvedBy     User?               @relation("ShipmentResolver", fields: [resolvedById], references: [id])
+  resolvedAt     DateTime?
+  closedAt       DateTime? // set when the shop says nothing more is coming
+  closedById     String?
+  closedBy       User?               @relation("ShipmentCloser", fields: [closedById], references: [id])
+  createdById    String
+  createdBy      User                @relation("ShipmentCreator", fields: [createdById], references: [id])
+  submissionKey  String              @unique
+  createdAt      DateTime            @default(now())
+  items          ShipmentItem[]
+  receivings     ShipmentReceiving[]
+
+  @@index([status, createdAt])
+  @@index([issue])
+}
+
+model ShipmentItem {
+  id            String                  @id @default(cuid())
+  shipmentId    String
+  shipment      Shipment                @relation(fields: [shipmentId], references: [id])
+  productId     String
+  product       Product                 @relation(fields: [productId], references: [id])
+  expectedQty   Decimal                 @db.Decimal(14, 3) // base units; 0 for goods the shop found that were not announced
+  enteredQty    Decimal                 @db.Decimal(14, 3) // as the owner typed it, in enteredUnit
+  enteredUnitId String
+  enteredUnit   Unit                    @relation(fields: [enteredUnitId], references: [id])
+  factor        Decimal                 @db.Decimal(14, 4)
+  unitCost      Decimal?                @db.Decimal(16, 4) // landed cost per base unit, set by the owner (hidden from the shop)
+  lineCost      Decimal?                @db.Decimal(14, 2)
+  unexpected    Boolean                 @default(false)
+  missingQty    Decimal                 @default(0) @db.Decimal(14, 3) // filled in when the shipment is closed
+  receivingItems ShipmentReceivingItem[]
+
+  @@unique([shipmentId, productId])
+  @@index([productId])
+}
+
+model ShipmentReceiving {
+  id           String                  @id @default(cuid())
+  shipmentId   String
+  shipment     Shipment                @relation(fields: [shipmentId], references: [id])
+  sessionNo    Int
+  status       ReceivingStatus         @default(DRAFT)
+  notes        String?
+  finishShipment Boolean               @default(false) // "nothing more is coming"
+  startedById  String
+  startedBy    User                    @relation("ReceivingStarter", fields: [startedById], references: [id])
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  confirmedById String?
+  confirmedBy  User?                   @relation("ReceivingConfirmer", fields: [confirmedById], references: [id])
+  confirmedAt  DateTime?
+  stockReceiptId String?               @unique
+  stockReceipt StockReceipt?           @relation(fields: [stockReceiptId], references: [id])
+  items        ShipmentReceivingItem[]
+
+  @@unique([shipmentId, sessionNo])
+}
+
+model ShipmentReceivingItem {
+  id             String            @id @default(cuid())
+  receivingId    String
+  receiving      ShipmentReceiving @relation(fields: [receivingId], references: [id])
+  productId      String
+  product        Product           @relation(fields: [productId], references: [id])
+  shipmentItemId String? // null = goods that were not announced
+  shipmentItem   ShipmentItem?     @relation(fields: [shipmentItemId], references: [id])
+  enteredUnitId  String
+  enteredUnit    Unit              @relation(fields: [enteredUnitId], references: [id])
+  factor         Decimal           @db.Decimal(14, 4)
+  enteredGood    Decimal           @db.Decimal(14, 3)
+  enteredDamaged Decimal           @db.Decimal(14, 3)
+  goodQty        Decimal           @db.Decimal(14, 3) // base units in good condition
+  damagedQty     Decimal           @db.Decimal(14, 3) // base units damaged on arrival
+  note           String?
+
+  @@index([receivingId])
+  @@index([shipmentItemId])
 }

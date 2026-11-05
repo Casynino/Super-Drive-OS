@@ -49,6 +49,10 @@ export const PERMISSIONS = [
   { key: "inventory.report_damage", module: "Inventory", label: "Report damaged or missing stock" },
   { key: "inventory.adjust", module: "Inventory", label: "Adjust stock quantities" },
 
+  // Incoming stock (shipments)
+  { key: "shipments.manage", module: "Shipments", label: "Announce incoming shipments and investigate problems" },
+  { key: "shipments.receive", module: "Shipments", label: "Count and confirm incoming shipments" },
+
   // Purchasing & suppliers
   { key: "purchasing.view", module: "Purchasing", label: "View purchase orders" },
   { key: "purchasing.create", module: "Purchasing", label: "Create purchase orders" },
@@ -96,6 +100,7 @@ export const SHOP_FLOOR_PERMISSIONS: ReadonlySet<string> = new Set<PermissionKey
   "sales.credit",
   "payments.record",
   "inventory.receive",
+  "shipments.receive",
   "inventory.report_damage",
   "inventory.count",
   "expenses.create",
@@ -145,6 +150,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "suppliers.view",
       "returns.create",
       "returns.approve",
+      "shipments.manage",
       "expenses.view",
       "closing.submit",
       "closing.approve",
@@ -167,7 +173,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "payments.record",
       "products.view",
       "inventory.view",
-      "inventory.receive",
+      "shipments.receive",
       "inventory.report_damage",
       "returns.create",
       "expenses.create",
@@ -182,7 +188,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "products.view",
       "inventory.view",
       "inventory.movements",
-      "inventory.receive",
+      "shipments.receive",
       "inventory.transfer",
       "inventory.count",
       "inventory.report_damage",
