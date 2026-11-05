@@ -103,8 +103,8 @@ Done: foundation, inventory, POS/sales, customers & credit (spec v2 phases 1–4
 - **6. Cash & closing — done (2026-11-06)**: cash accounts + ledger hooked into payments/refunds, expenses (limit + approval), bank deposits, daily closing with carry-forward and owner review. Reseller collections will land in the same ledger.
 - ~~7. Shipments~~ — built as 5b.
 - **8. Resellers / consignment — done (2026-11-06)** (section 7): custody locations, issue documents, sold reports as credit invoices, collections via the normal payment flow.
-- **9. Dashboards & analytics**: owner (drill-down, trends, insights, forecasts labelled as estimates), attendant dashboard.
-- **10. CallMeBot reporting**.
-- **11. Receipts (80 mm / PDF / reprint) and UI polish**.
+- **9. Dashboards & analytics — done (2026-11-06)**: owner (drill-down, trends, insights, forecasts labelled as estimates), attendant dashboard.
+- **10. CallMeBot reporting — done (2026-11-06)**.
+- **11. Receipts (80 mm / PDF / reprint) — done (2026-11-06)**; UI polish ongoing.
 - **12. Security, load/concurrency testing, production readiness** (backups, Neon migration plan, rate limits).
 After each phase: typecheck, unit + database tests, browser check, local commit. Nothing is pushed until Nino says so.
