@@ -7,6 +7,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import type { SessionUser } from "@/lib/auth/session";
+import { unclosedDays } from "@/lib/cash/closing";
 import { businessDay, dayToDate, defaultLocationId, getBalances } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { getOwnerDashboard } from "@/lib/dashboard/owner";
@@ -317,6 +318,16 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
   const incoming = can(user, "shipments.receive") ? await db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] } } }) : 0;
   const closedToday = can(user, "closing.submit") ? await db.dailyClosing.findFirst({ where: { businessDate: dayToDate(businessDay()) }, select: { id: true } }) : null;
   const pendingExpensesMine = can(user, "expenses.create") ? await db.expense.count({ where: { requestedById: user.id, status: "PENDING" } }) : 0;
+  const hourNow = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Africa/Dar_es_Salaam" }).format(new Date()));
+  const [shelf, spentToday, recentReceipts, recentIssues, recentPays, recentSpend, olderOpen] = await Promise.all([
+    can(user, "inventory.view") ? db.stockBalance.aggregate({ where: { location: { type: { not: "RESELLER" } } }, _sum: { quantity: true } }) : null,
+    can(user, "expenses.create") ? db.expense.aggregate({ where: { requestedById: user.id, status: "APPROVED", expenseDate: dayToDate(today) }, _sum: { amount: true } }) : null,
+    can(user, "inventory.view") ? db.stockReceipt.findMany({ where: { createdAt: { gte: from, lte: to } }, orderBy: { createdAt: "desc" }, take: 4, select: { id: true, receiptNo: true, createdAt: true, items: { select: { product: { select: { name: true } } }, take: 2 } } }) : [],
+    can(user, "resellers.view") ? db.resellerIssue.findMany({ where: { createdAt: { gte: from, lte: to } }, orderBy: { createdAt: "desc" }, take: 4, select: { id: true, issueNo: true, createdAt: true, reseller: { select: { name: true } } } }) : [],
+    can(user, "payments.record") ? db.payment.findMany({ where: { source: "DEBT_COLLECTION", receivedById: user.id, receivedAt: { gte: from, lte: to } }, orderBy: { receivedAt: "desc" }, take: 4, select: { id: true, paymentNo: true, amount: true, receivedAt: true, customer: { select: { name: true } } } }) : [],
+    can(user, "expenses.create") ? db.expense.findMany({ where: { requestedById: user.id, requestedAt: { gte: from, lte: to } }, orderBy: { requestedAt: "desc" }, take: 4, select: { id: true, expenseNo: true, amount: true, requestedAt: true, status: true, category: { select: { name: true } } } }) : [],
+    can(user, "closing.submit") ? unclosedDays(db, await defaultLocationId(db), today) : [],
+  ]);
   const [mySales, myPayments, pendingMine, alerts] = await Promise.all([
     sells ? db.sale.findMany({ where: { salespersonId: user.id, createdAt: { gte: from, lte: to } }, orderBy: { createdAt: "desc" }, include: { customer: { select: { name: true } } } }) : [],
     can(user, "payments.record") || sells ? db.payment.groupBy({ by: ["method"], where: { receivedById: user.id, receivedAt: { gte: from, lte: to } }, _sum: { amount: true } }) : [],
@@ -329,6 +340,16 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
   const stillOwed = active.reduce((s, x) => s.plus(owedOf(x)), new Prisma.Decimal(0));
   const received = (method: string) => myPayments.find((p) => p.method === method)?._sum.amount ?? new Prisma.Decimal(0);
   const collected = myPayments.reduce((s, p) => s.plus(p._sum.amount ?? 0), new Prisma.Decimal(0));
+
+  const onCredit = active.filter((x) => owedOf(x).gt(0));
+  const canClose = can(user, "closing.submit");
+  const shopStatus = !canClose ? null : closedToday ? ({ label: "CLOSED", text: "Today is closed. Anything new goes into tomorrow's closing.", tone: "closed" } as const) : olderOpen.length > 0 || hourNow >= 18 ? ({ label: "AWAITING DAILY CLOSING", text: olderOpen.length > 0 ? "An earlier day was never closed. Close the day when you are ready." : "Count the cash and close the day when you finish.", tone: "awaiting" } as const) : ({ label: "OPEN", text: "The shop is open. Close the day when you finish.", tone: "open" } as const);
+  const feed = [
+    ...recentReceipts.map((r) => ({ at: r.createdAt, text: `Stock received: ${r.items.map((i) => i.product.name).join(", ")}`, ref: r.receiptNo, href: `/inventory/receiving/${r.id}` })),
+    ...recentIssues.map((i) => ({ at: i.createdAt, text: `Stock issued to ${i.reseller.name}`, ref: i.issueNo, href: `/resellers/issues/${i.id}` })),
+    ...recentPays.map((p) => ({ at: p.receivedAt, text: `Payment from ${p.customer?.name ?? "a customer"}: ${m(p.amount)}`, ref: p.paymentNo, href: `/payments/${p.id}` })),
+    ...recentSpend.map((e) => ({ at: e.requestedAt, text: `Expense (${e.category.name}): ${m(e.amount)}${e.status === "PENDING" ? " · waiting for the owner" : ""}`, ref: e.expenseNo, href: `/expenses/${e.id}` })),
+  ].sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 8);
 
   const actions = [
     can(user, "sales.pos") && { href: "/pos", icon: ShoppingCart, title: "New sale", text: "Sell to a customer", primary: true },
@@ -351,6 +372,16 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
         <p className="mt-1 text-sm text-slate-500">{new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Dar_es_Salaam" }).format(new Date())}</p>
       </div>
 
+      {shopStatus && (
+        <div className={cn("mb-5 flex items-center gap-3 rounded-2xl border px-4 py-3", shopStatus.tone === "open" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : shopStatus.tone === "awaiting" ? "border-amber-200 bg-oil-soft text-yellow-950" : "border-slate-200 bg-slate-100 text-slate-700")}>
+          <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", shopStatus.tone === "open" ? "bg-emerald-500" : shopStatus.tone === "awaiting" ? "animate-pulse bg-amber-500" : "bg-slate-400")} aria-hidden />
+          <span className="text-sm">
+            <strong className="mr-2 tracking-wide">{shopStatus.label}</strong>
+            {shopStatus.text}
+          </span>
+        </div>
+      )}
+
       <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         {actions.map((a) => (
           <Link key={a.title} href={a.href} className={cn("group flex items-center gap-4 rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:shadow-md sm:p-5", a.primary ? "col-span-2 border-navy-700 bg-navy-700 text-white lg:col-span-1" : "border-line bg-white")}>
@@ -366,11 +397,12 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
       </div>
 
       {sells && (
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <StatTile icon={Receipt} tone="navy" label="My sales today" value={m(soldToday)} hint={`${active.length} sale${active.length === 1 ? "" : "s"}`} href="/sales" />
-          <StatTile icon={Wallet} tone="green" label="Money I received today" value={m(collected)} hint={`Cash ${m(received("CASH"))} · Mobile ${m(received("MOBILE_MONEY"))} · Bank ${m(received("BANK"))}`} />
-          <StatTile icon={HandCoins} tone="red" label="Still unpaid on today's sales" value={m(stillOwed)} hint="Customers who took goods on credit" />
-          <StatTile icon={Undo2} tone="yellow" label="My requests waiting" value={pendingMine} hint="Returns waiting for the manager" />
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
+          <StatTile icon={Receipt} tone="navy" label="Sales today" value={m(soldToday)} hint={`${active.length} sale${active.length === 1 ? "" : "s"}`} href="/sales" />
+          <StatTile icon={Wallet} tone="green" label="Money received" value={m(collected)} hint={`Cash ${m(received("CASH"))} · Mobile ${m(received("MOBILE_MONEY"))} · Bank ${m(received("BANK"))}`} />
+          <StatTile icon={HandCoins} tone="red" label="On credit today" value={String(onCredit.length)} hint={`${m(stillOwed)} not paid yet`} />
+          {spentToday ? <StatTile icon={ReceiptText} tone="yellow" label="Expenses today" value={m(spentToday._sum.amount ?? 0)} href="/expenses" /> : <StatTile icon={Undo2} tone="yellow" label="Requests waiting" value={pendingMine} hint="Returns waiting for the manager" />}
+          {shelf ? <StatTile icon={Boxes} tone="slate" label="Stock on the shelf" value={`${Number(shelf._sum.quantity ?? 0).toFixed(0)} items`} href="/inventory" /> : <StatTile icon={Undo2} tone="slate" label="Requests waiting" value={pendingMine} />}
         </div>
       )}
 
@@ -436,6 +468,23 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
                 ))}
               </ul>
             )}
+          </section>
+        )}
+
+        {feed.length > 0 && (
+          <section className="card overflow-hidden lg:col-span-2">
+            <h2 className="border-b border-line px-5 py-3 text-base font-semibold text-slate-900">What happened today</h2>
+            <ul className="divide-y divide-slate-100">
+              {feed.map((f) => (
+                <li key={f.ref} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
+                  <Link href={f.href} className="min-w-0 truncate text-slate-800 hover:text-navy-700">
+                    {f.text}
+                    <span className="ml-2 text-xs text-slate-400">{f.ref}</span>
+                  </Link>
+                  <span className="shrink-0 text-xs text-slate-500">{new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dar_es_Salaam" }).format(f.at)}</span>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
       </div>

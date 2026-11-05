@@ -189,6 +189,7 @@ export async function buildDailyReport(db: Db, locationId: string, day: string):
   if (num(s.cash.refundsOut)) L.push(`- Refunds: ${m(num(s.cash.refundsOut))}`);
   L.push(`- Cash expenses: ${m(num(s.cash.expensesOut))}`);
   if (num(s.cash.withdrawals)) L.push(`- Owner withdrawals: ${m(num(s.cash.withdrawals))}`);
+  if (num(s.cash.supplierPayments)) L.push(`- Paid to suppliers: ${m(num(s.cash.supplierPayments))}`);
   if (num(s.cash.depositsOut)) L.push(`- Deposited earlier: ${m(num(s.cash.depositsOut))}`);
   if (num(s.cash.corrections)) L.push(`Corrections: ${m(num(s.cash.corrections))}`);
   L.push(`= Should be in the till: ${m(num(closing.expectedCash))}`, `Counted: ${m(num(closing.countedCash))}`, `Difference: ${diff === 0 ? "none" : `${diff < 0 ? "short" : "extra"} ${m(Math.abs(diff))}`}`);

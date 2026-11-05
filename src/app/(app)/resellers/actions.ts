@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
 import { fail, formString, formValues, guarded, isUniqueViolation, type ActionState } from "@/lib/action";
+import { notifyStockCrossings } from "@/lib/inventory/alerts";
 import { InsufficientStockError } from "@/lib/inventory/engine";
 import { formatMoney } from "@/lib/money";
 import { notifyPermission } from "@/lib/notifications";
@@ -112,6 +113,8 @@ export async function issueStockAction(_prev: ActionState, fd: FormData): Promis
           const r = await issueStock(tx, { user, resellerId, fromLocationId: formString(fd, "fromLocationId"), lines, notes: formString(fd, "notes") || null, submissionKey, currencyDecimals: currency.decimals });
           await writeAudit(tx, { user, action: "reseller.issue", entityType: "ResellerIssue", entityId: r.issue.id, reference: `${r.issue.issueNo} · ${r.reseller.name}`, after: { expectedValue: r.issue.expectedValue.toString(), lines: lines.length } });
           await notifyPermission(tx, "resellers.manage", { type: "reseller.issue", title: `Stock issued to ${r.reseller.name}: ${formatMoney(r.issue.expectedValue, currency)}`, body: `${user.name} · ${r.issue.issueNo}`, link: `/resellers/issues/${r.issue.id}` }, user.id);
+          const items = await tx.resellerIssueItem.findMany({ where: { issueId: r.issue.id }, select: { productId: true, quantity: true } });
+          await notifyStockCrossings(tx, items.map((i) => ({ productId: i.productId, qty: i.quantity })), `After issuing stock to ${r.reseller.name} (${r.issue.issueNo})`);
           return r.issue.id;
         },
         { timeout: 30000, maxWait: 15000 },

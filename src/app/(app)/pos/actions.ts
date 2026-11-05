@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
 import { fail, guarded, formString, type ActionState } from "@/lib/action";
+import { notifyStockCrossings } from "@/lib/inventory/alerts";
 import { InsufficientStockError } from "@/lib/inventory/engine";
 import { CreditLimitError, SaleError, postSale } from "@/lib/sales/post-sale";
 import { getBusinessProfile, getCurrency } from "@/lib/settings";
@@ -73,6 +74,8 @@ export async function createSale(_prev: ActionState, fd: FormData): Promise<Acti
           if (r.creditExceptionUsed) {
             await writeAudit(tx, { ...base, action: "credit.exception_approved", reason: r.sale.creditExceptionReason, after: { customerId: r.sale.customerId, creditSale: r.onCredit } });
           }
+          const sold = await tx.stockMovement.findMany({ where: { referenceType: "Sale", referenceId: r.sale.id, type: "SOLD" }, select: { productId: true, quantity: true } });
+          await notifyStockCrossings(tx, sold.map((m) => ({ productId: m.productId, qty: m.quantity.neg() })), `After sale ${r.sale.saleNo}`);
           return r.sale;
         },
         { timeout: 30000, maxWait: 15000 },

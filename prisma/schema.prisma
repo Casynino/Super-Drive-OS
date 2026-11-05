@@ -107,6 +107,7 @@ model User {
   resellersCreated    Reseller[]
   resellerIssues      ResellerIssue[]
   resellerReturns     ResellerReturn[]
+  supplierPayments    SupplierPayment[]
 
   @@index([roleId])
 }
@@ -317,18 +318,19 @@ enum AdjustmentKind {
 }
 
 model Supplier {
-  id            String         @id @default(cuid())
-  name          String         @unique
+  id            String            @id @default(cuid())
+  name          String            @unique
   contactPerson String?
   phone         String?
   email         String?
   address       String?
   notes         String?
-  status        RecordStatus   @default(ACTIVE)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  status        RecordStatus      @default(ACTIVE)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
   receipts      StockReceipt[]
   shipments     Shipment[]
+  payments      SupplierPayment[]
 }
 
 // Atomic sequence for human-readable document numbers (GRN-2026-000001, TRF-…, ADJ-…, later INV-…).
@@ -801,30 +803,31 @@ enum ReceivingStatus {
 }
 
 model Shipment {
-  id             String              @id @default(cuid())
-  shipmentNo     String              @unique
-  supplierId     String?
-  supplier       Supplier?           @relation(fields: [supplierId], references: [id])
-  reference      String? // tracking number / container / supplier invoice
-  expectedDate   DateTime?           @db.Date
-  locationId     String
-  location       Location            @relation(fields: [locationId], references: [id])
-  notes          String?
-  status         ShipmentStatus      @default(EXPECTED)
-  issue          ShipmentIssue       @default(NONE)
-  resolutionNote String?
-  resolvedById   String?
-  resolvedBy     User?               @relation("ShipmentResolver", fields: [resolvedById], references: [id])
-  resolvedAt     DateTime?
-  closedAt       DateTime? // set when the shop says nothing more is coming
-  closedById     String?
-  closedBy       User?               @relation("ShipmentCloser", fields: [closedById], references: [id])
-  createdById    String
-  createdBy      User                @relation("ShipmentCreator", fields: [createdById], references: [id])
-  submissionKey  String              @unique
-  createdAt      DateTime            @default(now())
-  items          ShipmentItem[]
-  receivings     ShipmentReceiving[]
+  id               String              @id @default(cuid())
+  shipmentNo       String              @unique
+  supplierId       String?
+  supplier         Supplier?           @relation(fields: [supplierId], references: [id])
+  reference        String? // tracking number / container / supplier invoice
+  expectedDate     DateTime?           @db.Date
+  locationId       String
+  location         Location            @relation(fields: [locationId], references: [id])
+  notes            String?
+  status           ShipmentStatus      @default(EXPECTED)
+  issue            ShipmentIssue       @default(NONE)
+  resolutionNote   String?
+  resolvedById     String?
+  resolvedBy       User?               @relation("ShipmentResolver", fields: [resolvedById], references: [id])
+  resolvedAt       DateTime?
+  closedAt         DateTime? // set when the shop says nothing more is coming
+  closedById       String?
+  closedBy         User?               @relation("ShipmentCloser", fields: [closedById], references: [id])
+  createdById      String
+  createdBy        User                @relation("ShipmentCreator", fields: [createdById], references: [id])
+  submissionKey    String              @unique
+  createdAt        DateTime            @default(now())
+  items            ShipmentItem[]
+  receivings       ShipmentReceiving[]
+  supplierPayments SupplierPayment[]
 
   @@index([status, createdAt])
   @@index([issue])
@@ -916,6 +919,7 @@ enum CashTxType {
   REFUND // money paid back to a customer
   EXPENSE
   EXPENSE_REVERSAL
+  SUPPLIER_PAYMENT // money paid to a supplier
   DEPOSIT_OUT // cash leaves the till for the bank (a transfer, not an expense)
   DEPOSIT_IN // the same money arriving in the bank account
   WITHDRAWAL // the owner takes money out
@@ -1221,4 +1225,26 @@ model WhatsAppReport {
 
   @@index([businessDate, kind])
   @@index([status, createdAt])
+}
+
+// Money paid to a supplier (from cash, mobile money or the bank). What we owe a supplier is always calculated:
+// the cost of their shipments and purchase receipts minus these payments.
+model SupplierPayment {
+  id            String        @id @default(cuid())
+  paymentNo     String        @unique
+  supplierId    String
+  supplier      Supplier      @relation(fields: [supplierId], references: [id])
+  shipmentId    String? // the shipment this payment is for, when it is for one
+  shipment      Shipment?     @relation(fields: [shipmentId], references: [id])
+  amount        Decimal       @db.Decimal(14, 2)
+  method        PaymentMethod
+  reference     String?
+  notes         String?
+  locationId    String
+  paidAt        DateTime      @default(now())
+  createdById   String
+  createdBy     User          @relation(fields: [createdById], references: [id])
+  submissionKey String        @unique
+
+  @@index([supplierId, paidAt])
 }

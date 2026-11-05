@@ -26,3 +26,40 @@ export async function getStockAlerts(db: Pick<Db, "product" | "stockBalance">) {
   }
   return { out, low, active: products.length, inStock };
 }
+
+/**
+ * Tells the owner when shelf stock drops to or below its minimum (or runs out) because of what was just done.
+ * Fires only when the level CROSSES the line (it was above, now it is at/below), so a busy day does not flood anyone.
+ * Stock held by resellers is not on the shelf and is ignored. Call inside the same transaction as the stock change.
+ */
+export async function notifyStockCrossings(
+  tx: Pick<Prisma.TransactionClient, "stockBalance" | "product" | "notification" | "user">,
+  removed: { productId: string; qty: Prisma.Decimal }[],
+  context: string,
+) {
+  const merged = new Map<string, Prisma.Decimal>();
+  for (const r of removed) merged.set(r.productId, (merged.get(r.productId) ?? new D(0)).plus(r.qty));
+  for (const [productId, qty] of merged) {
+    const [p, now] = await Promise.all([
+      tx.product.findUnique({ where: { id: productId }, select: { name: true, minStock: true, status: true, baseUnit: { select: { symbol: true } } } }),
+      tx.stockBalance.aggregate({ where: { productId, location: { type: { not: "RESELLER" } } }, _sum: { quantity: true } }),
+    ]);
+    if (!p || p.status !== "ACTIVE") continue;
+    const after = now._sum.quantity ?? new D(0);
+    const before = after.plus(qty);
+    const out = after.lte(0) && before.gt(0);
+    const low = !out && p.minStock.gt(0) && after.lte(p.minStock) && before.gt(p.minStock);
+    if (!out && !low) continue;
+    const people = await tx.user.findMany({ where: { status: "ACTIVE", role: { OR: [{ isSuperAdmin: true }, { permissions: { some: { permission: { key: "dashboard.view" } } } }] } }, select: { id: true } });
+    if (people.length === 0) continue;
+    await tx.notification.createMany({
+      data: people.map((u) => ({
+        userId: u.id,
+        type: out ? "stock.out" : "stock.low",
+        title: out ? `${p.name} is out of stock` : `${p.name} is running low: ${after.toString()} ${p.baseUnit.symbol} left`,
+        body: context,
+        link: "/inventory?status=" + (out ? "out" : "low"),
+      })),
+    });
+  }
+}

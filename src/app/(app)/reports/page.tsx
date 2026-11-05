@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { PRESETS, financeAnalytics, insights, inventoryAnalytics, reportRange, salesAnalytics, type Grain } from "@/lib/reports/analytics";
+import { getSupplierBalances } from "@/lib/cash/supplier";
 import { getCurrency } from "@/lib/settings";
 import { ACCOUNT_NAME, TX_LABEL } from "@/lib/cash/ledger";
 import { cn, formatDate } from "@/lib/utils";
@@ -39,6 +40,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   const [sales, inv, fin] = await Promise.all([salesAnalytics(db, r, grain, financials), inventoryAnalytics(db, financials), financeAnalytics(db, r)]);
   const notes = await insights(db, sales, inv, fin, r);
+  const supplierOwed = (await getSupplierBalances(db)).reduce((t, x) => t + Math.max(0, x.owed), 0);
   const q = (extra: Record<string, string>) => {
     const p = new URLSearchParams();
     const base: Record<string, string | undefined> = { tab: sp.tab, range: sp.range, from: sp.from, to: sp.to, grain: sp.grain, ...extra };
@@ -281,7 +283,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               <dl className="space-y-3 text-sm">
                 <div className="flex items-center justify-between"><dt className="text-slate-600">Customers</dt><dd className="font-semibold tabular-nums">{m(fin.customerOwed)} {fin.customerOverdue > 0 && <span className="badge-red ml-2">{m(fin.customerOverdue)} overdue</span>}</dd></div>
                 <div className="flex items-center justify-between"><dt className="text-slate-600">Resellers</dt><dd className="font-semibold tabular-nums">{m(fin.resellerOwed)} {fin.resellerOverdue > 0 && <span className="badge-red ml-2">{m(fin.resellerOverdue)} overdue</span>}</dd></div>
-                <div className="flex items-center justify-between border-t border-line pt-3"><dt className="text-slate-600">Supplier obligations</dt><dd className="text-slate-400">Not tracked yet</dd></div>
+                <div className="flex items-center justify-between border-t border-line pt-3"><dt className="text-slate-600">Supplier obligations</dt><dd className="font-semibold tabular-nums">{m(supplierOwed)}</dd></div>
               </dl>
             </section>
             <section className="card card-pad">

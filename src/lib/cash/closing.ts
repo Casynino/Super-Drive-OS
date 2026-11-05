@@ -26,7 +26,7 @@ export type ClosingSummary = {
   sales: { count: number; total: string; paidByMethod: MethodTotals; creditGiven: string; returnsCount: number; returnsValue: string };
   collections: { total: string; byMethod: MethodTotals };
   expenses: { total: string; byCategory: { name: string; amount: string }[] };
-  cash: { opening: string; salesIn: string; collectionsIn: string; refundsOut: string; expensesOut: string; withdrawals: string; depositsOut: string; corrections: string; expected: string };
+  cash: { opening: string; salesIn: string; collectionsIn: string; refundsOut: string; expensesOut: string; withdrawals: string; depositsOut: string; corrections: string; expected: string; /** paid to suppliers (absent in closings made before suppliers could be paid) */ supplierPayments?: string };
   accounts: { method: PaymentMethod; opening: string; in: string; out: string; balance: string }[];
   entries: number;
 };
@@ -89,7 +89,7 @@ async function summarize(tx: Pick<Tx, "$queryRaw">, rows: OpenRow[], stamped: Re
   const inBy = zeroBy();
   const outBy = zeroBy();
   const collections = zeroBy();
-  let salesIn = new D(0), collectionsIn = new D(0), refundsOut = new D(0), expensesOut = new D(0), withdrawals = new D(0), depositsOut = new D(0), corrections = new D(0);
+  let supplierOut = new D(0), salesIn = new D(0), collectionsIn = new D(0), refundsOut = new D(0), expensesOut = new D(0), withdrawals = new D(0), depositsOut = new D(0), corrections = new D(0);
 
   for (const r of rows) {
     if (r.type === "OPENING_BALANCE") {
@@ -106,6 +106,7 @@ async function summarize(tx: Pick<Tx, "$queryRaw">, rows: OpenRow[], stamped: Re
       case "REFUND": refundsOut = refundsOut.plus(r.amount.neg()); break;
       case "EXPENSE": case "EXPENSE_REVERSAL": expensesOut = expensesOut.minus(r.amount); break;
       case "WITHDRAWAL": withdrawals = withdrawals.plus(r.amount.neg()); break;
+      case "SUPPLIER_PAYMENT": supplierOut = supplierOut.plus(r.amount.neg()); break;
       case "DEPOSIT_OUT": depositsOut = depositsOut.plus(r.amount.neg()); break;
       default: corrections = corrections.plus(r.amount); // ADJUSTMENT (DEPOSIT_IN / CLOSING_DIFFERENCE never appear on open cash rows)
     }
@@ -133,7 +134,7 @@ async function summarize(tx: Pick<Tx, "$queryRaw">, rows: OpenRow[], stamped: Re
     expenses: { total: expenseTotal.toString(), byCategory: byCategory.map((c) => ({ name: c.name, amount: new D(c.v ?? 0).toString() })) },
     cash: {
       opening: opening.CASH.toString(), salesIn: salesIn.toString(), collectionsIn: collectionsIn.toString(), refundsOut: refundsOut.toString(), expensesOut: expensesOut.toString(),
-      withdrawals: withdrawals.toString(), depositsOut: depositsOut.toString(), corrections: corrections.toString(), expected: expectedCash.toString(),
+      withdrawals: withdrawals.toString(), depositsOut: depositsOut.toString(), corrections: corrections.toString(), expected: expectedCash.toString(), supplierPayments: supplierOut.toString(),
     },
     accounts: METHODS.map((method) => ({ method, opening: opening[method].toString(), in: inBy[method].toString(), out: outBy[method].toString(), balance: opening[method].plus(inBy[method]).minus(outBy[method]).toString() })),
     entries: rows.length,

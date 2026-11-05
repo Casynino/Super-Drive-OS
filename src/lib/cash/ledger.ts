@@ -36,6 +36,7 @@ export const TX_LABEL: Record<CashTxType, string> = {
   REFUND: "Refund to customer",
   EXPENSE: "Expense",
   EXPENSE_REVERSAL: "Expense reversed",
+  SUPPLIER_PAYMENT: "Paid to supplier",
   DEPOSIT_OUT: "Deposited to bank",
   DEPOSIT_IN: "Bank deposit received",
   WITHDRAWAL: "Withdrawal",

@@ -87,6 +87,7 @@ export function ClosingSummaryView({ s, currency, showAccounts = true }: { s: Cl
         {nonZero(s.cash.refundsOut) && <Row sign="-" label="Refunds paid to customers" value={m(s.cash.refundsOut)} />}
         <Row sign="-" label="Cash expenses" value={m(s.cash.expensesOut)} />
         {nonZero(s.cash.withdrawals) && <Row sign="-" label="Taken out by the owner" value={m(s.cash.withdrawals)} />}
+        {nonZero(s.cash.supplierPayments ?? "0") && <Row sign="-" label="Paid to suppliers" value={m(s.cash.supplierPayments ?? "0")} />}
         {nonZero(s.cash.depositsOut) && <Row sign="-" label="Deposited to the bank earlier" value={m(s.cash.depositsOut)} />}
         {nonZero(s.cash.corrections) && <Row sign={Number(s.cash.corrections) < 0 ? "-" : "+"} label="Corrections by the owner" value={m(String(Math.abs(Number(s.cash.corrections))))} />}
         <Row sign="=" label="Cash that should be in the till" value={m(s.cash.expected)} strong />

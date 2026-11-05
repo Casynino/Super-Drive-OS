@@ -63,7 +63,10 @@ export default async function SalePage({ params, searchParams }: { params: Promi
               Return / cancel
             </Link>
           )}
-          <PrintButton label="Print receipt" />
+          <Link href={`/sales/${sale.id}/receipt${sp.created ? "?first=1" : ""}`} className="btn-secondary">
+            Thermal receipt
+          </Link>
+          <PrintButton label="Print invoice" />
         </div>
       </div>
       {sp.reversal && (

@@ -74,7 +74,7 @@ export const NAV: NavGroup[] = [
       { label: "Expenses", href: "/expenses", icon: ReceiptText, permissions: ["expenses.view", "expenses.create"], ready: true },
       { label: "Cash & Accounts", href: "/cash", icon: Banknote, permissions: ["cash.view"], ready: true },
       { label: "Bank Deposits", href: "/deposits", icon: Landmark, permissions: ["deposits.record", "cash.view"], ready: true },
-      { label: "Supplier Accounts", href: "/suppliers", icon: Truck, permissions: ["suppliers.view", "suppliers.manage"], ready: true },
+      { label: "Supplier Accounts", href: "/suppliers", icon: Truck, permissions: ["suppliers.view", "suppliers.manage", "suppliers.pay"], ready: true },
       { label: "Financial Overview", href: "/finance", icon: ChartColumn, permissions: ["finance.view"], ready: false },
     ],
   },
