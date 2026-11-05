@@ -1178,3 +1178,47 @@ model ResellerReturnItem {
 
   @@index([returnId])
 }
+
+// ───────────── WhatsApp daily reports (CallMeBot) ─────────────
+// One row per message sent (or to be sent). Scheduled reports are unique per day/kind/part, so the scheduler can run
+// as often as it likes and never sends the same report twice. Message text is kept so a failed part can be retried
+// exactly as it was, and so the owner can see what was sent.
+
+enum ReportKind {
+  SUMMARY
+  DETAIL
+  EXCEPTION // the shop has not closed the day
+}
+
+enum ReportTrigger {
+  SCHEDULED
+  MANUAL
+}
+
+enum ReportStatus {
+  PENDING
+  SENDING // claimed by one running job, so two jobs can never send the same message
+  SENT
+  FAILED
+}
+
+model WhatsAppReport {
+  id            String        @id @default(cuid())
+  businessDate  DateTime      @db.Date
+  kind          ReportKind
+  part          Int // 1-based; the summary is part 1 of 1
+  parts         Int
+  trigger       ReportTrigger
+  status        ReportStatus  @default(PENDING)
+  attempts      Int           @default(0)
+  error         String?
+  content       String
+  toPhone       String // the number, masked for display in the log
+  requestedById String?
+  createdAt     DateTime      @default(now())
+  sentAt        DateTime?
+  claimedAt     DateTime?
+
+  @@index([businessDate, kind])
+  @@index([status, createdAt])
+}

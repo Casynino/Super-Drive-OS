@@ -84,7 +84,7 @@ export const NAV: NavGroup[] = [
       { label: "Employees", href: "/employees", icon: UserCog, permissions: ["employees.view", "employees.manage"], ready: true },
       { label: "Approvals", href: "/approvals", icon: Inbox, permissions: ["returns.approve", "expenses.approve", "closing.approve"], ready: true },
       { label: "Daily Closing", href: "/closing", icon: CalendarCheck, permissions: ["closing.submit", "closing.approve"], ready: true },
-      { label: "Reports", href: "/reports", icon: ChartColumn, permissions: ["reports.view", "reports.financial"], ready: false },
+      { label: "Reports", href: "/reports", icon: ChartColumn, permissions: ["reports.view", "reports.financial"], ready: true },
       { label: "Audit Logs", href: "/audit", icon: ScrollText, permissions: ["audit.view"], ready: true },
       { label: "Roles & Permissions", href: "/settings/roles", icon: ShieldCheck, permissions: ["roles.manage"], ready: true },
       { label: "Settings", href: "/settings", icon: Settings, permissions: ["settings.view", "catalog.manage"], ready: true },

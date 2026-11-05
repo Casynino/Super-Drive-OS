@@ -61,15 +61,15 @@ export function DonutChart({ data, money, centre }: { data: { name: string; valu
   );
 }
 
-export function TopProductsChart({ data, money }: { data: { name: string; value: number }[]; money: Money }) {
-  if (data.length === 0) return <Empty text="No product sales in this period yet" />;
+export function TopProductsChart({ data, money, empty = "No product sales in this period yet", label = "Sales" }: { data: { name: string; value: number }[]; money: Money; empty?: string; label?: string }) {
+  if (data.length === 0) return <Empty text={empty} />;
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} layout="vertical" margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 4" stroke="#e2e7ee" horizontal={false} />
         <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#64748b" }} tickFormatter={short} />
         <YAxis type="category" dataKey="name" width={132} tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#334155" }} />
-        <Tooltip cursor={{ fill: "#f1f5f9" }} formatter={(v) => [fmt(Number(v), money), "Sales"]} contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee" }} />
+        <Tooltip cursor={{ fill: "#f1f5f9" }} formatter={(v) => [fmt(Number(v), money), label]} contentStyle={{ borderRadius: 10, border: "1px solid #e2e7ee" }} />
         <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={16}>
           {data.map((_, i) => (
             <Cell key={i} fill={i === 0 ? "#0e3d6e" : "#4f85b9"} />

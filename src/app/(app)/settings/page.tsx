@@ -67,11 +67,16 @@ export default async function SettingsPage() {
         title="Settings"
         description="Business details and the lists used when registering products and stock."
         actions={
-          can(user, "roles.manage") && (
-            <Link href="/settings/roles" className="btn-secondary">
-              Roles &amp; permissions
+          <>
+            <Link href="/settings/whatsapp" className="btn-secondary">
+              WhatsApp report
             </Link>
-          )
+            {can(user, "roles.manage") && (
+              <Link href="/settings/roles" className="btn-secondary">
+                Roles &amp; permissions
+              </Link>
+            )}
+          </>
         }
       />
 
