@@ -1,11 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
-import { fail, zodErrors, formString, type ActionState } from "@/lib/action";
+import { fail, zodErrors, formString, isUniqueViolation, type ActionState } from "@/lib/action";
 import { getDummyHash, hashPassword, passwordSchema, verifyPassword } from "./password";
 import { SESSION_COOKIE, createSession, destroySession, getSessionUser } from "./session";
 
@@ -62,6 +63,44 @@ export async function logout() {
   await destroySession();
   if (user) await writeAudit(db, { user: { id: user.id, name: user.name }, action: "auth.logout", entityType: "User", entityId: user.id });
   redirect("/login");
+}
+
+const profileSchema = z.object({
+  name: z.string().trim().min(2, "Enter your full name.").max(100, "Too long."),
+  phone: z.string().trim().max(30, "Too long.").optional(),
+});
+
+/** A signed-in person edits their OWN name, email and phone. Username and role stay with the owner (Employees). */
+export async function updateProfile(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await getSessionUser();
+  if (!session) return fail("Your session has expired. Please sign in again.");
+  const values = { name: formString(formData, "name"), email: formString(formData, "email"), phone: formString(formData, "phone") };
+
+  const parsed = profileSchema.safeParse({ name: values.name, phone: values.phone || undefined });
+  const errors: Record<string, string> = {};
+  if (!parsed.success) for (const i of parsed.error.issues) errors[String(i.path[0])] ??= i.message;
+  const email = values.email.toLowerCase();
+  if (email && !z.email().safeParse(email).success) errors.email = "Enter a valid email.";
+  if (Object.keys(errors).length > 0 || !parsed.success) return fail("Please fix the highlighted fields.", errors, values);
+
+  const before = await db.user.findUniqueOrThrow({ where: { id: session.id }, select: { name: true, email: true, phone: true } });
+  const after = { name: parsed.data.name, email: email || null, phone: parsed.data.phone ?? null };
+  if (after.email && after.email !== before.email && (await db.user.findUnique({ where: { email: after.email }, select: { id: true } }))) {
+    return fail("Please fix the highlighted fields.", { email: "This email is already used by another employee." }, values);
+  }
+  if (before.name === after.name && before.email === after.email && before.phone === after.phone) return { ok: true, message: "Nothing to change.", values };
+
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: session.id }, data: after });
+      await writeAudit(tx, { user: { id: session.id, name: after.name }, action: "auth.profile_updated", entityType: "User", entityId: session.id, before, after });
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) return fail("Please fix the highlighted fields.", { email: "This email is already used by another employee." }, values);
+    throw e;
+  }
+  revalidatePath("/", "layout"); // the name in the menu and header changes everywhere
+  return { ok: true, message: "Your details are saved.", values };
 }
 
 const changeSchema = z

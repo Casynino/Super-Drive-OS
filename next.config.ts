@@ -9,6 +9,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // hides the round "N" badge Next.js draws in the corner while developing (it covered the sidebar corner)
+  devIndicators: false,
   // lets a second dev server (a preview with other data) run beside the normal one without sharing build files
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // Product photos come straight from a phone camera, so uploads need more than the 1 MB default.

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import AppShell from "@/components/AppShell";
 import { NAV } from "@/components/nav";
-import { canAny } from "@/lib/auth/can";
+import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { logout } from "@/lib/auth/actions";
 import { db } from "@/lib/db";
@@ -29,7 +29,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .filter((i) => i.ready && (i.permissions.length === 0 || canAny(user, i.permissions)))
     .map((i) => i.href);
 
-  const unread = await db.notification.count({ where: { userId: user.id, readAt: null } });
+  // Counts beside the menu items that need someone to act
+  const [unread, returnsWaiting, expensesWaiting, closingsToReview, shipmentsToCount, shipmentIssues] = await Promise.all([
+    db.notification.count({ where: { userId: user.id, readAt: null } }),
+    can(user, "returns.approve") ? db.saleReversal.count({ where: { status: "PENDING" } }) : 0,
+    can(user, "expenses.approve") ? db.expense.count({ where: { status: "PENDING" } }) : 0,
+    can(user, "closing.approve") ? db.dailyClosing.count({ where: { status: "NEEDS_REVIEW" } }) : 0,
+    can(user, "shipments.receive") ? db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] } } }) : 0,
+    can(user, "shipments.manage") ? db.shipment.count({ where: { issue: "OPEN" } }) : 0,
+  ]);
+  const badges = { approvals: returnsWaiting + expensesWaiting + closingsToReview, incoming: can(user, "shipments.receive") ? shipmentsToCount : shipmentIssues };
 
   return (
     <AppShell
@@ -38,6 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       visibleHrefs={visibleHrefs}
       logoutAction={logout}
       unread={unread}
+      badges={badges}
     >
       {children}
     </AppShell>
