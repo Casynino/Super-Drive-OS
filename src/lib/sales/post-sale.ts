@@ -4,6 +4,7 @@
 // Lock order (always the same, so concurrent sales can't deadlock):
 //   invoice number counter → customer row → product rows (shared) → stock balance rows → payment counter.
 import { Prisma, type PaymentMethod } from "@/generated/prisma/client";
+import { recordPaymentCash } from "@/lib/cash/ledger";
 import { lockProductsShared, moveStock, nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
 import { resolveLines } from "@/lib/inventory/lines";
 import { parseMoney } from "@/lib/money";
@@ -235,6 +236,8 @@ export async function postSale(tx: Tx, input: SaleInput) {
       },
     });
     payment = { id: p.id, paymentNo };
+    // The money is now in the till / mobile money / bank, in the same transaction as the sale.
+    await recordPaymentCash(tx, { id: p.id, paymentNo, source: "AT_SALE", method: input.method!, amount: paidNow }, { locationId: input.locationId, userId: input.user.id });
   }
 
   return { sale, payment, creditExceptionUsed: creditApprovedById !== null, onCredit, total };

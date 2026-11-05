@@ -7,6 +7,7 @@
 //
 // Lock order (consistent with sales and collections): customer row → sale row → product rows → stock balances.
 import { Prisma, type PaymentMethod, type ReturnCondition, type ReversalKind } from "@/generated/prisma/client";
+import { recordRefundCash } from "@/lib/cash/ledger";
 import { applyIncomingCost, lockProducts, moveStock, nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
 import { toBaseQuantity, validateQuantity } from "@/lib/units";
 import { netPaid, netTotal } from "./owed";
@@ -199,6 +200,8 @@ export async function completeReversal(tx: Tx, input: { reversalId: string; appr
     where: { id: reversal.id },
     data: { status: "COMPLETED", decidedById: input.approver.id, decidedAt: new Date(), decisionNote: input.note ?? null, returnValue, refundAmount: refund },
   });
+  // The refund leaves the account it is paid from (the till, mobile money or the bank).
+  if (refund.gt(0)) await recordRefundCash(tx, { id: reversal.id, reversalNo: reversal.reversalNo, method: reversal.refundMethod!, amount: refund }, { locationId: sale.locationId, userId: input.approver.id });
   return { reversal: done2, returnValue, refund, saleNo: sale.saleNo, saleCancelled: newReturned.eq(sale.total), requestedById: reversal.requestedById };
 }
 

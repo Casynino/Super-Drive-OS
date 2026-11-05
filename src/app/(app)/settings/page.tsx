@@ -5,7 +5,10 @@ import EntityForm from "@/components/EntityForm";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
+import { getCashSettings } from "@/lib/cash/settings";
+import { formatMoney } from "@/lib/money";
 import { getBusinessProfile, getCurrency } from "@/lib/settings";
+import { saveCashSettings, saveExpenseCategory, setExpenseCategoryStatus } from "../cash/settings-actions";
 import { saveBrand, saveBusinessProfile, saveCategory, saveLocation, saveUnit, setEntityStatus } from "./actions";
 
 export const metadata = { title: "Settings" };
@@ -56,6 +59,7 @@ export default async function SettingsPage() {
     db.product.groupBy({ by: ["baseUnitId"], where: { status: "ACTIVE" }, _count: { _all: true } }),
   ]);
   const baseUse = new Map(activeBaseUse.map((r) => [r.baseUnitId, r._count._all]));
+  const [cashSettings, expenseCategories] = await Promise.all([getCashSettings(db), db.expenseCategory.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { expenses: true } } } })]);
 
   return (
     <>
@@ -89,6 +93,68 @@ export default async function SettingsPage() {
               Currency: <span className="font-medium text-slate-700">{currency.code}</span> ({currency.symbol}). Fixed because every recorded amount depends on it.
             </p>
           </div>
+        </Section>
+
+        <Section title="Expenses and daily closing" description="How much the shop may spend without asking you, and how a cash count that does not match is handled.">
+          <div className="px-4 py-4 sm:px-5">
+            <EntityForm
+              action={saveCashSettings}
+              submitLabel="Save"
+              disabled={!canSettings}
+              fields={[
+                { name: "expenseApprovalLimit", label: `Expense limit without approval (${currency.symbol})`, value: cashSettings.expenseApprovalLimit.toString(), hint: "An expense up to this amount is recorded straight away. Above it, the owner must approve first. 0 means every expense needs approval." },
+                { name: "closingTolerance", label: `Allowed cash difference at closing (${currency.symbol})`, value: cashSettings.closingTolerance.toString(), hint: "If the counted cash is off by more than this, the closing is sent to you to review. 0 means any difference." },
+              ]}
+            />
+          </div>
+          <Row dim>
+            <p className="text-sm font-medium text-slate-700">Expense categories</p>
+          </Row>
+          {canSettings && (
+            <Row dim>
+              <EntityForm
+                layout="inline"
+                action={saveExpenseCategory}
+                submitLabel="Add category"
+                fields={[
+                  { name: "name", label: "New category", required: true, placeholder: "e.g. Electricity" },
+                  { name: "approvalLimit", label: "Own limit (optional)", placeholder: formatMoney(cashSettings.expenseApprovalLimit, currency), hint: "Leave empty to use the general limit." },
+                ]}
+              />
+            </Row>
+          )}
+          {expenseCategories.map((c) => (
+            <Row key={c.id}>
+              {canSettings ? (
+                <EntityForm
+                  layout="inline"
+                  action={saveExpenseCategory}
+                  submitLabel="Save"
+                  submitClass="btn-secondary"
+                  hidden={{ id: c.id }}
+                  fields={[
+                    { name: "name", label: "Name", value: c.name },
+                    { name: "approvalLimit", label: "Own limit", value: c.approvalLimit?.toString() ?? "", placeholder: "General limit" },
+                  ]}
+                />
+              ) : (
+                <span className="text-sm font-medium">{c.name}</span>
+              )}
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-500">{c._count.expenses} expenses</span>
+                <StatusBadge status={c.status} />
+                {canSettings && (
+                  <form action={setExpenseCategoryStatus}>
+                    <input type="hidden" name="id" value={c.id} />
+                    <input type="hidden" name="status" value={c.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"} />
+                    <button type="submit" className={c.status === "ACTIVE" ? "btn-danger btn-sm" : "btn-secondary btn-sm"}>
+                      {c.status === "ACTIVE" ? "Deactivate" : "Reactivate"}
+                    </button>
+                  </form>
+                )}
+              </div>
+            </Row>
+          ))}
         </Section>
 
         <Section title="Categories" description="Group your products, e.g. Engine Oil, Gear Oil, Grease, Filters.">

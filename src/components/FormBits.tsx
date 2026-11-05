@@ -8,14 +8,16 @@ export function SubmitButton({
   children,
   pendingLabel = "Saving…",
   className = "btn-primary",
+  disabled = false,
 }: {
   children: React.ReactNode;
   pendingLabel?: string;
   className?: string;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className={className} disabled={pending} aria-busy={pending}>
+    <button type="submit" className={className} disabled={pending || disabled} aria-busy={pending}>
       {pending && <Loader2 size={16} className="animate-spin" />}
       {pending ? pendingLabel : children}
     </button>

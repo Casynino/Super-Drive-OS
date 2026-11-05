@@ -72,9 +72,22 @@ async function main() {
       { key: "businessName", value: "Super Drive Oil" },
       { key: "currency", value: { code: "TZS", symbol: "TSh", decimals: 0 } },
       { key: "creditTermsDays", value: 30 },
+      { key: "expenseApprovalLimit", value: 0 }, // 0 = every expense needs the owner's approval until the owner sets a limit
+      { key: "closingTolerance", value: 0 }, // 0 = any cash difference at closing goes to the owner
     ],
     skipDuplicates: true,
   });
+
+  // Cash accounts (structure, no money): cash, mobile money and bank for every location
+  for (const loc of await db.location.findMany({ select: { id: true } })) {
+    for (const [method, name] of [["CASH", "Cash on hand"], ["MOBILE_MONEY", "Mobile money"], ["BANK", "Bank account"]] as const) {
+      await db.cashAccount.upsert({ where: { locationId_method: { locationId: loc.id, method } }, update: {}, create: { locationId: loc.id, method, name } });
+    }
+  }
+  // Starting expense categories (the examples from the brief); only when none exist, so the owner's edits are never undone
+  if ((await db.expenseCategory.count()) === 0) {
+    await db.expenseCategory.createMany({ data: ["Transport", "Fuel", "Shop cleaning", "Delivery charges", "Small operational purchases", "Other"].map((name) => ({ name })) });
+  }
 
   // 4. First Super Admin (only when there are no users at all)
   if ((await db.user.count()) === 0) {

@@ -67,12 +67,16 @@ export const PERMISSIONS = [
   // Finance
   { key: "expenses.view", module: "Finance", label: "View expenses" },
   { key: "expenses.create", module: "Finance", label: "Record expenses" },
+  { key: "expenses.approve", module: "Finance", label: "Approve, reject and reverse expenses" },
   { key: "finance.view", module: "Finance", label: "View financial overview" },
   { key: "finance.reconcile", module: "Finance", label: "Reconcile cash and payment methods" },
+  { key: "cash.view", module: "Finance", label: "View cash, mobile money and bank balances and the cash ledger" },
+  { key: "cash.adjust", module: "Finance", label: "Set opening balances, record cash withdrawals and cash corrections" },
 
   // Daily closing
   { key: "closing.submit", module: "Daily Closing", label: "Submit daily closing" },
-  { key: "closing.approve", module: "Daily Closing", label: "Approve daily closing" },
+  { key: "closing.approve", module: "Daily Closing", label: "Review and approve daily closings" },
+  { key: "deposits.record", module: "Daily Closing", label: "Record bank deposits" },
 
   // Reports & management
   { key: "reports.view", module: "Reports", label: "View operational reports" },
@@ -106,6 +110,7 @@ export const SHOP_FLOOR_PERMISSIONS: ReadonlySet<string> = new Set<PermissionKey
   "expenses.create",
   "returns.create",
   "closing.submit",
+  "deposits.record",
 ]);
 
 export const PERMISSION_KEYS: readonly string[] = PERMISSIONS.map((p) => p.key);
@@ -152,8 +157,11 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "returns.approve",
       "shipments.manage",
       "expenses.view",
+      "expenses.approve",
+      "cash.view",
       "closing.submit",
       "closing.approve",
+      "deposits.record",
       "reports.view",
       "employees.view",
     ],
@@ -178,6 +186,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "returns.create",
       "expenses.create",
       "closing.submit",
+      "deposits.record",
     ],
   },
   {
@@ -218,6 +227,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "suppliers.pay",
       "expenses.view",
       "expenses.create",
+      "cash.view",
       "finance.view",
       "finance.reconcile",
       "reports.view",

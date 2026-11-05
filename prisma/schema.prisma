@@ -61,40 +61,48 @@ model RolePermission {
 }
 
 model User {
-  id                 String       @id @default(cuid())
-  username           String       @unique // stored lowercase
-  name               String
-  email              String?      @unique
-  phone              String?
-  passwordHash       String
-  roleId             String
-  role               Role         @relation(fields: [roleId], references: [id])
-  status             RecordStatus @default(ACTIVE)
-  mustChangePassword Boolean      @default(false)
-  failedLoginCount   Int          @default(0)
-  lockedUntil        DateTime?
-  lastLoginAt        DateTime?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-  sessions           Session[]
-  auditLogs          AuditLog[]
-  stockMovements     StockMovement[]
-  stockReceipts      StockReceipt[]
-  stockTransfers     StockTransfer[]
-  stockAdjustments   StockAdjustment[]
-  sales              Sale[]            @relation("SaleSalesperson")
-  creditApprovals    Sale[]            @relation("SaleCreditApprover")
-  paymentsReceived   Payment[]
-  customersCreated   Customer[]
-  creditApplications CreditApplication[]
-  notifications      Notification[]
-  shipmentsCreated   Shipment[]        @relation("ShipmentCreator")
-  shipmentsResolved  Shipment[]        @relation("ShipmentResolver")
-  shipmentsClosed    Shipment[]        @relation("ShipmentCloser")
-  receivingsStarted  ShipmentReceiving[] @relation("ReceivingStarter")
+  id                  String              @id @default(cuid())
+  username            String              @unique // stored lowercase
+  name                String
+  email               String?             @unique
+  phone               String?
+  passwordHash        String
+  roleId              String
+  role                Role                @relation(fields: [roleId], references: [id])
+  status              RecordStatus        @default(ACTIVE)
+  mustChangePassword  Boolean             @default(false)
+  failedLoginCount    Int                 @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  sessions            Session[]
+  auditLogs           AuditLog[]
+  stockMovements      StockMovement[]
+  stockReceipts       StockReceipt[]
+  stockTransfers      StockTransfer[]
+  stockAdjustments    StockAdjustment[]
+  sales               Sale[]              @relation("SaleSalesperson")
+  creditApprovals     Sale[]              @relation("SaleCreditApprover")
+  paymentsReceived    Payment[]
+  customersCreated    Customer[]
+  creditApplications  CreditApplication[]
+  notifications       Notification[]
+  shipmentsCreated    Shipment[]          @relation("ShipmentCreator")
+  shipmentsResolved   Shipment[]          @relation("ShipmentResolver")
+  shipmentsClosed     Shipment[]          @relation("ShipmentCloser")
+  receivingsStarted   ShipmentReceiving[] @relation("ReceivingStarter")
   receivingsConfirmed ShipmentReceiving[] @relation("ReceivingConfirmer")
-  reversalsRequested SaleReversal[]    @relation("ReversalRequester")
-  reversalsDecided   SaleReversal[]    @relation("ReversalDecider")
+  reversalsRequested  SaleReversal[]      @relation("ReversalRequester")
+  reversalsDecided    SaleReversal[]      @relation("ReversalDecider")
+  cashTransactions    CashTransaction[]
+  expensesRequested   Expense[]           @relation("ExpenseRequester")
+  expensesDecided     Expense[]           @relation("ExpenseDecider")
+  expensesReversed    Expense[]           @relation("ExpenseReverser")
+  bankDeposits        BankDeposit[]
+  closingsSubmitted   DailyClosing[]      @relation("ClosingSubmitter")
+  closingsReviewed    DailyClosing[]      @relation("ClosingReviewer")
+  attachments         Attachment[]
 
   @@index([roleId])
 }
@@ -126,14 +134,18 @@ model Location {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  balances       StockBalance[]
-  movements      StockMovement[]
-  receipts       StockReceipt[]
-  transfersOut   StockTransfer[]   @relation("TransferFrom")
-  transfersIn    StockTransfer[]   @relation("TransferTo")
-  adjustments    StockAdjustment[]
-  sales          Sale[]
-  shipments      Shipment[]
+  balances     StockBalance[]
+  movements    StockMovement[]
+  receipts     StockReceipt[]
+  transfersOut StockTransfer[]   @relation("TransferFrom")
+  transfersIn  StockTransfer[]   @relation("TransferTo")
+  adjustments  StockAdjustment[]
+  sales        Sale[]
+  shipments    Shipment[]
+  cashAccounts CashAccount[]
+  expenses     Expense[]
+  bankDeposits BankDeposit[]
+  closings     DailyClosing[]
 }
 
 model Setting {
@@ -165,46 +177,46 @@ model Brand {
 }
 
 model Unit {
-  id            String        @id @default(cuid())
-  name          String        @unique // Litre
-  symbol        String        @unique // L
-  allowsDecimal Boolean       @default(false) // litres: true, pieces/cartons: false
-  status        RecordStatus  @default(ACTIVE)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  baseProducts  Product[]
-  productUnits  ProductUnit[]
-  receiptItems  StockReceiptItem[]
-  transferItems StockTransferItem[]
-  adjustItems   StockAdjustmentItem[]
-  saleItems     SaleItem[]
-  shipmentItems ShipmentItem[]
+  id             String                  @id @default(cuid())
+  name           String                  @unique // Litre
+  symbol         String                  @unique // L
+  allowsDecimal  Boolean                 @default(false) // litres: true, pieces/cartons: false
+  status         RecordStatus            @default(ACTIVE)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  baseProducts   Product[]
+  productUnits   ProductUnit[]
+  receiptItems   StockReceiptItem[]
+  transferItems  StockTransferItem[]
+  adjustItems    StockAdjustmentItem[]
+  saleItems      SaleItem[]
+  shipmentItems  ShipmentItem[]
   receivingItems ShipmentReceivingItem[]
 }
 
 model Product {
-  id             String        @id @default(cuid())
-  sku            String        @unique // stored uppercase
-  barcode        String?       @unique
+  id             String                  @id @default(cuid())
+  sku            String                  @unique // stored uppercase
+  barcode        String?                 @unique
   name           String
   description    String?
   categoryId     String
-  category       Category      @relation(fields: [categoryId], references: [id])
+  category       Category                @relation(fields: [categoryId], references: [id])
   brandId        String?
-  brand          Brand?        @relation(fields: [brandId], references: [id])
+  brand          Brand?                  @relation(fields: [brandId], references: [id])
   packagingType  String?
   baseUnitId     String
-  baseUnit       Unit          @relation(fields: [baseUnitId], references: [id])
-  purchasePrice  Decimal       @db.Decimal(14, 2) // per base unit (default/last cost)
-  sellingPrice   Decimal       @db.Decimal(14, 2) // per base unit
-  wholesalePrice Decimal?      @db.Decimal(14, 2) // per base unit
-  minStock       Decimal       @default(0) @db.Decimal(14, 3) // in base units
-  avgCost        Decimal       @default(0) @db.Decimal(16, 4) // weighted-average cost per base unit, maintained by stock receipts
+  baseUnit       Unit                    @relation(fields: [baseUnitId], references: [id])
+  purchasePrice  Decimal                 @db.Decimal(14, 2) // per base unit (default/last cost)
+  sellingPrice   Decimal                 @db.Decimal(14, 2) // per base unit
+  wholesalePrice Decimal?                @db.Decimal(14, 2) // per base unit
+  minStock       Decimal                 @default(0) @db.Decimal(14, 3) // in base units
+  avgCost        Decimal                 @default(0) @db.Decimal(16, 4) // weighted-average cost per base unit, maintained by stock receipts
   imageUrl       String?
-  status         RecordStatus  @default(ACTIVE)
+  status         RecordStatus            @default(ACTIVE)
   createdById    String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
   units          ProductUnit[]
   balances       StockBalance[]
   movements      StockMovement[]
@@ -497,21 +509,21 @@ enum PaymentSource {
 // What a customer owes is NOT stored here: it is always calculated from their sales and payment
 // allocations, so it can never drift out of step with the transactions.
 model Customer {
-  id               String       @id @default(cuid())
-  name             String
-  contactPerson    String?
-  phone            String?
-  businessLocation String?
-  type             CustomerType @default(RETAIL)
-  creditLimit      Decimal      @default(0) @db.Decimal(14, 2) // 0 = no credit allowed
-  notes            String?
-  status           RecordStatus @default(ACTIVE)
-  createdById      String?
-  createdBy        User?        @relation(fields: [createdById], references: [id])
-  createdAt        DateTime     @default(now()) // account opening date
-  updatedAt        DateTime     @updatedAt
-  sales            Sale[]
-  payments         Payment[]
+  id                 String              @id @default(cuid())
+  name               String
+  contactPerson      String?
+  phone              String?
+  businessLocation   String?
+  type               CustomerType        @default(RETAIL)
+  creditLimit        Decimal             @default(0) @db.Decimal(14, 2) // 0 = no credit allowed
+  notes              String?
+  status             RecordStatus        @default(ACTIVE)
+  createdById        String?
+  createdBy          User?               @relation(fields: [createdById], references: [id])
+  createdAt          DateTime            @default(now()) // account opening date
+  updatedAt          DateTime            @updatedAt
+  sales              Sale[]
+  payments           Payment[]
   creditApplications CreditApplication[]
 
   @@index([name])
@@ -521,31 +533,31 @@ model Customer {
 
 // An invoice. Revenue is recognised here, once. Cash received later is a Payment, never a new Sale.
 model Sale {
-  id                    String            @id @default(cuid())
-  saleNo                String            @unique
+  id                    String              @id @default(cuid())
+  saleNo                String              @unique
   customerId            String?
-  customer              Customer?         @relation(fields: [customerId], references: [id])
+  customer              Customer?           @relation(fields: [customerId], references: [id])
   locationId            String
-  location              Location          @relation(fields: [locationId], references: [id])
+  location              Location            @relation(fields: [locationId], references: [id])
   salespersonId         String
-  salesperson           User              @relation("SaleSalesperson", fields: [salespersonId], references: [id])
-  status                SaleStatus        @default(COMPLETED)
-  subtotal              Decimal           @db.Decimal(14, 2) // at list prices
-  discountTotal         Decimal           @default(0) @db.Decimal(14, 2)
-  total                 Decimal           @db.Decimal(14, 2) // subtotal - discountTotal
-  amountPaid            Decimal           @default(0) @db.Decimal(14, 2) // = sum of payment allocations (money received, never reduced)
-  returnedTotal         Decimal           @default(0) @db.Decimal(14, 2) // value of goods returned / cancelled (credit note)
-  refundedTotal         Decimal           @default(0) @db.Decimal(14, 2) // money paid back to the customer
+  salesperson           User                @relation("SaleSalesperson", fields: [salespersonId], references: [id])
+  status                SaleStatus          @default(COMPLETED)
+  subtotal              Decimal             @db.Decimal(14, 2) // at list prices
+  discountTotal         Decimal             @default(0) @db.Decimal(14, 2)
+  total                 Decimal             @db.Decimal(14, 2) // subtotal - discountTotal
+  amountPaid            Decimal             @default(0) @db.Decimal(14, 2) // = sum of payment allocations (money received, never reduced)
+  returnedTotal         Decimal             @default(0) @db.Decimal(14, 2) // value of goods returned / cancelled (credit note)
+  refundedTotal         Decimal             @default(0) @db.Decimal(14, 2) // money paid back to the customer
   paymentStatus         PaymentStatus
-  dueDate               DateTime?         @db.Date
-  cogsTotal             Decimal           @db.Decimal(14, 2) // cost of goods sold, snapshot at sale time
+  dueDate               DateTime?           @db.Date
+  cogsTotal             Decimal             @db.Decimal(14, 2) // cost of goods sold, snapshot at sale time
   notes                 String?
   creditApprovedById    String?
-  creditApprovedBy      User?             @relation("SaleCreditApprover", fields: [creditApprovedById], references: [id])
+  creditApprovedBy      User?               @relation("SaleCreditApprover", fields: [creditApprovedById], references: [id])
   creditExceptionReason String?
   discountReason        String? // required whenever a discount was given
-  submissionKey         String            @unique
-  createdAt             DateTime          @default(now())
+  submissionKey         String              @unique
+  createdAt             DateTime            @default(now())
   items                 SaleItem[]
   allocations           PaymentAllocation[]
   reversals             SaleReversal[]
@@ -558,22 +570,22 @@ model Sale {
 }
 
 model SaleItem {
-  id            String  @id @default(cuid())
+  id            String         @id @default(cuid())
   saleId        String
-  sale          Sale    @relation(fields: [saleId], references: [id])
+  sale          Sale           @relation(fields: [saleId], references: [id])
   productId     String
-  product       Product @relation(fields: [productId], references: [id])
-  enteredQty    Decimal @db.Decimal(14, 3)
+  product       Product        @relation(fields: [productId], references: [id])
+  enteredQty    Decimal        @db.Decimal(14, 3)
   enteredUnitId String
-  enteredUnit   Unit    @relation(fields: [enteredUnitId], references: [id])
-  factor        Decimal @db.Decimal(14, 4)
-  quantity      Decimal @db.Decimal(14, 3) // base units deducted from stock
-  listPrice     Decimal @db.Decimal(14, 2) // per entered unit, from the price list
-  unitPrice     Decimal @db.Decimal(14, 2) // per entered unit, actually charged
-  discount      Decimal @default(0) @db.Decimal(14, 2) // line total at list price - lineTotal
-  lineTotal     Decimal @db.Decimal(14, 2)
-  unitCost      Decimal @db.Decimal(16, 4) // average cost per base unit at sale time
-  costTotal     Decimal @db.Decimal(14, 2)
+  enteredUnit   Unit           @relation(fields: [enteredUnitId], references: [id])
+  factor        Decimal        @db.Decimal(14, 4)
+  quantity      Decimal        @db.Decimal(14, 3) // base units deducted from stock
+  listPrice     Decimal        @db.Decimal(14, 2) // per entered unit, from the price list
+  unitPrice     Decimal        @db.Decimal(14, 2) // per entered unit, actually charged
+  discount      Decimal        @default(0) @db.Decimal(14, 2) // line total at list price - lineTotal
+  lineTotal     Decimal        @db.Decimal(14, 2)
+  unitCost      Decimal        @db.Decimal(16, 4) // average cost per base unit at sale time
+  costTotal     Decimal        @db.Decimal(14, 2)
   reversalItems ReversalItem[]
 
   @@index([saleId])
@@ -582,20 +594,20 @@ model SaleItem {
 
 // Money received. Linked to invoices through PaymentAllocation. Anything not allocated is customer credit (Phase 4).
 model Payment {
-  id           String        @id @default(cuid())
-  paymentNo    String        @unique
-  source       PaymentSource
-  customerId   String?
-  customer     Customer?     @relation(fields: [customerId], references: [id])
-  method       PaymentMethod
-  amount       Decimal       @db.Decimal(14, 2)
-  reference    String? // mobile money / bank transaction reference
-  notes        String?
-  receivedById String
-  receivedBy   User          @relation(fields: [receivedById], references: [id])
-  receivedAt   DateTime      @default(now())
-  submissionKey String?      @unique // set on debt collections: blocks duplicate form submissions
-  allocations  PaymentAllocation[]
+  id            String              @id @default(cuid())
+  paymentNo     String              @unique
+  source        PaymentSource
+  customerId    String?
+  customer      Customer?           @relation(fields: [customerId], references: [id])
+  method        PaymentMethod
+  amount        Decimal             @db.Decimal(14, 2)
+  reference     String? // mobile money / bank transaction reference
+  notes         String?
+  receivedById  String
+  receivedBy    User                @relation(fields: [receivedById], references: [id])
+  receivedAt    DateTime            @default(now())
+  submissionKey String?             @unique // set on debt collections: blocks duplicate form submissions
+  allocations   PaymentAllocation[]
 
   @@index([receivedAt])
   @@index([customerId])
@@ -688,25 +700,25 @@ enum ReturnCondition {
 // A return or cancellation. The original sale is never edited: it gets credit-note totals
 // (Sale.returnedTotal / refundedTotal) and this record explains why. PENDING until a manager approves.
 model SaleReversal {
-  id              String          @id @default(cuid())
-  reversalNo      String          @unique
+  id              String         @id @default(cuid())
+  reversalNo      String         @unique
   saleId          String
-  sale            Sale            @relation(fields: [saleId], references: [id])
+  sale            Sale           @relation(fields: [saleId], references: [id])
   kind            ReversalKind
-  status          ReversalStatus  @default(PENDING)
+  status          ReversalStatus @default(PENDING)
   reason          String
   refundMethod    PaymentMethod? // how any money goes back to the customer
   refundReference String?
-  returnValue     Decimal         @default(0) @db.Decimal(14, 2) // value of goods returned, set when completed
-  refundAmount    Decimal         @default(0) @db.Decimal(14, 2) // money actually paid back, set when completed
+  returnValue     Decimal        @default(0) @db.Decimal(14, 2) // value of goods returned, set when completed
+  refundAmount    Decimal        @default(0) @db.Decimal(14, 2) // money actually paid back, set when completed
   requestedById   String
-  requestedBy     User            @relation("ReversalRequester", fields: [requestedById], references: [id])
-  requestedAt     DateTime        @default(now())
+  requestedBy     User           @relation("ReversalRequester", fields: [requestedById], references: [id])
+  requestedAt     DateTime       @default(now())
   decidedById     String?
-  decidedBy       User?           @relation("ReversalDecider", fields: [decidedById], references: [id])
+  decidedBy       User?          @relation("ReversalDecider", fields: [decidedById], references: [id])
   decidedAt       DateTime?
   decisionNote    String?
-  submissionKey   String          @unique
+  submissionKey   String         @unique
   items           ReversalItem[]
 
   @@index([saleId])
@@ -801,20 +813,20 @@ model Shipment {
 }
 
 model ShipmentItem {
-  id            String                  @id @default(cuid())
-  shipmentId    String
-  shipment      Shipment                @relation(fields: [shipmentId], references: [id])
-  productId     String
-  product       Product                 @relation(fields: [productId], references: [id])
-  expectedQty   Decimal                 @db.Decimal(14, 3) // base units; 0 for goods the shop found that were not announced
-  enteredQty    Decimal                 @db.Decimal(14, 3) // as the owner typed it, in enteredUnit
-  enteredUnitId String
-  enteredUnit   Unit                    @relation(fields: [enteredUnitId], references: [id])
-  factor        Decimal                 @db.Decimal(14, 4)
-  unitCost      Decimal?                @db.Decimal(16, 4) // landed cost per base unit, set by the owner (hidden from the shop)
-  lineCost      Decimal?                @db.Decimal(14, 2)
-  unexpected    Boolean                 @default(false)
-  missingQty    Decimal                 @default(0) @db.Decimal(14, 3) // filled in when the shipment is closed
+  id             String                  @id @default(cuid())
+  shipmentId     String
+  shipment       Shipment                @relation(fields: [shipmentId], references: [id])
+  productId      String
+  product        Product                 @relation(fields: [productId], references: [id])
+  expectedQty    Decimal                 @db.Decimal(14, 3) // base units; 0 for goods the shop found that were not announced
+  enteredQty     Decimal                 @db.Decimal(14, 3) // as the owner typed it, in enteredUnit
+  enteredUnitId  String
+  enteredUnit    Unit                    @relation(fields: [enteredUnitId], references: [id])
+  factor         Decimal                 @db.Decimal(14, 4)
+  unitCost       Decimal?                @db.Decimal(16, 4) // landed cost per base unit, set by the owner (hidden from the shop)
+  lineCost       Decimal?                @db.Decimal(14, 2)
+  unexpected     Boolean                 @default(false)
+  missingQty     Decimal                 @default(0) @db.Decimal(14, 3) // filled in when the shipment is closed
   receivingItems ShipmentReceivingItem[]
 
   @@unique([shipmentId, productId])
@@ -822,23 +834,23 @@ model ShipmentItem {
 }
 
 model ShipmentReceiving {
-  id           String                  @id @default(cuid())
-  shipmentId   String
-  shipment     Shipment                @relation(fields: [shipmentId], references: [id])
-  sessionNo    Int
-  status       ReceivingStatus         @default(DRAFT)
-  notes        String?
-  finishShipment Boolean               @default(false) // "nothing more is coming"
-  startedById  String
-  startedBy    User                    @relation("ReceivingStarter", fields: [startedById], references: [id])
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
-  confirmedById String?
-  confirmedBy  User?                   @relation("ReceivingConfirmer", fields: [confirmedById], references: [id])
-  confirmedAt  DateTime?
-  stockReceiptId String?               @unique
-  stockReceipt StockReceipt?           @relation(fields: [stockReceiptId], references: [id])
-  items        ShipmentReceivingItem[]
+  id             String                  @id @default(cuid())
+  shipmentId     String
+  shipment       Shipment                @relation(fields: [shipmentId], references: [id])
+  sessionNo      Int
+  status         ReceivingStatus         @default(DRAFT)
+  notes          String?
+  finishShipment Boolean                 @default(false) // "nothing more is coming"
+  startedById    String
+  startedBy      User                    @relation("ReceivingStarter", fields: [startedById], references: [id])
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  confirmedById  String?
+  confirmedBy    User?                   @relation("ReceivingConfirmer", fields: [confirmedById], references: [id])
+  confirmedAt    DateTime?
+  stockReceiptId String?                 @unique
+  stockReceipt   StockReceipt?           @relation(fields: [stockReceiptId], references: [id])
+  items          ShipmentReceivingItem[]
 
   @@unique([shipmentId, sessionNo])
 }
@@ -862,4 +874,180 @@ model ShipmentReceivingItem {
 
   @@index([receivingId])
   @@index([shipmentItemId])
+}
+
+// ───────────── Cash, expenses, deposits and daily closing ─────────────
+
+// One account per payment method per location. Cash = physical money in the till; mobile money and the bank are
+// separate balances and are never mixed with it. The balance is always the sum of the ledger, never stored.
+model CashAccount {
+  id           String            @id @default(cuid())
+  locationId   String
+  location     Location          @relation(fields: [locationId], references: [id])
+  method       PaymentMethod
+  name         String
+  createdAt    DateTime          @default(now())
+  transactions CashTransaction[]
+
+  @@unique([locationId, method])
+}
+
+enum CashTxType {
+  SALE_PAYMENT // money taken at a sale
+  COLLECTION // a customer paid a debt (or advance credit)
+  REFUND // money paid back to a customer
+  EXPENSE
+  EXPENSE_REVERSAL
+  DEPOSIT_OUT // cash leaves the till for the bank (a transfer, not an expense)
+  DEPOSIT_IN // the same money arriving in the bank account
+  WITHDRAWAL // the owner takes money out
+  ADJUSTMENT // an authorised correction
+  OPENING_BALANCE // money that was already there when the system started
+  CLOSING_DIFFERENCE // counted cash minus expected cash, booked when a day is closed
+}
+
+// The append-only cash ledger. Signed amount (+ in, - out). Every row comes from a source record written in the same
+// database transaction, and (account, type, source) is unique so nothing can be counted twice. A row may belong to
+// at most one daily closing (closingId is set once, by that closing).
+model CashTransaction {
+  id            String        @id @default(cuid())
+  accountId     String
+  account       CashAccount   @relation(fields: [accountId], references: [id])
+  type          CashTxType
+  amount        Decimal       @db.Decimal(14, 2)
+  businessDate  DateTime      @db.Date
+  referenceType String
+  referenceId   String
+  referenceNo   String?
+  description   String?
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  createdAt     DateTime      @default(now())
+  closingId     String?
+  closing       DailyClosing? @relation(fields: [closingId], references: [id])
+
+  @@unique([accountId, type, referenceType, referenceId])
+  @@index([accountId, closingId])
+  @@index([businessDate])
+  @@index([type, businessDate])
+}
+
+model ExpenseCategory {
+  id            String       @id @default(cuid())
+  name          String       @unique
+  approvalLimit Decimal?     @db.Decimal(14, 2) // overrides the general limit for this category
+  status        RecordStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now())
+  expenses      Expense[]
+}
+
+enum ExpenseStatus {
+  PENDING // above the limit: waiting for the owner, no money has moved
+  APPROVED // within the limit, or approved: the money has left the account
+  REJECTED
+  REVERSED // approved earlier, then cancelled by an authorised person: the money is put back
+}
+
+model Expense {
+  id             String          @id @default(cuid())
+  expenseNo      String          @unique
+  categoryId     String
+  category       ExpenseCategory @relation(fields: [categoryId], references: [id])
+  description    String
+  amount         Decimal         @db.Decimal(14, 2)
+  method         PaymentMethod // which account the money comes from
+  expenseDate    DateTime        @db.Date
+  notes          String?
+  receiptId      String?
+  receipt        Attachment?     @relation(fields: [receiptId], references: [id])
+  status         ExpenseStatus
+  locationId     String
+  location       Location        @relation(fields: [locationId], references: [id])
+  requestedById  String
+  requestedBy    User            @relation("ExpenseRequester", fields: [requestedById], references: [id])
+  requestedAt    DateTime        @default(now())
+  decidedById    String?
+  decidedBy      User?           @relation("ExpenseDecider", fields: [decidedById], references: [id])
+  decidedAt      DateTime?
+  decisionNote   String?
+  reversedById   String?
+  reversedBy     User?           @relation("ExpenseReverser", fields: [reversedById], references: [id])
+  reversedAt     DateTime?
+  reversalReason String?
+  submissionKey  String          @unique
+
+  @@index([status, requestedAt])
+  @@index([expenseDate])
+  @@index([requestedById, requestedAt])
+}
+
+// A small picture (receipt, deposit slip) stored resized in the database, like product pictures.
+model Attachment {
+  id          String        @id @default(cuid())
+  kind        String // EXPENSE_RECEIPT | DEPOSIT_SLIP
+  mime        String
+  data        Bytes
+  sizeBytes   Int
+  createdById String
+  createdBy   User          @relation(fields: [createdById], references: [id])
+  createdAt   DateTime      @default(now())
+  expenses    Expense[]
+  deposits    BankDeposit[]
+}
+
+model BankDeposit {
+  id            String      @id @default(cuid())
+  depositNo     String      @unique
+  locationId    String
+  location      Location    @relation(fields: [locationId], references: [id])
+  amount        Decimal     @db.Decimal(14, 2)
+  bankReference String
+  notes         String?
+  slipId        String?
+  slip          Attachment? @relation(fields: [slipId], references: [id])
+  businessDate  DateTime    @db.Date
+  closingId     String? // set when the deposit was made as part of a daily closing
+  createdById   String
+  createdBy     User        @relation(fields: [createdById], references: [id])
+  createdAt     DateTime    @default(now())
+  submissionKey String      @unique
+
+  @@index([businessDate])
+}
+
+enum ClosingStatus {
+  SUBMITTED // within the allowed difference
+  NEEDS_REVIEW // the count differed by more than the allowed amount: the owner must look at it
+  REVIEWED // the owner has looked at it and signed it off
+}
+
+// One per location per business day. Once submitted it is locked: the figures are a snapshot and never change;
+// corrections are new, authorised cash adjustments.
+model DailyClosing {
+  id            String            @id @default(cuid())
+  closingNo     String            @unique
+  locationId    String
+  location      Location          @relation(fields: [locationId], references: [id])
+  businessDate  DateTime          @db.Date
+  openingCash   Decimal           @db.Decimal(14, 2)
+  expectedCash  Decimal           @db.Decimal(14, 2)
+  countedCash   Decimal           @db.Decimal(14, 2)
+  difference    Decimal           @db.Decimal(14, 2) // counted - expected (negative = shortage)
+  depositedNow  Decimal           @default(0) @db.Decimal(14, 2) // deposited to the bank as part of this closing
+  cashCarried   Decimal           @db.Decimal(14, 2) // cash left in the till = counted - depositedNow
+  summary       Json // the full day summary exactly as the attendant saw it
+  notes         String?
+  status        ClosingStatus
+  submittedById String
+  submittedBy   User              @relation("ClosingSubmitter", fields: [submittedById], references: [id])
+  submittedAt   DateTime          @default(now())
+  reviewedById  String?
+  reviewedBy    User?             @relation("ClosingReviewer", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  reviewNote    String?
+  submissionKey String            @unique
+  transactions  CashTransaction[]
+
+  @@unique([locationId, businessDate])
+  @@index([status])
 }

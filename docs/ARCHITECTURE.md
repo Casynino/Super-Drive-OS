@@ -100,7 +100,7 @@ The owner and the shop attendant do **different jobs from different screens**; b
 Done: foundation, inventory, POS/sales, customers & credit (spec v2 phases 1–4).
 - **5. Alignment — done:** product images, price history, POS product cards, discount reason, catalogue import, sale return/cancel with owner approval + refunds, notifications bell, Shop Attendant role, separation of duties, owner and shop dashboards.
 - **5b. Shipments / receiving document** (see 10b) — **done.**
-- **6. Cash & closing**: cash accounts + ledger (hooked into payments), expenses (limits/approval), bank deposits, daily closing + carry-forward. *Recommended before resellers* so reseller money lands in the cash ledger from day one.
+- **6. Cash & closing — done (2026-11-06)**: cash accounts + ledger hooked into payments/refunds, expenses (limit + approval), bank deposits, daily closing with carry-forward and owner review. Reseller collections will land in the same ledger.
 - ~~7. Shipments~~ — built as 5b.
 - **8. Resellers / consignment** (section 7).
 - **9. Dashboards & analytics**: owner (drill-down, trends, insights, forecasts labelled as estimates), attendant dashboard.

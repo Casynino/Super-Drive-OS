@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Truck, Banknote, Boxes, HandCoins, Package, PackageCheck, Receipt, Scale, ShoppingCart, TrendingUp, Undo2, Users, Wallet } from "lucide-react";
+import { AlertTriangle, CalendarCheck, Truck, Banknote, Boxes, HandCoins, Landmark, Package, PackageCheck, Receipt, ReceiptText, Scale, ShoppingCart, Smartphone, TrendingUp, Undo2, Users, Wallet } from "lucide-react";
 import StatTile from "@/components/dashboard/StatTile";
 import { DonutChart, SalesTrendChart, TopProductsChart } from "@/components/dashboard/Charts";
 import { SaleStatusBadge } from "../sales/StatusBadge";
@@ -7,6 +7,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import type { SessionUser } from "@/lib/auth/session";
+import { businessDay, dayToDate, defaultLocationId, getBalances } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { getOwnerDashboard } from "@/lib/dashboard/owner";
 import { RANGES, resolveRange } from "@/lib/dashboard/range";
@@ -35,12 +36,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
 async function OwnerDashboard({ user, range: rangeKey }: { user: SessionUser; range?: string }) {
   const range = resolveRange(rangeKey);
-  const [currency, data, alerts, shipmentIssues, shipmentsOnTheWay] = await Promise.all([
+  const locationId = await defaultLocationId(db);
+  const [currency, data, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, closingsToReview, lastClosing, spent] = await Promise.all([
     getCurrency(),
     getOwnerDashboard(db, range, { financials: can(user, "dashboard.financials"), valuation: can(user, "inventory.valuation") }),
     getStockAlerts(db),
     can(user, "shipments.manage") ? db.shipment.count({ where: { issue: "OPEN" } }) : 0,
     can(user, "shipments.manage") ? db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] } } }) : 0,
+    can(user, "cash.view") ? getBalances(db, locationId) : Promise.resolve([]),
+    can(user, "expenses.approve") ? db.expense.count({ where: { status: "PENDING" } }) : 0,
+    can(user, "closing.approve") ? db.dailyClosing.count({ where: { status: "NEEDS_REVIEW" } }) : 0,
+    can(user, "closing.approve") || can(user, "cash.view") ? db.dailyClosing.findFirst({ where: { locationId }, orderBy: { businessDate: "desc" }, select: { id: true, businessDate: true, difference: true, status: true } }) : null,
+    can(user, "expenses.view") ? db.expense.aggregate({ where: { status: "APPROVED", expenseDate: { gte: dayToDate(range.fromYmd), lte: dayToDate(range.toYmd) } }, _sum: { amount: true } }) : null,
   ]);
   const money = { symbol: currency.symbol, decimals: currency.decimals };
   const m = (v: number) => formatMoney(v, currency);
@@ -94,6 +101,50 @@ async function OwnerDashboard({ user, range: rangeKey }: { user: SessionUser; ra
         )}
       </div>
 
+      {balances.length > 0 && (
+        <section className="card card-pad mb-6">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-slate-900">Where the money is</h2>
+            <Link href="/cash" className="text-sm font-medium text-navy-700 hover:underline">
+              Cash &amp; accounts
+            </Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {balances.map((b) => {
+              const Icon = b.method === "CASH" ? Banknote : b.method === "BANK" ? Landmark : Smartphone;
+              return (
+                <div key={b.method} className="flex items-center gap-3 rounded-xl border border-line px-4 py-3">
+                  <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-lg", b.method === "CASH" ? "bg-oil-soft text-yellow-800" : b.method === "BANK" ? "bg-navy-50 text-navy-700" : "bg-emerald-50 text-emerald-700")}>
+                    <Icon size={20} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs text-slate-500">{b.name}</span>
+                    <span className={cn("block text-lg font-semibold tabular-nums", b.balance.lt(0) ? "text-brand-red-dark" : "text-slate-900")}>{m(b.balance.toNumber())}</span>
+                  </span>
+                </div>
+              );
+            })}
+            <Link href="/closing" className="flex items-center gap-3 rounded-xl border border-line px-4 py-3 transition hover:bg-slate-50">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
+                <CalendarCheck size={20} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs text-slate-500">Last day closed</span>
+                <span className="block text-sm font-semibold text-slate-900">
+                  {lastClosing ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" }).format(lastClosing.businessDate) : "Not yet"}
+                  {lastClosing && (
+                    <span className={cn("ml-2 text-xs font-medium", lastClosing.difference.isZero() ? "text-emerald-700" : lastClosing.difference.lt(0) ? "text-brand-red-dark" : "text-yellow-800")}>
+                      {lastClosing.difference.isZero() ? "matched" : `${lastClosing.difference.lt(0) ? "short" : "extra"} ${m(lastClosing.difference.abs().toNumber())}`}
+                    </span>
+                  )}
+                </span>
+                {spent && <span className="block text-xs text-slate-500">Spent in this period {m(Number(spent._sum.amount ?? 0))}</span>}
+              </span>
+            </Link>
+          </div>
+        </section>
+      )}
+
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         <section className="card card-pad lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
@@ -136,10 +187,12 @@ async function OwnerDashboard({ user, range: rangeKey }: { user: SessionUser; ra
             <Attention href="/shipments" show={can(user, "shipments.manage")} count={shipmentIssues} icon={AlertTriangle} text="shipments with damaged or missing goods to investigate" />
             <Attention href="/shipments" show={can(user, "shipments.manage")} count={shipmentsOnTheWay} icon={Truck} text="shipments on the way" />
             <Attention href="/approvals" show={can(user, "returns.approve")} count={data.pendingApprovals} icon={Undo2} text="return / cancel requests to approve" />
+            <Attention href="/approvals" show={can(user, "expenses.approve")} count={pendingExpenses} icon={ReceiptText} text="expenses waiting for your approval" />
+            <Attention href="/approvals" show={can(user, "closing.approve")} count={closingsToReview} icon={CalendarCheck} text="daily closings where the cash did not match" />
             <Attention href="/credit" show count={k.debt.overdue > 0 ? 1 : 0} icon={AlertTriangle} text={`${m(k.debt.overdue)} owed past the due date`} hideCount />
             <Attention href="/inventory?status=out" show count={alerts.out.length} icon={Package} text="products out of stock" />
             <Attention href="/inventory?status=low" show count={alerts.low.length} icon={Scale} text="products running low" />
-            {data.pendingApprovals + alerts.out.length + alerts.low.length + shipmentIssues === 0 && k.debt.overdue === 0 && <li className="rounded-lg bg-emerald-50 px-3 py-2.5 text-emerald-800">Nothing needs attention right now.</li>}
+            {data.pendingApprovals + pendingExpenses + closingsToReview + alerts.out.length + alerts.low.length + shipmentIssues === 0 && k.debt.overdue === 0 && <li className="rounded-lg bg-emerald-50 px-3 py-2.5 text-emerald-800">Nothing needs attention right now.</li>}
           </ul>
         </section>
       </div>
@@ -258,6 +311,8 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
   const sells = can(user, "sales.pos") || can(user, "sales.view_own") || can(user, "sales.view_all");
 
   const incoming = can(user, "shipments.receive") ? await db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] } } }) : 0;
+  const closedToday = can(user, "closing.submit") ? await db.dailyClosing.findFirst({ where: { businessDate: dayToDate(businessDay()) }, select: { id: true } }) : null;
+  const pendingExpensesMine = can(user, "expenses.create") ? await db.expense.count({ where: { requestedById: user.id, status: "PENDING" } }) : 0;
   const [mySales, myPayments, pendingMine, alerts] = await Promise.all([
     sells ? db.sale.findMany({ where: { salespersonId: user.id, createdAt: { gte: from, lte: to } }, orderBy: { createdAt: "desc" }, include: { customer: { select: { name: true } } } }) : [],
     can(user, "payments.record") || sells ? db.payment.groupBy({ by: ["method"], where: { receivedById: user.id, receivedAt: { gte: from, lte: to } }, _sum: { amount: true } }) : [],
@@ -276,6 +331,8 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
     can(user, "payments.record") && { href: "/customers", icon: Banknote, title: "Take a payment", text: "A customer pays a debt" },
     can(user, "shipments.receive") && { href: "/shipments", icon: PackageCheck, title: "Incoming stock", text: incoming > 0 ? `${incoming} ${incoming === 1 ? "delivery" : "deliveries"} to count` : "Count a delivery" },
     can(user, "returns.create") && { href: "/sales", icon: Undo2, title: "Return an item", text: "Open the sale first" },
+    can(user, "expenses.create") && { href: "/expenses", icon: ReceiptText, title: "Record an expense", text: pendingExpensesMine > 0 ? `${pendingExpensesMine} waiting for the owner` : "Money spent for the shop" },
+    can(user, "closing.submit") && { href: "/closing", icon: CalendarCheck, title: closedToday ? "Today is closed" : "Close the day", text: closedToday ? "See today's closing" : "Count the cash and finish" },
     can(user, "inventory.view") && { href: "/inventory", icon: Boxes, title: "View stock", text: "What is on the shelf" },
     can(user, "customers.view") && { href: "/customers", icon: Users, title: "Customers", text: "Find or add a customer" },
   ].filter(Boolean) as { href: string; icon: typeof Package; title: string; text: string; primary?: boolean }[];

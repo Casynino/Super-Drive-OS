@@ -4,6 +4,7 @@
 //
 // Lock order (matches post-sale.ts): customer row → invoice rows → payment counter.
 import { Prisma, type PaymentMethod, type PaymentStatus } from "@/generated/prisma/client";
+import { recordPaymentCash } from "@/lib/cash/ledger";
 import { nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
 import { parseMoney } from "@/lib/money";
 import { netPaid, netTotal, owedOf } from "./owed";
@@ -63,7 +64,7 @@ async function loadAllocations(tx: Tx, customerId: string, raw: RawAllocation[],
 
   const ids = parsed.map((p) => p.saleId).sort();
   await tx.$queryRaw`SELECT "id" FROM "Sale" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR UPDATE`;
-  const sales = await tx.sale.findMany({ where: { id: { in: ids } }, select: { id: true, saleNo: true, customerId: true, status: true, total: true, amountPaid: true, returnedTotal: true, refundedTotal: true } });
+  const sales = await tx.sale.findMany({ where: { id: { in: ids } }, select: { id: true, saleNo: true, locationId: true, customerId: true, status: true, total: true, amountPaid: true, returnedTotal: true, refundedTotal: true } });
   const byId = new Map(sales.map((s) => [s.id, s]));
 
   return parsed.map((p) => {
@@ -137,6 +138,7 @@ export async function postCollection(tx: Tx, input: CollectionInput) {
     },
   });
   await bumpSales(tx, rows);
+  await recordPaymentCash(tx, { id: payment.id, paymentNo, source: "DEBT_COLLECTION", method: input.method, amount }, { locationId: rows[0]?.sale.locationId, userId: input.user.id });
 
   return { payment, allocated, extra, invoices: rows.map((r) => ({ saleNo: r.sale.saleNo, amount: r.amount })) };
 }

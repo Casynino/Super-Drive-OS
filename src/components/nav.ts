@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Banknote,
   CalendarCheck,
   ClipboardCheck,
   Boxes,
@@ -68,17 +69,19 @@ export const NAV: NavGroup[] = [
     label: "Finance",
     items: [
       { label: "Payments", href: "/payments", icon: Wallet, permissions: ["payments.view"], ready: true },
-      { label: "Expenses", href: "/expenses", icon: ReceiptText, permissions: ["expenses.view"], ready: false },
+      { label: "Expenses", href: "/expenses", icon: ReceiptText, permissions: ["expenses.view", "expenses.create"], ready: true },
+      { label: "Cash & Accounts", href: "/cash", icon: Banknote, permissions: ["cash.view"], ready: true },
+      { label: "Bank Deposits", href: "/deposits", icon: Landmark, permissions: ["deposits.record", "cash.view"], ready: true },
       { label: "Supplier Accounts", href: "/suppliers", icon: Truck, permissions: ["suppliers.view", "suppliers.manage"], ready: true },
-      { label: "Financial Overview", href: "/finance", icon: Landmark, permissions: ["finance.view"], ready: false },
+      { label: "Financial Overview", href: "/finance", icon: ChartColumn, permissions: ["finance.view"], ready: false },
     ],
   },
   {
     label: "Management",
     items: [
       { label: "Employees", href: "/employees", icon: UserCog, permissions: ["employees.view", "employees.manage"], ready: true },
-      { label: "Approvals", href: "/approvals", icon: Inbox, permissions: ["returns.approve"], ready: true },
-      { label: "Daily Closing", href: "/closing", icon: CalendarCheck, permissions: ["closing.submit", "closing.approve"], ready: false },
+      { label: "Approvals", href: "/approvals", icon: Inbox, permissions: ["returns.approve", "expenses.approve", "closing.approve"], ready: true },
+      { label: "Daily Closing", href: "/closing", icon: CalendarCheck, permissions: ["closing.submit", "closing.approve"], ready: true },
       { label: "Reports", href: "/reports", icon: ChartColumn, permissions: ["reports.view", "reports.financial"], ready: false },
       { label: "Audit Logs", href: "/audit", icon: ScrollText, permissions: ["audit.view"], ready: true },
       { label: "Roles & Permissions", href: "/settings/roles", icon: ShieldCheck, permissions: ["roles.manage"], ready: true },

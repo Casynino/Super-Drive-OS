@@ -30,7 +30,7 @@ export default function StatTile({
   href?: string;
 }) {
   const body = (
-    <div className={cn("card card-pad h-full transition", href && "hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md")}>
+    <div className={cn("@container card card-pad h-full transition", href && "hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md")}>
       <div className="flex items-start justify-between gap-3">
         <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", TONES[tone])}>
           <Icon size={22} />
@@ -43,7 +43,7 @@ export default function StatTile({
         )}
       </div>
       <p className="mt-3 text-[13px] font-medium text-slate-500">{label}</p>
-      <p className="mt-0.5 truncate text-2xl font-bold tracking-tight text-slate-900">{value}</p>
+      <p className="mt-0.5 whitespace-nowrap text-[clamp(1.05rem,12cqw,1.5rem)] font-bold leading-tight tracking-tight text-slate-900">{value}</p>
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );
