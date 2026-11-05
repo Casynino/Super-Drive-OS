@@ -10,6 +10,7 @@ import {
   Receipt,
   ReceiptText,
   ScrollText,
+  Shuffle,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -53,10 +54,11 @@ export const NAV: NavGroup[] = [
     label: "Inventory",
     items: [
       { label: "Products", href: "/products", icon: Package, permissions: ["products.view"], ready: true },
-      { label: "Stock Overview", href: "/inventory", icon: Boxes, permissions: ["inventory.view"], ready: false },
-      { label: "Stock Receiving", href: "/inventory/receiving", icon: PackageCheck, permissions: ["inventory.receive", "purchasing.view"], ready: false },
-      { label: "Stock Movements", href: "/inventory/movements", icon: ArrowLeftRight, permissions: ["inventory.view"], ready: false },
-      { label: "Stock Adjustments", href: "/inventory/adjustments", icon: ClipboardCheck, permissions: ["inventory.adjust", "inventory.count", "inventory.report_damage"], ready: false },
+      { label: "Stock Overview", href: "/inventory", icon: Boxes, permissions: ["inventory.view"], ready: true },
+      { label: "Stock Receiving", href: "/inventory/receiving", icon: PackageCheck, permissions: ["inventory.receive", "inventory.movements", "purchasing.view"], ready: true },
+      { label: "Stock Transfers", href: "/inventory/transfers", icon: Shuffle, permissions: ["inventory.transfer", "inventory.movements"], ready: true },
+      { label: "Stock Movements", href: "/inventory/movements", icon: ArrowLeftRight, permissions: ["inventory.movements"], ready: true },
+      { label: "Stock Adjustments", href: "/inventory/adjustments", icon: ClipboardCheck, permissions: ["inventory.adjust", "inventory.count", "inventory.report_damage", "inventory.movements"], ready: true },
     ],
   },
   {
@@ -64,7 +66,7 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Payments", href: "/payments", icon: Wallet, permissions: ["payments.view", "payments.record"], ready: false },
       { label: "Expenses", href: "/expenses", icon: ReceiptText, permissions: ["expenses.view"], ready: false },
-      { label: "Supplier Accounts", href: "/suppliers", icon: Truck, permissions: ["suppliers.view"], ready: false },
+      { label: "Supplier Accounts", href: "/suppliers", icon: Truck, permissions: ["suppliers.view", "suppliers.manage"], ready: true },
       { label: "Financial Overview", href: "/finance", icon: Landmark, permissions: ["finance.view"], ready: false },
     ],
   },

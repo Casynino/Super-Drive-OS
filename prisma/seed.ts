@@ -20,13 +20,17 @@ const BASE_UNITS = [
 ];
 
 async function main() {
-  // 1. Permissions (sync registry → table)
+  // 1. Permissions (sync registry → table). A permission that is NEW in this run is also granted to the
+  //    built-in roles that list it by default, so upgrades work; later edits by the owner are never overwritten.
+  const newlyAdded: string[] = [];
   for (const p of PERMISSIONS) {
+    const existed = await db.permission.findUnique({ where: { key: p.key }, select: { id: true } });
     await db.permission.upsert({
       where: { key: p.key },
       update: { module: p.module, label: p.label },
       create: { key: p.key, module: p.module, label: p.label },
     });
+    if (!existed) newlyAdded.push(p.key);
   }
   await db.permission.deleteMany({ where: { key: { notIn: PERMISSIONS.map((p) => p.key) } } });
 
@@ -34,7 +38,16 @@ async function main() {
   const permIds = new Map((await db.permission.findMany({ select: { id: true, key: true } })).map((p) => [p.key, p.id]));
   for (const role of DEFAULT_ROLES) {
     const existing = await db.role.findUnique({ where: { key: role.key } });
-    if (existing) continue;
+    if (existing) {
+      for (const key of role.permissions.filter((k) => newlyAdded.includes(k))) {
+        await db.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: existing.id, permissionId: permIds.get(key)! } },
+          update: {},
+          create: { roleId: existing.id, permissionId: permIds.get(key)! },
+        });
+      }
+      continue;
+    }
     await db.role.create({
       data: {
         key: role.key,
@@ -58,7 +71,6 @@ async function main() {
     data: [
       { key: "businessName", value: "Super Drive Oil" },
       { key: "currency", value: { code: "TZS", symbol: "TSh", decimals: 0 } },
-      { key: "allowNegativeStock", value: false },
     ],
     skipDuplicates: true,
   });

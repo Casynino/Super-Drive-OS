@@ -14,7 +14,7 @@ export function formatMoney(value: DecimalLike | null | undefined, currency: Cur
     minimumFractionDigits: currency.decimals,
     maximumFractionDigits: currency.decimals,
   }).format(Number(n.toFixed(currency.decimals)));
-  return `${currency.symbol} ${formatted}`;
+  return `${currency.symbol}\u00A0${formatted}`; // non-breaking space so amounts never wrap
 }
 
 export function formatQuantity(value: DecimalLike, symbol?: string) {

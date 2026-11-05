@@ -77,3 +77,16 @@ export function Stat({ label, value, hint }: { label: string; value: React.React
     </div>
   );
 }
+
+export function DetailGrid({ items }: { items: { label: string; value: React.ReactNode }[] }) {
+  return (
+    <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+      {items.map((i) => (
+        <div key={i.label}>
+          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{i.label}</dt>
+          <dd className="mt-1 text-sm text-slate-900">{i.value || "—"}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}

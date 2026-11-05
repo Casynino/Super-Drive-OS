@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { packagePrice, toBaseQuantity, validateQuantity } from "./units";
+import { packBreakdown, packagePrice, toBaseQuantity, validateQuantity } from "./units";
 
 describe("toBaseQuantity", () => {
   it("2 cartons of 12 bottles deducts 24 bottles", () => {
@@ -47,5 +47,22 @@ describe("packagePrice", () => {
   it("uses the override when present (including zero)", () => {
     expect(packagePrice(1500, 12, 17000).toString()).toBe("17000");
     expect(packagePrice(1500, 12, 0).toString()).toBe("0");
+  });
+});
+
+describe("packBreakdown", () => {
+  const packs = [{ symbol: "ctn", factor: 12 }];
+  it("splits into packs plus loose units", () => {
+    expect(packBreakdown(41, "btl", packs)).toBe("3 ctn + 5 btl");
+  });
+  it("shows only packs when it divides evenly", () => {
+    expect(packBreakdown(24, "btl", packs)).toBe("2 ctn");
+  });
+  it("returns null when nothing fits", () => {
+    expect(packBreakdown(5, "btl", packs)).toBeNull();
+    expect(packBreakdown(5, "btl", [])).toBeNull();
+  });
+  it("uses the biggest pack that fits", () => {
+    expect(packBreakdown(250, "L", [{ symbol: "can", factor: 5 }, { symbol: "drum", factor: 200 }])).toBe("1 drum + 50 L");
   });
 });

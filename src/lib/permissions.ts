@@ -41,7 +41,8 @@ export const PERMISSIONS = [
 
   // Inventory
   { key: "inventory.view", module: "Inventory", label: "View stock levels" },
-  { key: "inventory.valuation", module: "Inventory", label: "See inventory value" },
+  { key: "inventory.valuation", module: "Inventory", label: "See inventory value and stock costs" },
+  { key: "inventory.movements", module: "Inventory", label: "View stock movement history and stock documents" },
   { key: "inventory.receive", module: "Inventory", label: "Receive stock" },
   { key: "inventory.transfer", module: "Inventory", label: "Transfer stock between locations" },
   { key: "inventory.count", module: "Inventory", label: "Conduct stock counts" },
@@ -119,6 +120,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "payments.record",
       "products.view",
       "inventory.view",
+      "inventory.movements",
       "purchasing.view",
       "suppliers.view",
       "returns.create",
@@ -152,11 +154,13 @@ export const DEFAULT_ROLES: DefaultRole[] = [
     permissions: [
       "products.view",
       "inventory.view",
+      "inventory.movements",
       "inventory.receive",
       "inventory.transfer",
       "inventory.count",
       "inventory.report_damage",
       "purchasing.view",
+      "suppliers.view",
     ],
   },
   {
@@ -175,6 +179,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "products.cost",
       "inventory.view",
       "inventory.valuation",
+      "inventory.movements",
       "purchasing.view",
       "suppliers.view",
       "suppliers.pay",

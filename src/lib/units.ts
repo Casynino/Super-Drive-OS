@@ -43,3 +43,17 @@ export function packagePrice(basePrice: DecimalLike, factor: DecimalLike, overri
   if (override !== null && override !== undefined) return new D(override);
   return new D(basePrice).mul(new D(factor));
 }
+
+/**
+ * Human-friendly split of a base quantity into the largest packaging unit that fits, e.g. 41 bottles
+ * with 1 carton = 12 → "3 ctn + 5 btl". Returns null when no packaging unit fits (or nothing to split).
+ */
+export function packBreakdown(quantity: DecimalLike, baseSymbol: string, packs: { symbol: string; factor: DecimalLike }[]): string | null {
+  const q = new D(quantity);
+  const fitting = packs.map((p) => ({ symbol: p.symbol, factor: new D(p.factor) })).filter((p) => p.factor.gt(0) && q.gte(p.factor));
+  if (fitting.length === 0) return null;
+  const best = fitting.sort((a, b) => b.factor.comparedTo(a.factor))[0]!;
+  const count = q.div(best.factor).floor();
+  const rest = q.minus(count.mul(best.factor));
+  return rest.isZero() ? `${count} ${best.symbol}` : `${count} ${best.symbol} + ${rest} ${baseSymbol}`;
+}

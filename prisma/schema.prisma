@@ -78,6 +78,10 @@ model User {
   updatedAt          DateTime     @updatedAt
   sessions           Session[]
   auditLogs          AuditLog[]
+  stockMovements     StockMovement[]
+  stockReceipts      StockReceipt[]
+  stockTransfers     StockTransfer[]
+  stockAdjustments   StockAdjustment[]
 
   @@index([roleId])
 }
@@ -108,6 +112,13 @@ model Location {
   status    RecordStatus @default(ACTIVE)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
+
+  balances       StockBalance[]
+  movements      StockMovement[]
+  receipts       StockReceipt[]
+  transfersOut   StockTransfer[]   @relation("TransferFrom")
+  transfersIn    StockTransfer[]   @relation("TransferTo")
+  adjustments    StockAdjustment[]
 }
 
 model Setting {
@@ -148,6 +159,9 @@ model Unit {
   updatedAt     DateTime      @updatedAt
   baseProducts  Product[]
   productUnits  ProductUnit[]
+  receiptItems  StockReceiptItem[]
+  transferItems StockTransferItem[]
+  adjustItems   StockAdjustmentItem[]
 }
 
 model Product {
@@ -167,12 +181,18 @@ model Product {
   sellingPrice   Decimal       @db.Decimal(14, 2) // per base unit
   wholesalePrice Decimal?      @db.Decimal(14, 2) // per base unit
   minStock       Decimal       @default(0) @db.Decimal(14, 3) // in base units
+  avgCost        Decimal       @default(0) @db.Decimal(16, 4) // weighted-average cost per base unit, maintained by stock receipts
   imageUrl       String?
   status         RecordStatus  @default(ACTIVE)
   createdById    String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   units          ProductUnit[]
+  balances       StockBalance[]
+  movements      StockMovement[]
+  receiptItems   StockReceiptItem[]
+  transferItems  StockTransferItem[]
+  adjustItems    StockAdjustmentItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -219,4 +239,199 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([userId])
   @@index([action])
+}
+
+// ───────────── Phase 2: Inventory ─────────────
+
+enum StockMovementType {
+  RECEIVED
+  SOLD
+  CUSTOMER_RETURN
+  SUPPLIER_RETURN
+  TRANSFER_IN
+  TRANSFER_OUT
+  DAMAGED
+  ADJUSTMENT
+  CORRECTION
+}
+
+enum ReceiptType {
+  PURCHASE
+  OPENING_STOCK
+}
+
+enum AdjustmentKind {
+  INCREASE
+  DECREASE
+  DAMAGE
+  COUNT
+}
+
+model Supplier {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  notes         String?
+  status        RecordStatus   @default(ACTIVE)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  receipts      StockReceipt[]
+}
+
+// Atomic sequence for human-readable document numbers (GRN-2026-000001, TRF-…, ADJ-…, later INV-…).
+model DocumentCounter {
+  key   String @id // e.g. "GRN-2026"
+  value Int    @default(0)
+}
+
+// Current quantity per product per location, in BASE units. Only changed through the stock engine,
+// always together with a StockMovement row. DB CHECK keeps it >= 0.
+model StockBalance {
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+  quantity   Decimal  @default(0) @db.Decimal(14, 3)
+  updatedAt  DateTime @updatedAt
+
+  @@id([productId, locationId])
+  @@index([locationId])
+}
+
+// The stock ledger. Append-only (DB trigger). quantity is signed: + in, - out.
+model StockMovement {
+  id            String            @id @default(cuid())
+  productId     String
+  product       Product           @relation(fields: [productId], references: [id])
+  locationId    String
+  location      Location          @relation(fields: [locationId], references: [id])
+  type          StockMovementType
+  quantity      Decimal           @db.Decimal(14, 3)
+  previousQty   Decimal           @db.Decimal(14, 3)
+  newQty        Decimal           @db.Decimal(14, 3)
+  unitCost      Decimal?          @db.Decimal(16, 4) // cost per base unit applied to this movement
+  referenceType String? // StockReceipt | StockTransfer | StockAdjustment | (later) Sale …
+  referenceId   String?
+  referenceNo   String?
+  reason        String?
+  userId        String
+  user          User              @relation(fields: [userId], references: [id])
+  createdAt     DateTime          @default(now())
+
+  @@index([productId, locationId, createdAt])
+  @@index([type, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+}
+
+model StockReceipt {
+  id              String             @id @default(cuid())
+  receiptNo       String             @unique
+  type            ReceiptType        @default(PURCHASE)
+  supplierId      String?
+  supplier        Supplier?          @relation(fields: [supplierId], references: [id])
+  locationId      String
+  location        Location           @relation(fields: [locationId], references: [id])
+  supplierInvoice String?
+  receivedDate    DateTime           @db.Date
+  notes           String?
+  totalCost       Decimal            @db.Decimal(14, 2)
+  submissionKey   String             @unique // blocks duplicate form submissions
+  receivedById    String
+  receivedBy      User               @relation(fields: [receivedById], references: [id])
+  createdAt       DateTime           @default(now())
+  items           StockReceiptItem[]
+
+  @@index([createdAt])
+  @@index([supplierId])
+}
+
+model StockReceiptItem {
+  id            String       @id @default(cuid())
+  receiptId     String
+  receipt       StockReceipt @relation(fields: [receiptId], references: [id])
+  productId     String
+  product       Product      @relation(fields: [productId], references: [id])
+  enteredQty    Decimal      @db.Decimal(14, 3) // as typed, in enteredUnit
+  enteredUnitId String
+  enteredUnit   Unit         @relation(fields: [enteredUnitId], references: [id])
+  factor        Decimal      @db.Decimal(14, 4) // base units per entered unit (snapshot)
+  quantity      Decimal      @db.Decimal(14, 3) // base units received
+  unitCost      Decimal      @db.Decimal(16, 4) // per base unit
+  lineTotal     Decimal      @db.Decimal(14, 2)
+
+  @@index([receiptId])
+  @@index([productId])
+}
+
+model StockTransfer {
+  id             String              @id @default(cuid())
+  transferNo     String              @unique
+  fromLocationId String
+  fromLocation   Location            @relation("TransferFrom", fields: [fromLocationId], references: [id])
+  toLocationId   String
+  toLocation     Location            @relation("TransferTo", fields: [toLocationId], references: [id])
+  notes          String?
+  submissionKey  String              @unique
+  createdById    String
+  createdBy      User                @relation(fields: [createdById], references: [id])
+  createdAt      DateTime            @default(now())
+  items          StockTransferItem[]
+
+  @@index([createdAt])
+}
+
+model StockTransferItem {
+  id            String        @id @default(cuid())
+  transferId    String
+  transfer      StockTransfer @relation(fields: [transferId], references: [id])
+  productId     String
+  product       Product       @relation(fields: [productId], references: [id])
+  enteredQty    Decimal       @db.Decimal(14, 3)
+  enteredUnitId String
+  enteredUnit   Unit          @relation(fields: [enteredUnitId], references: [id])
+  factor        Decimal       @db.Decimal(14, 4)
+  quantity      Decimal       @db.Decimal(14, 3)
+
+  @@index([transferId])
+  @@index([productId])
+}
+
+// Damage/loss reports, manual increases/decreases and stock counts. A reason is always required.
+model StockAdjustment {
+  id            String                @id @default(cuid())
+  adjustmentNo  String                @unique
+  kind          AdjustmentKind
+  locationId    String
+  location      Location              @relation(fields: [locationId], references: [id])
+  reason        String
+  submissionKey String                @unique
+  createdById   String
+  createdBy     User                  @relation(fields: [createdById], references: [id])
+  createdAt     DateTime              @default(now())
+  items         StockAdjustmentItem[]
+
+  @@index([createdAt])
+  @@index([kind])
+}
+
+model StockAdjustmentItem {
+  id            String          @id @default(cuid())
+  adjustmentId  String
+  adjustment    StockAdjustment @relation(fields: [adjustmentId], references: [id])
+  productId     String
+  product       Product         @relation(fields: [productId], references: [id])
+  enteredQty    Decimal         @db.Decimal(14, 3) // typed quantity (the counted total for COUNT)
+  enteredUnitId String
+  enteredUnit   Unit            @relation(fields: [enteredUnitId], references: [id])
+  factor        Decimal         @db.Decimal(14, 4)
+  systemQty     Decimal         @db.Decimal(14, 3) // on hand just before the adjustment
+  delta         Decimal         @db.Decimal(14, 3) // signed base-unit change actually applied
+  unitCost      Decimal?        @db.Decimal(16, 4)
+
+  @@index([adjustmentId])
+  @@index([productId])
 }
