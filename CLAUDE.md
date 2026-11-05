@@ -35,7 +35,13 @@ Local DB: `superdrive_dev` on local Postgres 16 (`DATABASE_URL` in `.env`, never
 - Product photos in `PRODUCTS /` are reference images only; do not seed products from them.
 
 ## Spec v2 (received 2026-11-05)
-Nino sent a second, more detailed specification (Owner + Shop Attendant, resellers/consignment, cash accounts + daily closing + bank deposits, expenses, approvals, WhatsApp reports via CallMeBot, product images, 80 mm receipts). Architecture, gap analysis, permission matrix and the re-sequenced roadmap are in `docs/ARCHITECTURE.md`; follow it. Pending his answers: image storage, discount-approval flow, reseller revenue recognition, phase order.
+Nino sent a second, more detailed specification (Owner + Shop Attendant, resellers/consignment, cash accounts + daily closing + bank deposits, expenses, approvals, WhatsApp reports via CallMeBot, product images, 80 mm receipts). Architecture, gap analysis, permission matrix and the re-sequenced roadmap are in `docs/ARCHITECTURE.md`; follow it. **Decisions (Nino, 2026-11-05):** product pictures stored resized in the database; discounts have **no limit and no approval**, but a reason is mandatory and saved with who gave it (`Sale.discountReason`); reseller sales are recognised when the reseller **reports them sold** (issue = custody transfer only); build order = alignment, then cash + daily closing, then resellers.
+
+## Product pictures & catalogue
+- Pictures live in `ProductImage` (resized WebP: 900 px full + 320 px thumb, ~35 KB each), served by `/api/product-image/[id]` for signed-in staff only. Upload on the product page (`products.edit`); `sharp` re-encodes everything, strips EXIF/GPS and checks the real file type.
+- `npm run db:import-catalog` loads Nino's 11 products from `prisma/catalog/` (his stock sheet; names, carton sizes, pictures). It sets **no prices and no stock** (the sheet had no prices); safe to re-run. Pictures were produced from his real photos in `PRODUCTS /` (`scripts/catalog-images/`: macOS Vision cut-out + studio background); two products (Total 15W-40 1L, Castrol 5W-30 5L) have **illustrated stand-ins** until real photos are uploaded.
+- Do not invent extra products: anything added to the catalogue is real inventory data. Add related products only when Nino confirms what the shop sells.
+- POS is a product-card screen (image, brand, packaging, price, stock); cards for items with no price or no stock are disabled.
 
 ## Roadmap status
 - Phase 1 Foundation — **done** (auth, roles/permissions UI, employees, settings/catalog, locations, products + packaging units, audit viewer, app shell).

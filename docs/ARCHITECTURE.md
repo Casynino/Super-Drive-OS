@@ -20,7 +20,7 @@ Everything above stays. The new spec **extends** it; only the items in section 2
 ## 2. Gaps and changes to existing features
 1. **Roles**: Owner = Super Admin (exists). "Shop Attendant" replaces the Salesperson role (same key, new name + wider defaults, section 4). Attendants never see costs, profit, valuation or supplier prices (already true for costs/valuation; extend to every new screen).
 2. **Receiving becomes two-step**: Owner creates an expected `Shipment` (supplier, products, quantities, costs). Attendant confirms what physically arrived (multiple sessions, damaged, missing, unexpected). Stock increases only on confirmation. Today's direct receipt stays for the Owner (opening stock, quick receipts) and becomes the "confirmation" record.
-3. **Discounts**: replace "discount permission" with a configurable limit. Reason is required. Above the attendant's limit an `ApprovalRequest` goes to the Owner; the sale can complete only with an approved, single-use request. Store original price, charged price, reason, approver.
+3. **Discounts** (decided: **no limit, no approval**): anyone with the discount permission may discount any amount, but a reason is mandatory. Stored per sale: original price, charged price, reason, who gave it. (An owner-set limit can be added later without changing the data.)
 4. **POS**: product cards with images and category filters, simple cart, one-click checkout. Price is never typed; only quantity (and the discount flow above).
 5. **Product images** and **price history** (new tables). A price change never alters past sales (already true: sale lines snapshot prices).
 6. **Reversals**: cancel / return a completed sale with an authorised reversal (stock back, money refunded or credited). Required before go-live; the spec lists it in several places.
@@ -44,7 +44,7 @@ Everything above stays. The new spec **extends** it; only the items in section 2
 | Create shipment (expected stock) | yes | no | no | no |
 | Confirm / receive shipment | yes | **yes** (no costs shown) | yes | no |
 | POS sale, walk-in default, cash/mobile/bank | yes | **yes** | yes | no |
-| Discount | any | up to limit, above = request approval | up to limit | no |
+| Discount | any (reason required) | any (reason required) | any (reason required) | no |
 | Credit sale, credit-limit exception | yes | credit if enabled; exception no | exception yes | no |
 | Issue stock to reseller, record reseller sales/returns | yes | **yes** | yes | view |
 | Record customer / reseller payments | yes | **yes** | yes | yes |
@@ -67,7 +67,7 @@ Cart → server recomputes prices → discount within limit? else `ApprovalReque
 - **Collection** = existing payment + allocation against those invoices (partial, multiple). No new revenue.
 - **Return / damaged** = custody → shop transfer, or `DAMAGED` movement; price differences need Owner approval.
 - **Outright credit sale** to a reseller stays a normal credit invoice (separate arrangement, as the spec requires).
-- Reseller dashboard numbers all derive from these records: received, expected value, reported sold, returned, remaining (= custody stock), collected, outstanding (= invoiced − collected), last settlement, overdue (settlement period setting). **[confirm]** revenue recognised when sold is reported (recommended) vs when issued.
+- Reseller dashboard numbers all derive from these records: received, expected value, reported sold, returned, remaining (= custody stock), collected, outstanding (= invoiced − collected), last settlement, overdue (settlement period setting). **Decided:** revenue is recognised when the sold report is recorded, not when stock is issued.
 
 ## 8. Daily cash reconciliation
 Per `CashAccount`: `Expected closing = opening + cash sales + collections + reseller collections − cash expenses − withdrawals − deposits`. Every term is a `CashTransaction` row written in the same DB transaction as its source, with a unique (type, reference) so nothing is counted twice. Mobile money and bank are separate accounts, never mixed with physical cash. Credit sales create no cash row.
@@ -85,7 +85,7 @@ Adopt the reference layouts: soft rounded cards with icon tiles and trend chips,
 
 ## 11. Roadmap (re-sequenced; recommendation in bold)
 Done: foundation, inventory, POS/sales, customers & credit (spec v2 phases 1–4).
-- **5. Alignment**: attendant role defaults, approvals + notifications, discount rules, price history, product images, POS product cards, sale cancel/return (reversals).
+- **5. Alignment**: *done so far:* product images (DB), price history, POS product cards, discount reason, the catalogue import. *Still to do:* attendant role defaults (rename + wider permissions), approvals + notifications (for expenses/closing, not discounts), sale cancel/return (reversals).
 - **6. Cash & closing**: cash accounts + ledger (hooked into payments), expenses (limits/approval), bank deposits, daily closing + carry-forward. *Recommended before resellers* so reseller money lands in the cash ledger from day one.
 - **7. Shipments**: owner-created expected shipments and attendant confirmation.
 - **8. Resellers / consignment** (section 7).

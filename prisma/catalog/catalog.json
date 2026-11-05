@@ -1,0 +1,18 @@
+{
+  "_note": "Products from Nino's own stock sheet (screenshot 2026-11-01). Prices were blank on the sheet, so they are NOT set here: the Owner enters them in Products. Stock is not set either: receive it through Stock Receiving.",
+  "categories": ["Engine Oil", "Transmission Fluid"],
+  "brands": ["Total", "Castrol", "Toyota", "Nissan"],
+  "products": [
+    { "sku": "TOT-20W50-5L",  "name": "Total 20W-50 5L",   "brand": "Total",  "category": "Engine Oil",         "packaging": "5L jug",  "perCarton": 3,  "description": "Total Quartz 5000 SL 20W-50 engine oil, 5 litre jug.", "image": "TOT-20W50-5L.jpg" },
+    { "sku": "TOT-15W40-5L",  "name": "Total 15W-40 5L",   "brand": "Total",  "category": "Engine Oil",         "packaging": "5L jug",  "perCarton": 3,  "description": "Total Rubia TIR 7400 15W-40 diesel engine oil, 5 litre jug.", "image": "TOT-15W40-5L.jpg" },
+    { "sku": "TOT-15W40-1L",  "name": "Total 15W-40 1L",   "brand": "Total",  "category": "Engine Oil",         "packaging": "1L bottle", "perCarton": 12, "description": "Total 15W-40 engine oil, 1 litre bottle. Picture is an illustration: upload a real photo.", "image": "TOT-15W40-1L.jpg" },
+    { "sku": "TOT-20W50-1L",  "name": "Total 20W-50 1L",   "brand": "Total",  "category": "Engine Oil",         "packaging": "1L bottle", "perCarton": 12, "description": "Total Quartz 5000 SL 20W-50 engine oil, 1 litre bottle.", "image": "TOT-20W50-1L.jpg" },
+    { "sku": "CAS-20W50-5L",  "name": "Castrol 20W-50 5L", "brand": "Castrol", "category": "Engine Oil",        "packaging": "5L jug",  "perCarton": 4,  "description": "Castrol GTX 20W-50 mineral engine oil, 5 litre jug.", "image": "CAS-20W50-5L.jpg" },
+    { "sku": "CAS-15W40-5L",  "name": "Castrol 15W-40 5L", "brand": "Castrol", "category": "Engine Oil",        "packaging": "5L jug",  "perCarton": 4,  "description": "Castrol GTX 15W-40 engine oil, 5 litre jug.", "image": "CAS-15W40-5L.jpg" },
+    { "sku": "CAS-5W30-5L",   "name": "Castrol 5W-30 5L",  "brand": "Castrol", "category": "Engine Oil",        "packaging": "5L jug",  "perCarton": 4,  "description": "Castrol 5W-30 engine oil, 5 litre jug. Picture is an illustration: upload a real photo.", "image": "CAS-5W30-5L.jpg" },
+    { "sku": "TOY-TCCVT-4L",  "name": "Toyota TC CVT 4L",  "brand": "Toyota", "category": "Transmission Fluid", "packaging": "4L tin",  "perCarton": 6,  "description": "Toyota Genuine CVT Fluid TC, 4 litre tin.", "image": "TOY-TCCVT-4L.jpg" },
+    { "sku": "TOY-T4-4L",     "name": "Toyota T-IV 4L",    "brand": "Toyota", "category": "Transmission Fluid", "packaging": "4L tin",  "perCarton": 6,  "description": "Toyota Automatic Transmission Fluid Type T-IV, 4 litre tin.", "image": "TOY-T4-4L.jpg" },
+    { "sku": "NIS-NS2-4L",    "name": "Nissan NS-2 4L",    "brand": "Nissan", "category": "Transmission Fluid", "packaging": "4L tin",  "perCarton": 6,  "description": "Nissan Genuine CVT Fluid NS-2, 4 litre tin.", "image": "NIS-NS2-4L.jpg" },
+    { "sku": "NIS-5W30NS-4L", "name": "Nissan 5W-30 NS 4L", "brand": "Nissan", "category": "Engine Oil",        "packaging": "4L tin",  "perCarton": 6,  "description": "Nissan Genuine Motor Oil Strong Save X 5W-30 SN, 4 litre tin.", "image": "NIS-5W30NS-4L.jpg" }
+  ]
+}

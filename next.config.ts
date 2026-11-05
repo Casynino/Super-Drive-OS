@@ -9,6 +9,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Product photos come straight from a phone camera, so uploads need more than the 1 MB default.
+  experimental: { serverActions: { bodySizeLimit: "8mb" } },
+  serverExternalPackages: ["sharp"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

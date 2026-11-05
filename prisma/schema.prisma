@@ -201,6 +201,8 @@ model Product {
   transferItems  StockTransferItem[]
   adjustItems    StockAdjustmentItem[]
   saleItems      SaleItem[]
+  image          ProductImage?
+  priceHistory   ProductPriceHistory[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -523,6 +525,7 @@ model Sale {
   creditApprovedById    String?
   creditApprovedBy      User?             @relation("SaleCreditApprover", fields: [creditApprovedById], references: [id])
   creditExceptionReason String?
+  discountReason        String? // required whenever a discount was given
   submissionKey         String            @unique
   createdAt             DateTime          @default(now())
   items                 SaleItem[]
@@ -611,4 +614,35 @@ model CreditApplication {
   allocations   PaymentAllocation[]
 
   @@index([customerId])
+}
+
+// ───────────── Product pictures & price history ─────────────
+
+// One picture per product, stored resized in the database (no external file service needed).
+// `full` is for the product page, `thumb` for POS cards. Served through /api/product-image/[id].
+model ProductImage {
+  productId   String   @id
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mime        String
+  full        Bytes
+  thumb       Bytes
+  width       Int
+  height      Int
+  updatedById String?
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+// Every change to a product's prices, newest last. Past sales keep their own price snapshots.
+model ProductPriceHistory {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  field       String // sellingPrice | wholesalePrice | purchasePrice | unitSellingPrice | unitWholesalePrice
+  unitLabel   String? // packaging unit symbol for unit prices
+  oldValue    Decimal? @db.Decimal(14, 2)
+  newValue    Decimal? @db.Decimal(14, 2)
+  changedById String?
+  createdAt   DateTime @default(now())
+
+  @@index([productId, createdAt])
 }

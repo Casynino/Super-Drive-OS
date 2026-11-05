@@ -7,6 +7,8 @@ import { formatDateTime } from "@/lib/utils";
 import { getProductFormOptions } from "../options";
 import ProductForm, { type ProductFormData } from "../ProductForm";
 import { setProductStatus } from "../actions";
+import { removeProductImage, uploadProductImage } from "../image-actions";
+import ProductImageCard from "@/components/products/ProductImageCard";
 
 export const metadata = { title: "Product" };
 
@@ -23,6 +25,7 @@ export default async function EditProductPage({
 
   const product = await db.product.findUnique({ where: { id }, include: { units: true } });
   if (!product) notFound();
+  const image = await db.productImage.findUnique({ where: { productId: id }, select: { updatedAt: true } });
 
   const { categories, brands, units, currency } = await getProductFormOptions({
     categoryId: product.categoryId,
@@ -69,6 +72,7 @@ export default async function EditProductPage({
           <Alert kind="success">Product created. Stock is added through Stock Receiving.</Alert>
         </div>
       )}
+      <ProductImageCard productId={product.id} productName={product.name} version={image ? image.updatedAt.getTime() : null} canEdit={canEdit} upload={uploadProductImage} remove={removeProductImage} />
       <ProductForm
         product={data}
         categories={categories}

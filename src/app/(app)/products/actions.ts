@@ -77,6 +77,24 @@ function snapshot(p: ProductWithUnits): Snapshot {
   };
 }
 
+type HistoryRow = { productId: string; field: string; unitLabel: string | null; oldValue: Prisma.Decimal | null; newValue: Prisma.Decimal | null; changedById: string };
+const asDec = (v: string | null | undefined) => (v === null || v === undefined ? null : new D(v));
+
+/** One row per price that actually changed (base prices and packaging-unit overrides). */
+function priceHistoryRows(productId: string, userId: string, before: Snapshot | null, after: Snapshot, symbols: Map<string, string>): HistoryRow[] {
+  const rows: HistoryRow[] = [];
+  for (const field of ["sellingPrice", "wholesalePrice", "purchasePrice"] as const) {
+    if ((before?.[field] ?? null) !== (after[field] ?? null)) rows.push({ productId, field, unitLabel: null, oldValue: asDec(before?.[field]), newValue: asDec(after[field]), changedById: userId });
+  }
+  for (const a of after.units) {
+    const b = before?.units.find((u) => u.unitId === a.unitId);
+    for (const [key, field] of [["sellingPrice", "unitSellingPrice"], ["wholesalePrice", "unitWholesalePrice"]] as const) {
+      if ((b?.[key] ?? null) !== (a[key] ?? null)) rows.push({ productId, field, unitLabel: symbols.get(a.unitId) ?? null, oldValue: asDec(b?.[key]), newValue: asDec(a[key]), changedById: userId });
+    }
+  }
+  return rows;
+}
+
 export async function saveProduct(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const id = formString(fd, "id") || null;
   const values = formValues(fd);
@@ -207,6 +225,9 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
             include: { units: true },
           });
           productId = created.id;
+          const symbols = new Map((await tx.unit.findMany({ select: { id: true, symbol: true } })).map((u) => [u.id, u.symbol]));
+          const initial = priceHistoryRows(created.id, user.id, null, snapshot(created), symbols).filter((r) => r.newValue && !r.newValue.isZero());
+          if (initial.length) await tx.productPriceHistory.createMany({ data: initial });
           await writeAudit(tx, { user, action: "product.create", entityType: "Product", entityId: created.id, after: snapshot(created), reference: created.sku });
           return;
         }
@@ -232,6 +253,9 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
         const priceChanged = Object.keys(diff.after).filter((k) => (PRICE_KEYS as readonly string[]).includes(k));
         const otherChanged = Object.keys(diff.after).filter((k) => !(PRICE_KEYS as readonly string[]).includes(k));
         if (priceChanged.length) {
+          const symbols = new Map((await tx.unit.findMany({ select: { id: true, symbol: true } })).map((u) => [u.id, u.symbol]));
+          const rows = priceHistoryRows(existing.id, user.id, before, snapshot(fresh), symbols);
+          if (rows.length) await tx.productPriceHistory.createMany({ data: rows });
           await writeAudit(tx, {
             user,
             action: "product.price_change",

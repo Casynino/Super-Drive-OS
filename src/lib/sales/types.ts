@@ -2,7 +2,15 @@
 import type { PickerProduct, PickerUnit } from "@/lib/inventory/types";
 
 export type PosUnit = PickerUnit & { retail: string; wholesale: string };
-export type PosProduct = Omit<PickerProduct, "units"> & { units: PosUnit[] };
+export type PosProduct = Omit<PickerProduct, "units"> & {
+  units: PosUnit[];
+  brand: string | null;
+  categoryId: string;
+  categoryName: string;
+  packaging: string | null;
+  /** picture version (changes when the picture is replaced); null = no picture */
+  imageV: number | null;
+};
 
 export type PosCustomer = {
   id: string;

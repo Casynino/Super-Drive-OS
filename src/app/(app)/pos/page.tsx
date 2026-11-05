@@ -24,7 +24,7 @@ export default async function PosPage() {
     db.product.findMany({
       where: { status: "ACTIVE" },
       orderBy: { name: "asc" },
-      include: { baseUnit: true, units: { include: { unit: true }, orderBy: { factor: "asc" } } },
+      include: { baseUnit: true, brand: { select: { name: true } }, category: { select: { id: true, name: true } }, image: { select: { updatedAt: true } }, units: { include: { unit: true }, orderBy: { factor: "asc" } } },
     }),
     getActiveLocations(),
     getStockByLocation(),
@@ -45,6 +45,11 @@ export default async function PosPage() {
       sku: p.sku,
       barcode: p.barcode,
       baseUnitId: p.baseUnitId,
+      brand: p.brand?.name ?? null,
+      categoryId: p.category.id,
+      categoryName: p.category.name,
+      packaging: p.packagingType,
+      imageV: p.image ? p.image.updatedAt.getTime() : null,
       units: [
         priced(p.baseUnit.id, p.baseUnit.name, p.baseUnit.symbol, p.baseUnit.allowsDecimal, new Prisma.Decimal(1), null, null),
         ...p.units.map((u) => priced(u.unit.id, u.unit.name, u.unit.symbol, u.unit.allowsDecimal, u.factor, u.sellingPrice, u.wholesalePrice)),

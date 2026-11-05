@@ -44,6 +44,8 @@ export type SaleInput = {
   partAmount: string | null;
   reference: string | null;
   notes: string | null;
+  /** why a discount was given; required whenever the sale has one */
+  discountReason?: string | null;
   /** unitPrice "" means "charge the list price" */
   lines: { productId: string; unitId: string; quantity: string; unitPrice: string }[];
   creditException: { reason: string } | null;
@@ -127,6 +129,10 @@ export async function postSale(tx: Tx, input: SaleInput) {
   const total = subtotal.minus(discountTotal);
   const cogsTotal = priced.reduce((s, p) => s.plus(p.costTotal), new D(0));
   if (total.lte(0)) throw new SaleError("The sale total must be greater than zero.", { lines: "The sale total must be greater than zero." });
+  const discountReason = input.discountReason?.trim() || null;
+  if (discountTotal.gt(0) && (!discountReason || discountReason.length < 3)) {
+    throw new SaleError("Give a reason for the discount.", { discountReason: "Say why the discount was given." });
+  }
 
   // 4. How much is paid now, and how much goes on credit
   let paidNow: Dec;
@@ -175,6 +181,7 @@ export async function postSale(tx: Tx, input: SaleInput) {
       dueDate,
       cogsTotal,
       notes: input.notes,
+      discountReason: discountTotal.gt(0) ? discountReason : null,
       creditApprovedById,
       creditExceptionReason,
       submissionKey: input.submissionKey, // a duplicate submission fails here, before stock is touched

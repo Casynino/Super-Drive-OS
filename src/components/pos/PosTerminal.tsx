@@ -1,10 +1,9 @@
 "use client";
 
 import { useActionState, useMemo, useState, useTransition } from "react";
-import { Minus, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { ImageOff, Minus, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
 import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
-import ProductPicker from "@/components/inventory/ProductPicker";
 import type { ActionState } from "@/lib/action";
 import type { LocationOption } from "@/lib/inventory/types";
 import { PAYMENT_METHODS, type CartLine, type PosCustomer, type PosProduct } from "@/lib/sales/types";
@@ -32,6 +31,21 @@ const TYPE_OPTIONS = [
   ["OTHER", "Other"],
 ] as const;
 const trim = (n: number) => String(Number(n.toFixed(3)));
+const imgSrc = (p: PosProduct, size: "thumb" | "full" = "thumb") => (p.imageV ? `/api/product-image/${p.id}?size=${size}&v=${p.imageV}` : null);
+
+function Thumb({ p, className }: { p: PosProduct; className?: string }) {
+  const src = imgSrc(p);
+  return (
+    <div className={cn("flex items-center justify-center overflow-hidden bg-gradient-to-b from-white to-slate-100", className)}>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={p.name} loading="lazy" className="h-full w-full object-contain" />
+      ) : (
+        <ImageOff size={20} className="text-slate-300" aria-label="No picture" />
+      )}
+    </div>
+  );
+}
 
 export default function PosTerminal({ action, quickAddCustomer, products, locations, stockByLocation, customers: initialCustomers, submissionKey: key, currency, perms }: Props) {
   const [state, formAction] = useActionState(action, initial);
@@ -47,14 +61,17 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
   const [partAmount, setPartAmount] = useState("");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
   const [exception, setException] = useState(false);
   const [exceptionReason, setExceptionReason] = useState("");
+  const [q, setQ] = useState("");
+  const [category, setCategory] = useState("");
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const categories = useMemo(() => [...new Map(products.map((p) => [p.categoryId, p.categoryName])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [products]);
   const nf = useMemo(() => new Intl.NumberFormat("en-US", { minimumFractionDigits: currency.decimals, maximumFractionDigits: currency.decimals }), [currency.decimals]);
   const fmt = (n: number) => `${currency.symbol} ${nf.format(n)}`;
   const round = (n: number) => Number(n.toFixed(currency.decimals));
-
   const wholesale = customer ? WHOLESALE.includes(customer.type) : false;
 
   // ── cart maths (display only; the server recalculates everything from the database) ──
@@ -64,8 +81,9 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
     const list = Number(wholesale ? unit.wholesale : unit.retail);
     const price = l.price.trim() === "" ? list : Number(l.price);
     const qty = Number(l.quantity);
-    const valid = Number.isFinite(qty) && qty > 0 && Number.isFinite(price) && price >= 0 && list > 0;
-    return { l, p, unit, list, price, qty, valid, lineList: valid ? round(qty * list) : 0, lineTotal: valid ? round(qty * price) : 0, baseQty: valid ? qty * Number(unit.factor) : 0 };
+    const tooHigh = price > list;
+    const valid = Number.isFinite(qty) && qty > 0 && Number.isFinite(price) && price >= 0 && list > 0 && !tooHigh;
+    return { l, p, unit, list, price, qty, valid, tooHigh, lineList: valid ? round(qty * list) : 0, lineTotal: valid ? round(qty * price) : 0, baseQty: valid ? qty * Number(unit.factor) : 0 };
   });
   const subtotal = rows.reduce((s, r) => s + r.lineList, 0);
   const total = rows.reduce((s, r) => s + r.lineTotal, 0);
@@ -73,7 +91,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
 
   const baseUsed = new Map<string, number>();
   for (const r of rows) baseUsed.set(r.p.id, (baseUsed.get(r.p.id) ?? 0) + r.baseQty);
-  const available = (productId: string) => Number(stockByLocation[locationId]?.[productId] ?? 0);
+  const inStock = (productId: string) => Number(stockByLocation[locationId]?.[productId] ?? 0);
 
   const partNum = Number(partAmount);
   const paidNow = mode === "FULL" ? total : mode === "CREDIT" ? 0 : Number.isFinite(partNum) ? partNum : 0;
@@ -87,6 +105,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
   else if (rows.some((r) => !r.valid)) problems.push("Fix the quantities or prices");
   if (mode !== "FULL" && !customer) problems.push("Choose a customer");
   if (mode === "PART" && !(partNum > 0 && partNum < total)) problems.push("Enter a part payment below the total");
+  if (discount > 0 && discountReason.trim().length < 3) problems.push("Say why the discount was given");
   if (overLimit && perms.creditException && exception && exceptionReason.trim().length < 5) problems.push("Give a reason for the exception");
   const canSubmit = problems.length === 0;
 
@@ -98,6 +117,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
     partAmount: mode === "PART" ? partAmount : null,
     reference: reference.trim() || null,
     notes: notes.trim() || null,
+    discountReason: discount > 0 ? discountReason.trim() : null,
     lines: cart.map((l) => ({ productId: l.productId, unitId: l.unitId, quantity: l.quantity, unitPrice: l.price })),
     creditException: overLimit && perms.creditException && exception ? { reason: exceptionReason.trim() } : null,
     submissionKey,
@@ -120,6 +140,30 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
       return free ? [...c, { productId: l.productId, unitId: free.id, quantity: "1", price: "" }] : c;
     });
 
+  // ── product grid ──
+  const term = q.trim().toLowerCase();
+  const visible = products.filter(
+    (p) =>
+      (!category || p.categoryId === category) &&
+      (!term || p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term) || (p.barcode ?? "").toLowerCase().includes(term) || (p.brand ?? "").toLowerCase().includes(term)),
+  );
+  const unitPrice = (p: PosProduct) => Number(wholesale ? p.units[0]!.wholesale : p.units[0]!.retail);
+  function cardState(p: PosProduct) {
+    const left = inStock(p.id) - (baseUsed.get(p.id) ?? 0);
+    const hasPrice = unitPrice(p) > 0;
+    return { left, hasPrice, sellable: hasPrice && left > 0 };
+  }
+  const onSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const exact = products.find((p) => p.sku.toLowerCase() === term || (p.barcode && p.barcode.toLowerCase() === term)); // a barcode scanner types the code then presses Enter
+    const pick = exact ?? (visible.length === 1 ? visible[0] : undefined);
+    if (pick && cardState(pick).sellable) {
+      addProduct(pick);
+      setQ("");
+    }
+  };
+
   // ── customer search / quick add ──
   const [custQ, setCustQ] = useState("");
   const [addOpen, setAddOpen] = useState(false);
@@ -139,6 +183,8 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
       setNewCust({ name: "", phone: "", type: "RETAIL" });
     });
 
+  const cartCount = rows.length;
+
   return (
     <form
       action={formAction}
@@ -156,118 +202,170 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_390px]">
-        {/* ───────── Left: products & cart ───────── */}
-        <section className="space-y-4">
-          <div className="card card-pad">
-            <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
-              <div>
-                <label className="label">Add product</label>
-                <ProductPicker products={products} onPick={(p) => addProduct(byId.get(p.id)!)} autoFocus placeholder="Search name or scan barcode…" />
+      <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
+        {/* ───────── Left: product cards ───────── */}
+        <section className="min-w-0">
+          <div className="card card-pad mb-4">
+            <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
+              <div className="relative">
+                <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input className="input h-11 pl-10 text-base" placeholder="Search products or scan a barcode…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onSearchKey} aria-label="Search products" autoFocus />
               </div>
               {locations.length > 1 && (
-                <div>
-                  <label className="label" htmlFor="pos-location">
-                    Sell from
-                  </label>
-                  <select id="pos-location" className="input" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-                    {locations.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select className="input h-11" value={locationId} onChange={(e) => setLocationId(e.target.value)} aria-label="Sell from">
+                  {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
               )}
+            </div>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Categories">
+              {[["", "All"], ...categories].map(([id, name]) => (
+                <button key={id} type="button" role="tab" aria-selected={category === id} onClick={() => setCategory(id!)} className={cn("shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition", category === id ? "border-navy-700 bg-navy-700 text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50")}>
+                  {name}
+                </button>
+              ))}
             </div>
           </div>
 
+          {visible.length === 0 ? (
+            <div className="card px-6 py-14 text-center text-sm text-slate-500">No product matches “{q}”.</div>
+          ) : (
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 2xl:grid-cols-4">
+              {visible.map((p) => {
+                const { left, hasPrice, sellable } = cardState(p);
+                const inCart = rows.filter((r) => r.p.id === p.id).reduce((s, r) => s + r.qty, 0);
+                return (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => addProduct(p)}
+                      disabled={!sellable}
+                      className={cn(
+                        "group relative flex h-full w-full flex-col rounded-2xl border bg-white p-2.5 text-left shadow-[0_1px_2px_rgba(15,27,45,0.05)] transition",
+                        sellable ? "border-line hover:-translate-y-0.5 hover:border-navy-300 hover:shadow-md active:translate-y-0" : "cursor-not-allowed border-line opacity-60",
+                        inCart > 0 && "border-navy-600 ring-2 ring-navy-200",
+                      )}
+                    >
+                      <div className="relative">
+                        <Thumb p={p} className="aspect-square w-full rounded-xl [&_img]:p-1.5 [&_img]:transition [&_img]:duration-200 group-hover:[&_img]:scale-105" />
+                        {inCart > 0 && <span className="absolute right-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-navy-700 px-1.5 text-xs font-semibold text-white shadow">{trim(inCart)}</span>}
+                        <span className={cn("absolute bottom-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-semibold backdrop-blur", left <= 0 ? "bg-brand-red text-white" : left <= 5 ? "bg-oil-400 text-navy-950" : "bg-white/90 text-slate-700 ring-1 ring-slate-200")}>
+                          {left <= 0 ? "Out of stock" : `${trim(left)} left`}
+                        </span>
+                      </div>
+                      <p className="mt-2.5 line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-slate-900">{p.name}</p>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">{[p.brand, p.packaging].filter(Boolean).join(" · ") || p.categoryName}</p>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        {hasPrice ? <span className="text-base font-bold text-navy-800">{fmt(unitPrice(p))}</span> : <span className="text-xs font-medium text-brand-red-dark">No price set</span>}
+                        {sellable && (
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-700 text-white transition group-hover:bg-navy-800" aria-hidden>
+                            <Plus size={16} />
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {/* ───────── Right: cart, customer, payment ───────── */}
+        <aside id="pos-cart" className="space-y-4 xl:sticky xl:top-20 xl:self-start">
           <div className="card overflow-hidden">
-            <h2 className="border-b border-line px-4 py-3 text-base font-semibold text-slate-900">Cart {rows.length > 0 && <span className="text-sm font-normal text-slate-500">({rows.length})</span>}</h2>
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+              <h2 className="text-base font-semibold text-slate-900">
+                Current sale {cartCount > 0 && <span className="text-sm font-normal text-slate-500">({cartCount})</span>}
+              </h2>
+              {cartCount > 0 && (
+                <button type="button" className="text-sm font-medium text-brand-red-dark hover:underline" onClick={() => setCart([])}>
+                  Clear cart
+                </button>
+              )}
+            </div>
             {rows.length === 0 ? (
-              <p className="px-4 py-12 text-center text-sm text-slate-500">The cart is empty. Search for a product above.</p>
+              <p className="px-4 py-10 text-center text-sm text-slate-500">Tap a product to add it.</p>
             ) : (
               <ul className="divide-y divide-slate-100">
                 {rows.map((r, i) => {
                   const err = fe[`line.${i}`];
-                  const free = available(r.p.id);
-                  const used = baseUsed.get(r.p.id) ?? 0;
-                  const over = used > free;
+                  const free = inStock(r.p.id);
+                  const over = (baseUsed.get(r.p.id) ?? 0) > free;
                   const takenUnits = new Set(cart.filter((x, idx) => x.productId === r.l.productId && idx !== i).map((x) => x.unitId));
                   return (
                     <li key={`${r.l.productId}:${r.l.unitId}`} className={cn("px-4 py-3", (err || over) && "bg-brand-red-soft/40")}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-slate-900">{r.p.name}</p>
-                          <p className={cn("text-xs", over ? "font-medium text-brand-red-dark" : "text-slate-500")}>
-                            {over ? `Only ${trim(free)} ${r.p.units[0]!.symbol} in stock here` : `${trim(free)} ${r.p.units[0]!.symbol} in stock`}
-                            {r.p.units.length > 1 && r.baseQty > 0 && r.unit.id !== r.p.baseUnitId && ` · uses ${trim(r.baseQty)} ${r.p.units[0]!.symbol}`}
-                          </p>
-                        </div>
-                        <button type="button" className="btn-secondary btn-sm shrink-0" onClick={() => setCart((c) => c.filter((_, idx) => idx !== i))} aria-label={`Remove ${r.p.name}`}>
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-
-                      <div className="mt-2.5 grid grid-cols-2 items-end gap-3 sm:grid-cols-[130px_150px_1fr_auto]">
-                        <div>
-                          <label className="label" htmlFor={`pos-unit-${i}`}>
-                            Unit
-                          </label>
-                          <select id={`pos-unit-${i}`} className="input" value={r.l.unitId} onChange={(e) => patch(i, { unitId: e.target.value, price: "" })} disabled={r.p.units.length === 1}>
-                            {r.p.units.filter((u) => u.id === r.l.unitId || !takenUnits.has(u.id)).map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="label" htmlFor={`pos-qty-${i}`}>
-                            Quantity
-                          </label>
-                          <div className="flex items-center gap-1.5">
-                            <button type="button" className="btn-secondary btn-sm px-2" onClick={() => step(i, -1)} aria-label="Decrease quantity">
-                              <Minus size={15} />
-                            </button>
-                            <input id={`pos-qty-${i}`} className="input min-w-0 text-center" inputMode="decimal" value={r.l.quantity} onChange={(e) => patch(i, { quantity: e.target.value })} />
-                            <button type="button" className="btn-secondary btn-sm px-2" onClick={() => step(i, 1)} aria-label="Increase quantity">
-                              <Plus size={15} />
+                      <div className="flex gap-3">
+                        <Thumb p={r.p} className="h-14 w-14 shrink-0 rounded-lg border border-line [&_img]:p-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">{r.p.name}</p>
+                            <button type="button" className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-red-dark" onClick={() => setCart((c) => c.filter((_, idx) => idx !== i))} aria-label={`Remove ${r.p.name}`}>
+                              <Trash2 size={16} />
                             </button>
                           </div>
-                        </div>
-                        <div>
-                          <label className="label" htmlFor={`pos-price-${i}`}>
-                            Price per {r.unit.symbol}
-                          </label>
-                          {perms.discount ? (
-                            <input id={`pos-price-${i}`} className="input" inputMode="decimal" value={r.l.price} placeholder={nf.format(r.list)} onChange={(e) => patch(i, { price: e.target.value })} />
-                          ) : (
-                            <p className="flex min-h-9 items-center text-sm text-slate-900">{r.list > 0 ? fmt(r.list) : <span className="text-brand-red-dark">No price set</span>}</p>
+                          <p className={cn("text-xs", over ? "font-medium text-brand-red-dark" : "text-slate-500")}>
+                            {over ? `Only ${trim(free)} in stock here` : `${fmt(r.list)} each`}
+                            {!over && r.unit.id !== r.p.baseUnitId && r.baseQty > 0 && ` · uses ${trim(r.baseQty)} ${r.p.units[0]!.symbol}`}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <div className="flex items-center gap-1">
+                              <button type="button" className="btn-secondary btn-sm px-2" onClick={() => step(i, -1)} aria-label="Decrease quantity">
+                                <Minus size={14} />
+                              </button>
+                              <input className="input h-8 w-14 min-w-0 px-1 text-center" inputMode="decimal" value={r.l.quantity} onChange={(e) => patch(i, { quantity: e.target.value })} aria-label={`Quantity of ${r.p.name}`} />
+                              <button type="button" className="btn-secondary btn-sm px-2" onClick={() => step(i, 1)} aria-label="Increase quantity">
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                            <select className="input h-8 w-auto py-0 pr-8 text-sm" value={r.l.unitId} onChange={(e) => patch(i, { unitId: e.target.value, price: "" })} disabled={r.p.units.length === 1} aria-label="Unit">
+                              {r.p.units.filter((u) => u.id === r.l.unitId || !takenUnits.has(u.id)).map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.name}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="ml-auto text-right">
+                              <span className="block text-sm font-bold text-slate-900">{fmt(r.lineTotal)}</span>
+                              {r.price < r.list && r.valid && <span className="block text-[11px] text-emerald-700">−{fmt(r.lineList - r.lineTotal)}</span>}
+                            </span>
+                          </div>
+                          {perms.discount && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <label className="text-xs text-slate-500" htmlFor={`pos-price-${i}`}>
+                                Price each
+                              </label>
+                              <input id={`pos-price-${i}`} className="input h-8 w-28 px-2 text-sm" inputMode="decimal" value={r.l.price} placeholder={nf.format(r.list)} onChange={(e) => patch(i, { price: e.target.value })} />
+                            </div>
+                          )}
+                          {r.p.units.length > 1 && r.p.units.some((u) => !cart.some((x) => x.productId === r.l.productId && x.unitId === u.id)) && (
+                            <button type="button" className="mt-1.5 text-xs font-medium text-navy-700 hover:underline" onClick={() => addOtherUnit(i)}>
+                              + Add in another unit
+                            </button>
                           )}
                         </div>
-                        <div className="col-span-2 text-right sm:col-span-1 sm:min-w-28">
-                          <p className="text-xs text-slate-500">Line total</p>
-                          <p className="text-base font-semibold text-slate-900">{fmt(r.lineTotal)}</p>
-                          {r.price < r.list && r.valid && <p className="text-xs text-emerald-700">Discount {fmt(r.lineList - r.lineTotal)}</p>}
-                        </div>
                       </div>
-                      {r.p.units.length > 1 && r.p.units.some((u) => !cart.some((x) => x.productId === r.l.productId && x.unitId === u.id)) && (
-                        <button type="button" className="mt-2 text-xs font-medium text-navy-700 hover:underline" onClick={() => addOtherUnit(i)}>
-                          + Add {r.p.name.length > 24 ? "this product" : "it"} in another unit
-                        </button>
-                      )}
-                      {err && <p className="field-error">{err}</p>}
+                      {(err || r.tooHigh) && <p className="field-error">{err ?? "The price cannot be higher than the list price."}</p>}
                     </li>
                   );
                 })}
               </ul>
             )}
+            {discount > 0 && (
+              <div className="border-t border-line bg-emerald-50/60 px-4 py-3">
+                <label className="label" htmlFor="pos-discount-reason">
+                  Why is a discount given? <span className="text-brand-red">*</span>
+                </label>
+                <input id="pos-discount-reason" className={cn("input", fe.discountReason && "input-error")} value={discountReason} onChange={(e) => setDiscountReason(e.target.value)} placeholder="e.g. regular customer, damaged box" />
+                {fe.discountReason && <p className="field-error">{fe.discountReason}</p>}
+                <p className="hint">Saved on the sale together with your name.</p>
+              </div>
+            )}
           </div>
-        </section>
 
-        {/* ───────── Right: customer, payment, totals ───────── */}
-        <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
           <div className="card card-pad">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-900">Customer</h2>
@@ -297,7 +395,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
               </div>
             ) : (
               <div className="relative">
-                <input className="input" placeholder="Walk-in customer. Search to choose one…" value={custQ} onChange={(e) => setCustQ(e.target.value)} aria-label="Search customers" />
+                <input className="input" placeholder="Walk-in customer (search to choose one)" value={custQ} onChange={(e) => setCustQ(e.target.value)} aria-label="Search customers" />
                 {matches.length > 0 && (
                   <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-line bg-white py-1 shadow-lg">
                     {matches.map((c) => (
@@ -409,7 +507,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                   <dd>−{fmt(discount)}</dd>
                 </div>
               )}
-              <div className="flex items-baseline justify-between border-t border-line pt-2 text-lg font-semibold text-slate-900">
+              <div className="flex items-baseline justify-between border-t border-line pt-2 text-xl font-bold text-slate-900">
                 <dt>Total</dt>
                 <dd>{fmt(total)}</dd>
               </div>
@@ -427,7 +525,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
               )}
             </dl>
             <div className="mt-4 hidden xl:block">
-              <SubmitButton pendingLabel="Completing…" className="btn-primary w-full min-h-11 text-base" >
+              <SubmitButton pendingLabel="Completing…" className="btn-primary min-h-12 w-full text-base">
                 Complete sale
               </SubmitButton>
               {!canSubmit && <p className="hint text-center">{problems[0]}</p>}
@@ -437,13 +535,16 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
       </div>
 
       {/* Mobile / tablet: the total and the button are always in reach */}
-      <div className="fixed inset-x-0 bottom-0 z-30 lg:left-64 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,27,45,0.08)] backdrop-blur xl:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,27,45,0.08)] backdrop-blur lg:left-64 xl:hidden">
         <div className="mx-auto flex max-w-xl items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-slate-500">{rows.length} item{rows.length === 1 ? "" : "s"}{!canSubmit ? ` · ${problems[0]}` : ""}</p>
-            <p className="truncate text-lg font-semibold text-slate-900">{fmt(total)}</p>
-          </div>
-          <SubmitButton pendingLabel="Completing…" className="btn-primary min-h-11 px-6 text-base">
+          <button type="button" className="min-w-0 flex-1 text-left" onClick={() => document.getElementById("pos-cart")?.scrollIntoView({ behavior: "smooth" })}>
+            <p className="text-xs text-slate-500">
+              {cartCount} item{cartCount === 1 ? "" : "s"}
+              {!canSubmit ? ` · ${problems[0]}` : " · tap to review"}
+            </p>
+            <p className="truncate text-lg font-bold text-slate-900">{fmt(total)}</p>
+          </button>
+          <SubmitButton pendingLabel="Completing…" className="btn-primary min-h-12 px-6 text-base">
             Complete sale
           </SubmitButton>
         </div>

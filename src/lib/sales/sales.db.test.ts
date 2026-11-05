@@ -133,7 +133,11 @@ describe("cash sales", () => {
     const line = (p: string) => [{ productId: f.product.id, unitId: unitBottle, quantity: "2", unitPrice: p }];
     await expect(sell(f, { lines: line("20000") })).rejects.toBeInstanceOf(SaleError);
     await expect(sell(f, { can: { discount: true, credit: true, approveCreditException: false }, lines: line("30000") })).rejects.toBeInstanceOf(SaleError);
-    const { sale } = await sell(f, { can: { discount: true, credit: true, approveCreditException: false }, lines: line("20000") });
+    const allowed = { discount: true, credit: true, approveCreditException: false };
+    // a discount without a reason is refused
+    await expect(sell(f, { can: allowed, lines: line("20000") })).rejects.toBeInstanceOf(SaleError);
+    const { sale } = await sell(f, { can: allowed, discountReason: "Regular customer", lines: line("20000") });
+    expect(sale.discountReason).toBe("Regular customer");
     expect(sale.subtotal.toString()).toBe("50000");
     expect(sale.discountTotal.toString()).toBe("10000");
     expect(sale.total.toString()).toBe("40000");

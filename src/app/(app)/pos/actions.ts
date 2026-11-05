@@ -19,6 +19,7 @@ const payloadSchema = z.object({
   partAmount: z.string().max(20).nullable(),
   reference: z.string().trim().max(80).nullable(),
   notes: z.string().trim().max(500).nullable(),
+  discountReason: z.string().trim().max(200).nullable(),
   lines: z
     .array(z.object({ productId: z.string().min(1), unitId: z.string().min(1), quantity: z.string().max(24), unitPrice: z.string().max(24) }))
     .min(1, "Add at least one product.")
@@ -55,6 +56,7 @@ export async function createSale(_prev: ActionState, fd: FormData): Promise<Acti
             partAmount: payload.partAmount,
             reference: payload.reference || null,
             notes: payload.notes || null,
+            discountReason: payload.discountReason || null,
             lines: payload.lines,
             creditException: payload.creditException,
             submissionKey: payload.submissionKey,
@@ -67,7 +69,7 @@ export async function createSale(_prev: ActionState, fd: FormData): Promise<Acti
             action: "sale.create",
             after: { total: r.sale.total, paid: r.sale.amountPaid, onCredit: r.onCredit, status: r.sale.paymentStatus, customerId: r.sale.customerId, location: location.name, lines: payload.lines.length },
           });
-          if (r.sale.discountTotal.gt(0)) await writeAudit(tx, { ...base, action: "sale.discount_given", after: { discountTotal: r.sale.discountTotal, subtotal: r.sale.subtotal } });
+          if (r.sale.discountTotal.gt(0)) await writeAudit(tx, { ...base, action: "sale.discount_given", reason: r.sale.discountReason, after: { discountTotal: r.sale.discountTotal, subtotal: r.sale.subtotal } });
           if (r.creditExceptionUsed) {
             await writeAudit(tx, { ...base, action: "credit.exception_approved", reason: r.sale.creditExceptionReason, after: { customerId: r.sale.customerId, creditSale: r.onCredit } });
           }

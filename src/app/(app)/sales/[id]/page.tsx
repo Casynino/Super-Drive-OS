@@ -158,12 +158,17 @@ export default async function SalePage({ params, searchParams }: { params: Promi
         <p className="mt-8 text-center text-xs text-slate-500">Thank you for choosing {profile.name}.</p>
       </article>
 
-      {(sale.creditApprovedBy || showProfit) && (
+      {(sale.creditApprovedBy || showProfit || sale.discountReason) && (
         <section className="card card-pad mx-auto mt-5 max-w-3xl text-sm print:hidden">
           <h2 className="mb-2 text-base font-semibold text-slate-900">Internal details</h2>
           {sale.creditApprovedBy && (
             <p className="text-slate-700">
               Credit limit exception approved by <span className="font-medium">{sale.creditApprovedBy.name}</span>: {sale.creditExceptionReason}
+            </p>
+          )}
+          {sale.discountReason && (
+            <p className="text-slate-700">
+              Discount of <span className="font-medium">{money(sale.discountTotal)}</span> given: {sale.discountReason}
             </p>
           )}
           {showProfit && (
