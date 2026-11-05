@@ -34,6 +34,9 @@ Local DB: `superdrive_dev` on local Postgres 16 (`DATABASE_URL` in `.env`, never
 - No sparkle/star icons anywhere. Brand colours: navy `#0E3D6E`, red `#ED1C24`, oil yellow `#FDC400`.
 - Product photos in `PRODUCTS /` are reference images only; do not seed products from them.
 
+## Spec v2 (received 2026-11-05)
+Nino sent a second, more detailed specification (Owner + Shop Attendant, resellers/consignment, cash accounts + daily closing + bank deposits, expenses, approvals, WhatsApp reports via CallMeBot, product images, 80 mm receipts). Architecture, gap analysis, permission matrix and the re-sequenced roadmap are in `docs/ARCHITECTURE.md`; follow it. Pending his answers: image storage, discount-approval flow, reseller revenue recognition, phase order.
+
 ## Roadmap status
 - Phase 1 Foundation — **done** (auth, roles/permissions UI, employees, settings/catalog, locations, products + packaging units, audit viewer, app shell).
 - Phase 2 Inventory — **done**: stock overview/valuation, receiving (supplier delivery or opening stock, packaging units), transfers, damage/increase/decrease/count adjustments, movement ledger, basic Suppliers (name/contact only).
