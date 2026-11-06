@@ -11,6 +11,7 @@ import { recordRefundCash } from "@/lib/cash/ledger";
 import { applyIncomingCost, lockProducts, nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
 import { moveStockTracked } from "@/lib/inventory/items";
 import { toBaseQuantity, validateQuantity } from "@/lib/units";
+import { freePickupReservation, settlePickupNote } from "@/lib/warehouse/pickup";
 import { netPaid, netTotal } from "./owed";
 import { statusFor } from "./collections";
 
@@ -168,22 +169,38 @@ export async function completeReversal(tx: Tx, input: { reversalId: string; appr
     throw new ReversalError(`The customer is owed a refund of ${refund.toString()} but no refund method was chosen. Reject this request and ask for it again with the refund method.`, { refundMethod: "Choose how the refund is paid." });
   }
 
-  // Stock back through the stock engine
+  // Stock back through the stock engine. Goods that were sold from the warehouse but never collected are still on the shelf: for those the
+  // reservation is simply given back (no stock movement). Only goods that really left come back as stock.
+  const note = await tx.pickupNote.findUnique({ where: { saleId: sale.id }, include: { items: true } });
+  if (note) await tx.$queryRaw`SELECT "id" FROM "PickupNote" WHERE "id" = ${note.id} FOR UPDATE`;
+  const noteItems = note ? await tx.pickupNoteItem.findMany({ where: { noteId: note.id } }) : [];
   const ordered = [...priced].sort((a, b) => a.line.productId.localeCompare(b.line.productId));
   const ref = { referenceType: "SaleReversal", referenceId: reversal.id, referenceNo: reversal.reversalNo, userId: input.approver.id };
   for (const p of ordered) {
     const unitCost = p.saleItem.unitCost;
+    let physical = p.line.quantity; // what really has to come back into stock
+    const pi = noteItems.find((x) => x.saleItemId === p.line.saleItemId);
+    if (note && pi) {
+      const waiting = pi.quantity.minus(pi.releasedQty).minus(pi.cancelledQty);
+      const fromReserve = Prisma.Decimal.min(physical, waiting);
+      if (fromReserve.gt(0)) {
+        await freePickupReservation(tx, { noteId: note.id, noteItemId: pi.id, productId: pi.productId, locationId: note.locationId, qty: fromReserve, userId: input.approver.id, reason: `${reversal.reversalNo}: ${reversal.reason}` });
+        physical = physical.minus(fromReserve);
+      }
+    }
+    if (physical.lte(0)) continue;
     if (p.line.condition === "RESELLABLE") {
-      await applyIncomingCost(tx, p.line.productId, p.line.quantity, unitCost); // before the quantity moves in
+      await applyIncomingCost(tx, p.line.productId, physical, unitCost); // before the quantity moves in
       // the pieces that were sold on this invoice line go back into stock
-      await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "CUSTOMER_RETURN", delta: p.line.quantity, unitCost, reason: reversal.reason }, { saleItemId: p.line.saleItemId });
+      await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "CUSTOMER_RETURN", delta: physical, unitCost, reason: reversal.reason }, { saleItemId: p.line.saleItemId });
     } else {
       // Damaged goods come back and are written off straight away: the ledger shows both steps, and sellable stock does not change.
       // The same pieces come back and are marked damaged.
-      const back = await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "CUSTOMER_RETURN", delta: p.line.quantity, unitCost, reason: `${reversal.reason} (damaged)` }, { saleItemId: p.line.saleItemId });
-      await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "DAMAGED", delta: p.line.quantity.neg(), unitCost, reason: `Returned damaged: ${reversal.reason}` }, { itemIds: back.itemIds });
+      const back = await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "CUSTOMER_RETURN", delta: physical, unitCost, reason: `${reversal.reason} (damaged)` }, { saleItemId: p.line.saleItemId });
+      await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "DAMAGED", delta: physical.neg(), unitCost, reason: `Returned damaged: ${reversal.reason}` }, { itemIds: back.itemIds });
     }
   }
+  if (note) await settlePickupNote(tx, { noteId: note.id, userId: input.approver.id, reason: `${reversal.reversalNo}: ${reversal.reason}` });
 
   // The sale's credit-note totals and status (its original figures stay untouched)
   const after = { total: sale.total, amountPaid: sale.amountPaid, returnedTotal: newReturned, refundedTotal: sale.refundedTotal.plus(refund) };

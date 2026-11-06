@@ -10,6 +10,7 @@ import { lockProductsShared, nextDocumentNo, type Dec, type Tx } from "@/lib/inv
 import { ItemError, moveStockTracked, resolveItemCodes } from "@/lib/inventory/items";
 import { resolveLines } from "@/lib/inventory/lines";
 import { parseMoney } from "@/lib/money";
+import { createPickupNote } from "@/lib/warehouse/pickup";
 import { customerOutstanding } from "./outstanding";
 import { isWholesaleType, listPrice } from "./pricing";
 
@@ -245,8 +246,14 @@ export async function postSale(tx: Tx, input: SaleInput) {
     },
   });
 
+  // From a pickup location (the Store Warehouse) the goods are only RESERVED now and leave when the attendant hands them over
+  // (see releasePickup). Everywhere else the stock leaves at once, as before.
+  const location = await tx.location.findUnique({ where: { id: input.locationId }, select: { pickupRequired: true } });
+  const usePickup = Boolean(location?.pickupRequired) && !input.reseller;
+  if (usePickup && input.lines.some((l) => (l.itemCodes?.length ?? 0) > 0)) throw new SaleError("Pieces are not scanned when selling from the warehouse: the attendant checks the goods when they are collected.");
+
   // 7. Stock out, one ledger row per line (refused if there isn't enough; the whole sale then rolls back)
-  for (const { l } of sorted) {
+  for (const { l } of usePickup ? [] : sorted) {
     const codes = input.lines[l.index]!.itemCodes ?? [];
     try {
       // scanned pieces are marked sold exactly; the rest of the quantity is taken from stock without items, then the oldest pieces
@@ -300,5 +307,17 @@ export async function postSale(tx: Tx, input: SaleInput) {
     }
   }
 
-  return { sale, payment, creditExceptionUsed: creditApprovedById !== null, onCredit, total };
+  // 9. The pickup note with its QR code: reserves the goods (refused if the available stock does not cover them)
+  const pickup = usePickup
+    ? await createPickupNote(tx, {
+        saleId: sale.id,
+        saleNo,
+        locationId: input.locationId,
+        userId: input.user.id,
+        auth: onCredit.isZero() ? "PAID" : paidNow.gt(0) ? "PART_PAID" : "CREDIT_APPROVED",
+        lines: sorted.map(({ l }) => ({ saleItemId: lineIds.get(l.index)!, productId: l.productId, quantity: l.quantity })),
+      })
+    : null;
+
+  return { sale, payment, creditExceptionUsed: creditApprovedById !== null, onCredit, total, pickup };
 }

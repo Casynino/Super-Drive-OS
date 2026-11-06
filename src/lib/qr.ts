@@ -7,7 +7,9 @@ import QRCode from "qrcode";
  */
 export const ITEM_QR_PREFIX = "SDOI:";
 export const PRODUCT_QR_PREFIX = "SDOP:";
+export const PICKUP_QR_PREFIX = "SDOPU:";
 export const itemQrText = (token: string) => `${ITEM_QR_PREFIX}${token}`;
+export const pickupQrText = (token: string) => `${PICKUP_QR_PREFIX}${token}`;
 export const productQrText = (barcode: string) => `${PRODUCT_QR_PREFIX}${barcode}`;
 
 /** A QR code as an SVG string (dark modules on white, with a quiet zone), made on the server so it prints sharp at any size. */

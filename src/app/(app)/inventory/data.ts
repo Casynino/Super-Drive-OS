@@ -29,11 +29,14 @@ export async function getActiveLocations(): Promise<LocationOption[]> {
   return rows;
 }
 
-/** { locationId: { productId: quantity } } for non-zero balances; used for "on hand" hints in forms. */
+/** { locationId: { productId: available } } for what can still be sold or moved (physical stock minus what is reserved for collection); used for "on hand" hints in forms and the POS. */
 export async function getStockByLocation(): Promise<Record<string, Record<string, string>>> {
-  const rows = await db.stockBalance.findMany({ where: { quantity: { gt: 0 } }, select: { productId: true, locationId: true, quantity: true } });
+  const rows = await db.stockBalance.findMany({ where: { quantity: { gt: 0 } }, select: { productId: true, locationId: true, quantity: true, reserved: true } });
   const out: Record<string, Record<string, string>> = {};
-  for (const r of rows) (out[r.locationId] ??= {})[r.productId] = r.quantity.toString();
+  for (const r of rows) {
+    const available = r.quantity.minus(r.reserved);
+    if (available.gt(0)) (out[r.locationId] ??= {})[r.productId] = available.toString();
+  }
   return out;
 }
 

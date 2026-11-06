@@ -2,8 +2,9 @@
 // which updates the balance and appends the ledger row in the SAME transaction.
 //
 // Concurrency model (PostgreSQL, READ COMMITTED):
-//  - moveStock does ONE atomic UPDATE ... WHERE quantity + delta >= 0. The row lock it takes serialises
-//    concurrent writers of that product+location, so two sales can never both take the last bottle.
+//  - moveStock does ONE atomic UPDATE ... WHERE quantity + delta >= reserved. The row lock it takes serialises
+//    concurrent writers of that product+location, so two sales can never both take the last bottle. Stock that is
+//    reserved (sold, waiting to be collected from the warehouse) can never be taken by anything else.
 //  - Anything that reads-then-writes the product's weighted-average cost first locks the Product row
 //    (lockProducts). Callers lock products in sorted order, and balances in (productId, locationId) order,
 //    so concurrent documents cannot deadlock each other.
@@ -94,12 +95,13 @@ export async function moveStock(tx: Tx, m: MoveInput): Promise<{ previousQty: De
     UPDATE "StockBalance"
        SET "quantity" = "quantity" + ${delta}::numeric, "updatedAt" = now()
      WHERE "productId" = ${m.productId} AND "locationId" = ${m.locationId}
-       AND "quantity" + ${delta}::numeric >= 0
+       AND "quantity" + ${delta}::numeric >= "reserved"
     RETURNING "quantity"`;
 
   if (rows.length === 0) {
     const bal = await tx.stockBalance.findUnique({ where: { productId_locationId: { productId: m.productId, locationId: m.locationId } } });
-    throw new InsufficientStockError(m.productId, m.locationId, bal?.quantity ?? new D(0), m.delta.abs());
+    // what could have been taken: physical stock minus what is already reserved for collection
+    throw new InsufficientStockError(m.productId, m.locationId, bal ? bal.quantity.minus(bal.reserved) : new D(0), m.delta.abs());
   }
 
   const newQty = new D(rows[0]!.quantity.toString());
@@ -121,6 +123,36 @@ export async function moveStock(tx: Tx, m: MoveInput): Promise<{ previousQty: De
     },
   });
   return { previousQty, newQty };
+}
+
+/**
+ * Sets stock aside for a sale that will be collected later: available (quantity - reserved) must cover it, so the same goods can
+ * never be sold twice. One atomic UPDATE, so concurrent sales queue on the row. Returns the reserved figure before and after.
+ */
+export async function reserveStock(tx: Tx, p: { productId: string; locationId: string; qty: Dec }): Promise<{ previousReserved: Dec; newReserved: Dec }> {
+  const q = p.qty.toString();
+  const rows = await tx.$queryRaw<{ reserved: Prisma.Decimal | string }[]>`
+    UPDATE "StockBalance" SET "reserved" = "reserved" + ${q}::numeric, "updatedAt" = now()
+     WHERE "productId" = ${p.productId} AND "locationId" = ${p.locationId} AND "quantity" - "reserved" >= ${q}::numeric
+    RETURNING "reserved"`;
+  if (rows.length === 0) {
+    const bal = await tx.stockBalance.findUnique({ where: { productId_locationId: { productId: p.productId, locationId: p.locationId } } });
+    throw new InsufficientStockError(p.productId, p.locationId, bal ? bal.quantity.minus(bal.reserved) : new D(0), p.qty);
+  }
+  const newReserved = new D(rows[0]!.reserved.toString());
+  return { previousReserved: newReserved.minus(p.qty), newReserved };
+}
+
+/** Gives a reservation back (the goods were collected, or the sale was cancelled before collection). */
+export async function unreserveStock(tx: Tx, p: { productId: string; locationId: string; qty: Dec }): Promise<{ previousReserved: Dec; newReserved: Dec }> {
+  const q = p.qty.toString();
+  const rows = await tx.$queryRaw<{ reserved: Prisma.Decimal | string }[]>`
+    UPDATE "StockBalance" SET "reserved" = "reserved" - ${q}::numeric, "updatedAt" = now()
+     WHERE "productId" = ${p.productId} AND "locationId" = ${p.locationId} AND "reserved" >= ${q}::numeric
+    RETURNING "reserved"`;
+  if (rows.length === 0) throw new Error("There is no reservation of that size to give back.");
+  const newReserved = new D(rows[0]!.reserved.toString());
+  return { previousReserved: newReserved.plus(p.qty), newReserved };
 }
 
 /** Pure: new weighted-average cost after adding `addQty` units at `addUnitCost` to `onHand` units at `avgCost`. */

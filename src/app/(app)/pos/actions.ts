@@ -76,8 +76,12 @@ export async function createSale(_prev: ActionState, fd: FormData): Promise<Acti
           if (r.creditExceptionUsed) {
             await writeAudit(tx, { ...base, action: "credit.exception_approved", reason: r.sale.creditExceptionReason, after: { customerId: r.sale.customerId, creditSale: r.onCredit } });
           }
-          const sold = await tx.stockMovement.findMany({ where: { referenceType: "Sale", referenceId: r.sale.id, type: "SOLD" }, select: { productId: true, quantity: true } });
-          await notifyStockCrossings(tx, sold.map((m) => ({ productId: m.productId, qty: m.quantity.neg() })), `After sale ${r.sale.saleNo}`);
+          // stock that left at once (SOLD rows) or, from the warehouse, stock that was reserved for the pickup note
+          const sold = r.pickup
+            ? (await tx.pickupNoteItem.findMany({ where: { noteId: r.pickup.id }, select: { productId: true, quantity: true } })).map((m) => ({ productId: m.productId, qty: m.quantity }))
+            : (await tx.stockMovement.findMany({ where: { referenceType: "Sale", referenceId: r.sale.id, type: "SOLD" }, select: { productId: true, quantity: true } })).map((m) => ({ productId: m.productId, qty: m.quantity.neg() }));
+          await notifyStockCrossings(tx, sold, `After sale ${r.sale.saleNo}`);
+          if (r.pickup) await writeAudit(tx, { ...base, action: "pickup.created", entityType: "PickupNote", entityId: r.pickup.id, reference: r.pickup.noteNo, after: { sale: r.sale.saleNo, auth: r.pickup.auth } });
           return r.sale;
         },
         { timeout: 30000, maxWait: 15000 },

@@ -10,9 +10,9 @@ export type StockAlert = { id: string; name: string; qty: string; min: string; s
 export async function getStockAlerts(db: Pick<Db, "product" | "stockBalance">) {
   const [products, balances] = await Promise.all([
     db.product.findMany({ where: { status: "ACTIVE" }, select: { id: true, name: true, minStock: true, baseUnit: { select: { symbol: true } }, units: { select: { factor: true, unit: { select: { symbol: true } } } }, image: { select: { updatedAt: true } } }, orderBy: { name: "asc" } }),
-    db.stockBalance.groupBy({ by: ["productId"], where: { location: { type: { not: "RESELLER" } } }, _sum: { quantity: true } }), // stock with resellers is not on the shelf
+    db.stockBalance.groupBy({ by: ["productId"], where: { location: { type: { not: "RESELLER" } } }, _sum: { quantity: true, reserved: true } }), // stock with resellers is not on the shelf; reserved stock is already sold, so it is not available
   ]);
-  const qty = new Map(balances.map((b) => [b.productId, b._sum.quantity ?? new D(0)]));
+  const qty = new Map(balances.map((b) => [b.productId, (b._sum.quantity ?? new D(0)).minus(b._sum.reserved ?? 0)])); // available = physical - reserved
   const out: StockAlert[] = [];
   const low: StockAlert[] = [];
   let inStock = 0;
@@ -43,10 +43,10 @@ export async function notifyStockCrossings(
   for (const [productId, qty] of merged) {
     const [p, now] = await Promise.all([
       tx.product.findUnique({ where: { id: productId }, select: { name: true, minStock: true, status: true, baseUnit: { select: { symbol: true } } } }),
-      tx.stockBalance.aggregate({ where: { productId, location: { type: { not: "RESELLER" } } }, _sum: { quantity: true } }),
+      tx.stockBalance.aggregate({ where: { productId, location: { type: { not: "RESELLER" } } }, _sum: { quantity: true, reserved: true } }),
     ]);
     if (!p || p.status !== "ACTIVE") continue;
-    const after = now._sum.quantity ?? new D(0);
+    const after = (now._sum.quantity ?? new D(0)).minus(now._sum.reserved ?? 0); // what can still be sold
     const before = after.plus(qty);
     const out = after.lte(0) && before.gt(0);
     const low = !out && p.minStock.gt(0) && after.lte(p.minStock) && before.gt(p.minStock);
