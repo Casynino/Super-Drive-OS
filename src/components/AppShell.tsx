@@ -30,22 +30,11 @@ function initials(name: string) {
     .join("");
 }
 
-const STORAGE_KEY = "sd-nav-closed";
-
 export default function AppShell({ businessName, user, visibleHrefs, logoutAction, unread, badges, children }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  // groups the person has folded away (remembered on this device)
-  const [closed, setClosed] = useState<Record<string, boolean>>({});
 
   useEffect(() => setOpen(false), [pathname]);
-  useEffect(() => {
-    try {
-      setClosed(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as Record<string, boolean>);
-    } catch {
-      /* private mode etc.: everything simply stays open */
-    }
-  }, []);
 
   const visible = new Set(visibleHrefs);
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.ready && visible.has(i.href)) })).filter((g) => g.items.length > 0);
@@ -57,22 +46,11 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
   const activeGroup = groups.find((g) => g.items.some((i) => i.href === active))?.label;
 
-  // Going to a page inside a folded group opens that group again
+  // Accordion: one group open at a time. It starts on the group of the page you are on, and follows you when you go to another page.
+  const [openGroup, setOpenGroup] = useState<string | null>(activeGroup ?? null);
   useEffect(() => {
-    if (activeGroup && closed[activeGroup]) setClosed((c) => ({ ...c, [activeGroup]: false }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
-
-  const toggle = (label: string) =>
-    setClosed((c) => {
-      const next = { ...c, [label]: !c[label] };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+    if (activeGroup) setOpenGroup(activeGroup);
+  }, [activeGroup]);
 
   const count = (item: NavItem) => (item.badge ? badges[item.badge] : 0);
 
@@ -85,10 +63,10 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         <Link
           href={item.href}
           aria-current={isActive ? "page" : undefined}
-          className={cn("relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition", isActive ? "bg-navy-50 font-semibold text-navy-800" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}
+          className={cn("relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition", isActive ? "bg-navy-50 font-semibold text-navy-800" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}
         >
-          {isActive && <span className="absolute inset-y-1.5 -left-[9px] w-[3px] rounded-r bg-oil-400" />}
-          <Icon size={18} className={cn("shrink-0", isActive ? "text-navy-700" : "text-slate-400")} />
+          {isActive && <span className="absolute inset-y-1.5 -left-[13px] w-[3px] rounded-r bg-oil-400" />}
+          <Icon size={16} className={cn("shrink-0", isActive ? "text-navy-700" : "text-slate-400")} />
           <span className="min-w-0 flex-1 truncate">{item.label}</span>
           {n > 0 && <span className="shrink-0 rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white">{n > 99 ? "99+" : n}</span>}
         </Link>
@@ -107,35 +85,44 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Main">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3" aria-label="Main">
         {groups.map((group) => {
           if (!group.label)
             return (
-              <ul key="top" className="mb-3 space-y-0.5">
+              <ul key="top" className="mb-2 space-y-0.5">
                 {group.items.map(link)}
               </ul>
             );
           const Icon = group.icon;
-          const isOpen = !closed[group.label];
+          const isOpen = openGroup === group.label;
           const here = group.label === activeGroup;
+          // a red number on a folded group so a waiting approval is never hidden inside it
+          const waiting = group.items.reduce((sum, i) => sum + count(i), 0);
           return (
-            <div key={group.label} className="mb-2">
+            <div key={group.label}>
               <button
                 type="button"
-                onClick={() => toggle(group.label)}
+                onClick={() => setOpenGroup(isOpen ? null : group.label)}
                 aria-expanded={isOpen}
-                className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition hover:text-slate-800"
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.14em] transition",
+                  isOpen ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-100/70 hover:text-slate-800",
+                )}
               >
-                {Icon && <Icon size={15} className={cn("shrink-0", here ? "text-oil-500" : "text-slate-400")} />}
+                {Icon && <Icon size={16} className={cn("shrink-0", here ? "text-oil-500" : "text-slate-400")} />}
                 <span className="flex-1">{group.label}</span>
-                <ChevronDown size={14} className={cn("shrink-0 text-slate-400 transition-transform", !isOpen && "-rotate-90")} />
+                {!isOpen && waiting > 0 && <span className="rounded-full bg-brand-red px-1.5 text-[11px] font-bold normal-case leading-[18px] tracking-normal text-white">{waiting > 99 ? "99+" : waiting}</span>}
+                <ChevronDown size={14} className={cn("shrink-0 text-slate-400 transition-transform duration-200", !isOpen && "-rotate-90")} />
               </button>
-              {isOpen && <ul className="ml-[1.2rem] mt-0.5 space-y-0.5 border-l border-line pl-2">{group.items.map(link)}</ul>}
+              <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out", isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+                <div className="overflow-hidden" inert={!isOpen}>
+                  <ul className="ml-[1.15rem] mt-1 space-y-0.5 border-l border-line pb-1 pl-3">{group.items.map(link)}</ul>
+                </div>
+              </div>
             </div>
           );
         })}
       </nav>
-
     </div>
   );
 
