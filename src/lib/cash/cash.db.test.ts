@@ -10,7 +10,7 @@ import { completeReversal, createReversalRequest } from "@/lib/sales/reversals";
 import { postDeposit, postManualCash, type ManualKind } from "./deposits";
 import { decideExpense, recordExpense, reverseExpense } from "./expenses";
 import { CashError, accountBalance, businessDay, getAccount, getBalances, postCash } from "./ledger";
-import { getClosingPreview, reviewClosing, submitClosing, unclosedDays } from "./closing";
+import { getClosingPreview, submitClosing, unclosedDays } from "./closing";
 
 const D = (v: string | number) => new Prisma.Decimal(v);
 let userId: string;
@@ -79,7 +79,7 @@ const expense = (s: Shop, amount: string, over: Partial<Parameters<typeof record
 const deposit = (s: Shop, amount: string, key = randomUUID()) =>
   db.$transaction((tx) => postDeposit(tx, { user: { id: userId }, locationId: s.location.id, amount, bankReference: "SLIP-1", notes: null, slipId: null, submissionKey: key, currencyDecimals: 0 }));
 const close = (s: Shop, counted: string, over: Partial<Parameters<typeof submitClosing>[1]> = {}) =>
-  db.$transaction((tx) => submitClosing(tx, { user: { id: userId }, locationId: s.location.id, day: "", countedCash: counted, notes: null, deposit: null, submissionKey: randomUUID(), currencyDecimals: 0, tolerance: D(0), ...over }), { timeout: 30000 });
+  db.$transaction((tx) => submitClosing(tx, { user: { id: userId }, locationId: s.location.id, day: "", countedCash: counted, notes: null, deposit: null, submissionKey: randomUUID(), currencyDecimals: 0, ...over }), { timeout: 30000 });
 
 describe("money arriving and leaving is written to the ledger by the source records", () => {
   it("a cash sale lands in cash, a mobile sale in mobile money, a credit sale in nothing, a part payment only its paid part", async () => {
@@ -282,7 +282,7 @@ describe("daily closing", () => {
     expect(preview.summary.accounts.find((a) => a.method === "MOBILE_MONEY")!.balance).toBe("25000");
 
     const r = await close(s, "139000", { notes: "Short by one" });
-    expect(r.status).toBe("NEEDS_REVIEW"); // tolerance 0
+    expect(r.status).toBe("SUBMITTED"); // a difference is recorded, never sent for sign-off
     expect(r.difference.toString()).toBe("-1000");
     expect([r.closing.expectedCash.toString(), r.closing.countedCash.toString(), r.closing.cashCarried.toString()]).toEqual(["140000", "139000", "139000"]);
     expect(await balance(s, "CASH")).toBe("139000"); // the ledger now says exactly what was counted
@@ -290,12 +290,13 @@ describe("daily closing", () => {
     expect(await db.cashTransaction.count({ where: { closingId: r.closing.id } })).toBe(5); // opening, two sales, expense, count difference
   });
 
-  it("a count within the owner's tolerance is accepted without review", async () => {
+  it("any difference is recorded as it is: no review step, the ledger follows the count", async () => {
     const s = await shop();
     await manual(s, "CASH", "OPENING", "50000");
-    const r = await close(s, "49500", { tolerance: D(1000) });
+    const r = await close(s, "49500");
     expect(r.status).toBe("SUBMITTED");
     expect(r.difference.toString()).toBe("-500");
+    expect(await balance(s, "CASH")).toBe("49500");
   });
 
   it("the same day cannot be closed twice, even at the same moment", async () => {
@@ -359,19 +360,6 @@ describe("daily closing", () => {
     const stamped = await db.cashTransaction.findFirstOrThrow({ where: { closingId: r.closing.id } });
     const other = await db.dailyClosing.create({ data: { closingNo: `X-${randomUUID()}`, locationId: s.location.id, businessDate: new Date("2020-01-01"), openingCash: 0, expectedCash: 0, countedCash: 0, difference: 0, cashCarried: 0, summary: {}, status: "SUBMITTED", submittedById: userId, submissionKey: randomUUID() } });
     await expect(db.$executeRaw`UPDATE "CashTransaction" SET "closingId" = ${other.id} WHERE "id" = ${stamped.id}`).rejects.toThrow(/already belongs/);
-  });
-
-  it("a difference needs the owner's note before it is signed off, and only once", async () => {
-    const s = await shop();
-    await manual(s, "CASH", "OPENING", "20000");
-    const r = await close(s, "18000");
-    await expect(db.$transaction((tx) => reviewClosing(tx, { closingId: r.closing.id, reviewer: { id: managerId }, note: "" }))).rejects.toMatchObject({ fieldErrors: { note: expect.any(String) } });
-    const done = await db.$transaction((tx) => reviewClosing(tx, { closingId: r.closing.id, reviewer: { id: managerId }, note: "Customer was given too much change; talked to the attendant" }));
-    expect(done.closing.status).toBe("REVIEWED");
-    expect(done.closing.reviewedById).toBe(managerId);
-    await expect(db.$transaction((tx) => reviewClosing(tx, { closingId: r.closing.id, reviewer: { id: managerId }, note: "again" }))).rejects.toThrow(/already reviewed/);
-    // the figures are untouched by the review
-    expect((await db.dailyClosing.findUniqueOrThrow({ where: { id: r.closing.id } })).difference.toString()).toBe("-2000");
   });
 
   it("mobile money and bank are never mixed into the cash count", async () => {

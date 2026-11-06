@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Banknote, CheckCircle2, Landmark, Receipt, ReceiptText, Scale } from "lucide-react";
-import { ClosingStatusBadge, ClosingSummaryView, Difference } from "@/components/cash/Display";
-import { ReviewClosingForm } from "@/components/cash/CashForms";
+import { Banknote, CheckCircle2, Landmark, Lock, Receipt, ReceiptText, Scale } from "lucide-react";
+import PrintButton from "@/components/PrintButton";
+import { ClosingStatusBadge, ClosingSummaryView } from "@/components/cash/Display";
 import KpiCard from "@/components/dashboard/KpiCard";
 import Spread from "@/components/reports/Spread";
 import { Alert, PageHeader } from "@/components/ui";
@@ -14,7 +14,6 @@ import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { formatDate, formatDateTime } from "@/lib/utils";
-import { reviewClosingAction } from "../actions";
 
 export const metadata = { title: "End of day report" };
 
@@ -27,7 +26,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
   if (!canSubmit && !canReview) redirect("/forbidden");
   const { id } = await params;
   const sp = await searchParams;
-  const c = await db.dailyClosing.findUnique({ where: { id }, include: { submittedBy: { select: { name: true } }, reviewedBy: { select: { name: true } } } });
+  const c = await db.dailyClosing.findUnique({ where: { id }, include: { submittedBy: { select: { name: true } }, location: { select: { name: true } } } });
   if (!c || (!canReview && c.submittedById !== user.id)) notFound();
   const day = c.businessDate.toISOString().slice(0, 10);
   const [currency, deposits, best] = await Promise.all([
@@ -49,10 +48,15 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
   const inBy = (k: "CASH" | "MOBILE_MONEY" | "BANK") => dec(summary.sales.paidByMethod[k]).plus(dec(summary.collections.byMethod[k]));
   const received = inBy("CASH").plus(inBy("MOBILE_MONEY")).plus(inBy("BANK"));
   const banked = deposits.reduce((t, d) => t.plus(d.amount), new D(0));
+  // where the money was when the day was closed: the till after the bank trip, mobile money, and the bank (with what was just banked)
+  const methodBalance = (m: "MOBILE_MONEY" | "BANK") => dec(summary.accounts.find((a) => a.method === m)?.balance);
+  const mobileLeft = methodBalance("MOBILE_MONEY");
+  const bankLeft = methodBalance("BANK").plus(banked);
+  const everything = c.cashCarried.plus(mobileLeft).plus(bankLeft);
 
   return (
     <>
-      <PageHeader title={`End of day · ${formatDate(c.businessDate)}`} back={{ href: "/closing", label: "End of day" }} description={`${c.closingNo} · ${c.submittedBy.name} · ${formatDateTime(c.submittedAt)}`} actions={<ClosingStatusBadge status={c.status} difference={c.difference.toString()} />} />
+      <PageHeader title={`End of day · ${formatDate(c.businessDate)}`} back={{ href: "/closing", label: "End of day" }} description={`${c.location.name} · ${c.closingNo} · submitted by ${c.submittedBy.name}, ${formatDateTime(c.submittedAt)}`} actions={<><ClosingStatusBadge status={c.status} difference={c.difference.toString()} /><PrintButton label="Print / Save as PDF" /></>} />
 
       {sp.done && (
         <div className="mb-4">
@@ -76,6 +80,26 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
           hint={`Counted ${money(c.countedCash)} · expected ${money(c.expectedCash)}`}
         />
       </div>
+
+      <section className="card mb-5 px-4 py-4 sm:px-5" aria-label="Where the money is">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">Where the money was when the day closed</h2>
+          <span className="text-sm font-semibold tabular-nums text-slate-900">{money(everything)} in all</span>
+        </div>
+        <dl className="mt-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
+          {[
+            ["In the till (cash)", c.cashCarried, banked.gt(0) ? `after ${money(banked)} went to the bank` : "nothing was banked"],
+            ["Mobile money", mobileLeft, "in the mobile money accounts"],
+            ["In the bank", bankLeft, banked.gt(0) ? `includes ${money(banked)} banked today` : "in the bank accounts"],
+          ].map(([label, value, note]) => (
+            <div key={String(label)} className="rounded-xl border border-line px-3.5 py-3">
+              <dt className="text-xs text-slate-500">{String(label)}</dt>
+              <dd className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">{money(value as Prisma.Decimal)}</dd>
+              <p className="mt-0.5 text-[11px] text-slate-500">{String(note)}</p>
+            </div>
+          ))}
+        </dl>
+      </section>
 
       <div className="mb-5 grid gap-4 lg:grid-cols-2">
         <Spread title="Where the money came in" parts={[{ name: "Cash", value: inBy("CASH") }, { name: "Mobile money", value: inBy("MOBILE_MONEY") }, { name: "Bank", value: inBy("BANK") }]} money={money} empty="No money came in today." />
@@ -129,39 +153,15 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-        <div>
-          <h2 className="mb-3 text-base font-semibold text-slate-900">The day in figures</h2>
-          <ClosingSummaryView s={summary} currency={currency} />
-        </div>
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          {c.status === "REVIEWED" ? (
-            <section className="card card-pad">
-              <h2 className="text-base font-semibold text-slate-900">Reviewed</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                {c.reviewedBy?.name} · {formatDateTime(c.reviewedAt)}
-              </p>
-              {c.reviewNote && <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">“{c.reviewNote}”</p>}
-            </section>
-          ) : canReview ? (
-            <section className="card card-pad">
-              <h2 className="mb-1 text-base font-semibold text-slate-900">{c.status === "NEEDS_REVIEW" ? "The count did not match" : "Sign off"}</h2>
-              <p className="mb-3 text-sm text-slate-500">{c.status === "NEEDS_REVIEW" ? "Talk to the shop, then write what you found." : "Mark this day as checked."}</p>
-              <ReviewClosingForm closingId={c.id} action={reviewClosingAction} needsNote={c.status === "NEEDS_REVIEW"} />
-            </section>
-          ) : c.status === "NEEDS_REVIEW" ? (
-            <Alert kind="info">The owner has been told about the difference.</Alert>
-          ) : null}
-          <section className="card card-pad">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Difference</p>
-            <p className="mt-1">
-              <Difference value={c.difference.toString()} currency={currency} className="text-lg" />
-            </p>
-          </section>
-          <Link href="/closing" className="btn-secondary w-full justify-center">
-            All closings
-          </Link>
-        </aside>
+      <h2 className="mb-3 text-base font-semibold text-slate-900">The day in figures</h2>
+      <ClosingSummaryView s={summary} currency={currency} />
+      <p className="mt-5 flex items-center gap-2 text-xs text-slate-500">
+        <Lock size={13} /> This record is locked. It cannot be edited or deleted, so it stays as the permanent record of the day.
+      </p>
+      <div className="mt-3">
+        <Link href="/closing" className="btn-secondary">
+          All closings
+        </Link>
       </div>
     </>
   );

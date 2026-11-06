@@ -6,7 +6,7 @@
 // Submitting is one transaction that: stamps every open ledger row with this closing (a row can belong to only one),
 // books the difference so the ledger balance equals the counted cash from now on (carry-forward), optionally deposits
 // part of the cash to the bank, and LOCKS the figures (database trigger). Corrections afterwards are authorised cash
-// adjustments, never edits. A difference above the owner's tolerance sends the closing to the owner for review.
+// adjustments, never edits. A difference is recorded and shown in red; nobody has to sign it off.
 //
 // Lock order: cash account row → document counters. Ledger rows written by other transactions while a closing runs are
 // not part of it (it only stamps the rows it read); they simply belong to the next closing.
@@ -175,7 +175,6 @@ export type SubmitClosingInput = {
   deposit: { amount: string; bankReference: string; notes: string | null; slipId: string | null; bankAccountId?: string | null } | null;
   submissionKey: string;
   currencyDecimals: number;
-  tolerance: Dec;
 };
 
 export async function submitClosing(tx: Tx, input: SubmitClosingInput) {
@@ -206,7 +205,7 @@ export async function submitClosing(tx: Tx, input: SubmitClosingInput) {
   const stamped = await stampedBalances(tx, input.locationId);
   const { summary, expectedCash, openingCash } = await summarize(tx, rows, stamped, input.locationId, day);
   const difference = counted.minus(expectedCash);
-  const status = difference.abs().gt(input.tolerance) ? "NEEDS_REVIEW" : "SUBMITTED";
+  const status = "SUBMITTED" as const; // the difference is on the record; there is no sign-off step
 
   const closingNo = await nextDocumentNo(tx, "CLS");
   const closing = await tx.dailyClosing.create({
@@ -249,17 +248,4 @@ export async function submitClosing(tx: Tx, input: SubmitClosingInput) {
     depositNo = dep.depositNo;
   }
   return { closing, difference, status, depositNo, summary };
-}
-
-// ───────────── Owner review ─────────────
-
-export async function reviewClosing(tx: Tx, input: { closingId: string; reviewer: { id: string }; note: string }) {
-  const note = input.note.trim();
-  await tx.$queryRaw`SELECT "id" FROM "DailyClosing" WHERE "id" = ${input.closingId} FOR UPDATE`;
-  const c = await tx.dailyClosing.findUnique({ where: { id: input.closingId } });
-  if (!c) throw new CashError("This closing no longer exists.");
-  if (c.status === "REVIEWED") throw new CashError("This closing was already reviewed.");
-  if (c.status === "NEEDS_REVIEW" && note.length < 3) throw new CashError("Write what you found about the difference before signing it off.", { note: "A note is required for a closing with a difference." });
-  const updated = await tx.dailyClosing.update({ where: { id: c.id }, data: { status: "REVIEWED", reviewedById: input.reviewer.id, reviewedAt: new Date(), reviewNote: note || null } });
-  return { closing: updated, submittedById: c.submittedById };
 }

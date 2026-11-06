@@ -80,7 +80,7 @@ export const PERMISSIONS = [
 
   // Daily closing
   { key: "closing.submit", module: "Daily Closing", label: "Submit daily closing" },
-  { key: "closing.approve", module: "Daily Closing", label: "Review and approve daily closings" },
+  { key: "closing.approve", module: "Daily Closing", label: "See every day's closing and its report" },
   { key: "deposits.record", module: "Daily Closing", label: "Record bank deposits" },
 
   // Reports & management

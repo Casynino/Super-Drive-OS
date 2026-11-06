@@ -97,7 +97,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   const range = resolveRange("month");
   const financials = can(user, "dashboard.financials");
   const locationId = await defaultLocationId(db);
-  const [currency, profile, data, extras, overview, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, closingsToReview, resellerOverdue, shelf, away, closedToday] = await Promise.all([
+  const [currency, profile, data, extras, overview, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, resellerOverdue, shelf, away, closedToday] = await Promise.all([
     getCurrency(),
     getBusinessProfile(),
     getOwnerDashboard(db, range, { financials, valuation: can(user, "inventory.valuation") }),
@@ -108,7 +108,6 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
     can(user, "shipments.manage") ? db.shipment.count({ where: { status: "EXPECTED", arrivedAt: null } }) : 0,
     can(user, "cash.view") ? getBalances(db, locationId) : Promise.resolve([]),
     can(user, "expenses.approve") ? db.expense.aggregate({ where: { status: "PENDING" }, _count: true, _sum: { amount: true } }) : null,
-    can(user, "closing.approve") ? db.dailyClosing.findMany({ where: { status: "NEEDS_REVIEW" }, select: { difference: true } }) : [],
     can(user, "resellers.view") ? db.$queryRaw<{ v: number | null }[]>`SELECT SUM("total" - "returnedTotal" - "amountPaid" + "refundedTotal")::float AS v FROM "Sale" WHERE "channel" = 'RESELLER' AND "status" = 'COMPLETED' AND "dueDate" < ${businessDay()}::date AND ("total" - "returnedTotal" - "amountPaid" + "refundedTotal") > 0`.then((r) => Number(r[0]?.v ?? 0)) : 0,
     can(user, "inventory.view") ? db.stockBalance.aggregate({ where: { location: { type: { not: "RESELLER" } } }, _sum: { quantity: true } }) : null,
     can(user, "inventory.view") ? db.stockBalance.aggregate({ where: { location: { type: "RESELLER" } }, _sum: { quantity: true } }) : null,
@@ -131,7 +130,6 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   if (data.pendingApprovals > 0 && can(user, "returns.approve")) items.push({ id: "returns", group: "decisions", tone: "amber", icon: "returns", title: `${plural(data.pendingApprovals, "return or cancellation", "returns and cancellations")} waiting`, detail: "Stock and money wait for your yes.", href: pendingReturn ? `/sales/${pendingReturn.saleId}` : "/sales" });
   if (pendingExpenses && pendingExpenses._count > 0) items.push({ id: "expenses", group: "decisions", tone: "amber", icon: "expense", title: `${plural(pendingExpenses._count, "expense", "expenses")} waiting for approval`, detail: "Nothing is paid out until you approve.", main: m(Number(pendingExpenses._sum.amount ?? 0)), href: "/expenses?status=PENDING" });
-  if (closingsToReview.length > 0) items.push({ id: "closings", group: "decisions", tone: "red", icon: "closing", title: `${plural(closingsToReview.length, "daily closing", "daily closings")} where the cash did not match`, detail: "Look into the difference and sign it off.", main: m(closingsToReview.reduce((s, c) => s + Math.abs(c.difference.toNumber()), 0)), sub: "difference", href: "/closing?status=NEEDS_REVIEW" });
   if (shipmentIssues > 0) items.push({ id: "ship-issues", group: "decisions", tone: "amber", icon: "shipment", title: `${plural(shipmentIssues, "shipment", "shipments")} with damaged or missing goods`, detail: "Find out what went wrong and close the investigation.", href: "/shipments" });
   if (k.debt.overdue > 0) items.push({ id: "overdue", group: "money", tone: "red", icon: "debt", title: "Customers owe money past the due date", detail: o.oldestOwed > 0 ? `The oldest unpaid bill is ${o.oldestOwed} days old.` : "Follow these up before they get older.", main: m(k.debt.overdue), sub: `of ${m(k.debt.value)} owed in all`, href: "/credit" });
   if (resellerOverdue > 0) items.push({ id: "reseller-overdue", group: "money", tone: "red", icon: "reseller", title: "Winga have not paid on time", detail: "Money is past the settlement date.", main: m(resellerOverdue), href: "/resellers" });

@@ -7,7 +7,6 @@ export type CashSettings = {
   /** Expenses up to this amount are recorded straight away; anything above needs the owner first. 0 = every expense needs approval. */
   expenseApprovalLimit: Prisma.Decimal;
   /** A cash count that differs from the expected amount by more than this needs the owner's review. 0 = any difference. */
-  closingTolerance: Prisma.Decimal;
 };
 
 const amount = (v: unknown) => {
@@ -16,7 +15,7 @@ const amount = (v: unknown) => {
 };
 
 export async function getCashSettings(db: Pick<Tx, "setting">): Promise<CashSettings> {
-  const rows = await db.setting.findMany({ where: { key: { in: ["expenseApprovalLimit", "closingTolerance"] } } });
+  const rows = await db.setting.findMany({ where: { key: { in: ["expenseApprovalLimit"] } } });
   const m = new Map(rows.map((r) => [r.key, r.value]));
-  return { expenseApprovalLimit: amount(m.get("expenseApprovalLimit")), closingTolerance: amount(m.get("closingTolerance")) };
+  return { expenseApprovalLimit: amount(m.get("expenseApprovalLimit")) };
 }

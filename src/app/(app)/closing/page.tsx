@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
-import { AlertTriangle, Banknote, CalendarCheck, CheckCircle2, Clock, Landmark, Receipt, Smartphone, TrendingUp } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarCheck, CheckCircle2, Landmark, Receipt, Scale, Smartphone, TrendingUp } from "lucide-react";
 import ClosingForm from "@/components/cash/ClosingForm";
 import { DepositForm } from "@/components/cash/CashForms";
 import { ClosingStatusBadge, ClosingSummaryView, Difference } from "@/components/cash/Display";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
-import type { Prisma, ClosingStatus } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { getClosingPreview, unclosedDays } from "@/lib/cash/closing";
@@ -22,7 +22,7 @@ import { submitClosingAction } from "./actions";
 export const metadata = { title: "End of day" };
 
 /** Closing: one place for the end of the day. The shop counts the cash, banks some of it and closes; the owner sees every day's report. */
-export default async function ClosingPage({ searchParams }: { searchParams: Promise<{ status?: string; banked?: string }> }) {
+export default async function ClosingPage({ searchParams }: { searchParams: Promise<{ show?: string; shop?: string; banked?: string }> }) {
   const user = await requireUser();
   const canSubmit = can(user, "closing.submit");
   const canReview = can(user, "closing.approve");
@@ -34,18 +34,20 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
   const today = businessDay();
   const locationId = await defaultLocationId(db);
 
-  const statusFilter: ClosingStatus | undefined = sp.status === "NEEDS_REVIEW" || sp.status === "REVIEWED" || sp.status === "SUBMITTED" ? sp.status : undefined;
-  const where: Prisma.DailyClosingWhereInput = { ...(canReview ? {} : { submittedById: user.id }), ...(statusFilter ? { status: statusFilter } : {}) };
+  const show = sp.show === "short" || sp.show === "extra" ? sp.show : undefined;
+  const where: Prisma.DailyClosingWhereInput = { ...(canReview ? {} : { submittedById: user.id }), ...(sp.shop ? { locationId: sp.shop } : {}), ...(show === "short" ? { difference: { lt: 0 } } : show === "extra" ? { difference: { gt: 0 } } : {}) };
+  const monthStart = new Date(`${today.slice(0, 8)}01T00:00:00Z`);
   const depositWhere: Prisma.BankDepositWhereInput = canReview ? {} : { createdById: user.id };
 
-  const [preview, older, history, needReview, accounts, deposits, monthBanked] = await Promise.all([
+  const [preview, older, history, monthShort, accounts, deposits, monthBanked, shops] = await Promise.all([
     canSubmit ? getClosingPreview(db, locationId, today) : Promise.resolve(null),
     canSubmit ? unclosedDays(db, locationId, today) : Promise.resolve([] as string[]),
-    db.dailyClosing.findMany({ where, orderBy: { businessDate: "desc" }, take: 30, include: { submittedBy: { select: { name: true } } } }),
-    canReview ? db.dailyClosing.count({ where: { status: "NEEDS_REVIEW" } }) : Promise.resolve(0),
+    db.dailyClosing.findMany({ where, orderBy: { businessDate: "desc" }, take: 30, include: { submittedBy: { select: { name: true } }, location: { select: { name: true } } } }),
+    canReview ? db.dailyClosing.aggregate({ where: { businessDate: { gte: monthStart }, difference: { lt: 0 } }, _sum: { difference: true }, _count: true }) : Promise.resolve(null),
     getAccountBalances(db, locationId, today),
     db.bankDeposit.findMany({ where: depositWhere, orderBy: { createdAt: "desc" }, take: 12, include: { createdBy: { select: { name: true } } } }),
     db.bankDeposit.aggregate({ where: { ...depositWhere, businessDate: { gte: new Date(`${today.slice(0, 8)}01T00:00:00Z`) } }, _sum: { amount: true } }),
+    db.location.findMany({ where: { type: { not: "RESELLER" }, status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
   const last = history[0];
   const cash = accounts.find((a) => a.method === "CASH");
@@ -59,7 +61,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title="End of day" description={canSubmit ? "Count the cash, bank it, close the day." : "Every closed day and its report."} />
+      <PageHeader title="End of day" description={canSubmit ? "Count the cash, bank it, close the day." : "Every closed day, with any cash that was short."} />
 
       {sp.banked && (
         <div className="mb-4">
@@ -71,7 +73,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
 
       {canReview && (
         <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
-          <KpiCard icon={Clock} tone={needReview ? "red" : "slate"} label="Waiting for your review" value={String(needReview)} hint={needReview ? "Cash did not match" : "Nothing to review"} href={needReview ? "/closing?status=NEEDS_REVIEW" : undefined} />
+          <KpiCard icon={Scale} tone={monthShort && monthShort._count > 0 ? "red" : "green"} label="Cash short this month" value={money(new Prisma.Decimal(monthShort?._sum.difference ?? 0).abs())} hint={monthShort && monthShort._count > 0 ? `On ${monthShort._count} day${monthShort._count === 1 ? "" : "s"}` : "No cash missing"} href={monthShort && monthShort._count > 0 ? "/closing?show=short" : undefined} />
           <KpiCard icon={Banknote} tone="yellow" label="Cash in the till" value={money(cash?.balance ?? 0)} hint="Now" />
           <KpiCard icon={Landmark} tone="navy" label="Banked this month" value={money(monthBanked._sum.amount ?? 0)} hint="Cash taken to the bank" />
           <KpiCard icon={CalendarCheck} tone={last && !last.difference.isZero() ? "red" : "green"} label="Last closing" value={last ? formatDate(last.businessDate) : "—"} hint={last ? (last.difference.isZero() ? "No difference" : last.difference.lt(0) ? `Short ${money(last.difference.abs())}` : `Extra ${money(last.difference)}`) : "No day closed yet"} />
@@ -148,14 +150,23 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
           <h2 className="text-base font-semibold text-slate-900">{canReview ? "All closings" : "Your closings"}</h2>
           {canReview && (
             <div className="flex gap-1.5 text-sm">
-              {[["", "All"], ["NEEDS_REVIEW", "Needs review"], ["REVIEWED", "Reviewed"]].map(([v, label]) => (
-                <Link key={v} href={v ? `/closing?status=${v}` : "/closing"} className={`rounded-full px-3 py-1 ${(sp.status ?? "") === v ? "bg-navy-700 text-white" : "bg-white text-slate-600 ring-1 ring-line hover:bg-slate-50"}`}>
+              {[["", "All"], ["short", "Short"], ["extra", "Extra"]].map(([v, label]) => (
+                <Link key={v} href={`/closing?${new URLSearchParams({ ...(sp.shop ? { shop: sp.shop } : {}), ...(v ? { show: v } : {}) }).toString()}`} className={`rounded-full px-3 py-1 ${(sp.show ?? "") === v ? "bg-navy-700 text-white" : "bg-white text-slate-600 ring-1 ring-line hover:bg-slate-50"}`}>
                   {label}
                 </Link>
               ))}
             </div>
           )}
         </div>
+        {shops.length > 1 && (
+          <nav className="-mx-1 mb-3 flex flex-wrap gap-1.5 px-1" aria-label="Shop">
+            {[{ id: "", name: "All shops" }, ...shops].map((x) => (
+              <Link key={x.id} href={`/closing?${new URLSearchParams({ ...(x.id ? { shop: x.id } : {}), ...(show ? { show } : {}) }).toString()}`} className={`rounded-full px-3 py-1 text-sm ${(sp.shop ?? "") === x.id ? "bg-navy-700 text-white" : "bg-white text-slate-600 ring-1 ring-line hover:bg-slate-50"}`}>
+                {x.name}
+              </Link>
+            ))}
+          </nav>
+        )}
         <div className="card overflow-hidden">
           {history.length === 0 ? (
             <EmptyState icon={<CalendarCheck size={22} />} title="No closings yet" description="Each closed day appears here." />
@@ -165,6 +176,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                 <thead>
                   <tr>
                     <th>Day</th>
+                    {shops.length > 1 && <th>Shop</th>}
                     <th className="hidden sm:table-cell">Closing</th>
                     <th className="text-right">Expected</th>
                     <th className="text-right">Counted</th>
@@ -182,6 +194,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                           {formatDate(c.businessDate)}
                         </Link>
                       </td>
+                      {shops.length > 1 && <td className="whitespace-nowrap">{c.location.name}</td>}
                       <td className="hidden text-slate-500 sm:table-cell">{c.closingNo}</td>
                       <td className="text-right tabular-nums">{money(c.expectedCash)}</td>
                       <td className="text-right tabular-nums">{money(c.countedCash)}</td>

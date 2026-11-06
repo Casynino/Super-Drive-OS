@@ -75,7 +75,6 @@ async function main() {
       { key: "currency", value: { code: "TZS", symbol: "TSh", decimals: 0 } },
       { key: "creditTermsDays", value: 30 },
       { key: "expenseApprovalLimit", value: 0 }, // 0 = no approval needed: expenses are recorded and paid at once (the owner may set a limit later)
-      { key: "closingTolerance", value: 0 }, // 0 = any cash difference at closing goes to the owner
     ],
     skipDuplicates: true,
   });

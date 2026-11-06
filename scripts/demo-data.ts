@@ -18,7 +18,7 @@ import { Prisma, PrismaClient, type PaymentMethod } from "../src/generated/prism
 import { hashPassword } from "../src/lib/auth/password";
 import { postManualCash, postDeposit } from "../src/lib/cash/deposits";
 import { decideExpense, recordExpense } from "../src/lib/cash/expenses";
-import { reviewClosing, submitClosing, getClosingPreview } from "../src/lib/cash/closing";
+import { submitClosing, getClosingPreview } from "../src/lib/cash/closing";
 import { paySupplier } from "../src/lib/cash/supplier";
 import { createReseller, issueStock, reportSold, returnStock } from "../src/lib/resellers/engine";
 import { postCollection } from "../src/lib/sales/collections";
@@ -154,7 +154,7 @@ async function setup(d: number) {
   await mk("Neema Joseph", "neema", "ACCOUNTANT", "0716 555 205");
 
   // settings the cash screens use
-  for (const [k, v] of [["expenseApprovalLimit", 30000], ["closingTolerance", 1000]] as const) await db.setting.upsert({ where: { key: k }, update: { value: v }, create: { key: k, value: v } });
+  for (const [k, v] of [["expenseApprovalLimit", 30000]] as const) await db.setting.upsert({ where: { key: k }, update: { value: v }, create: { key: k, value: v } });
 
   // expense categories on top of the starting ones
   for (const name of ["Rent", "Salaries", "Electricity and water", "Marketing"]) if (!(await db.expenseCategory.findFirst({ where: { name } }))) await db.expenseCategory.create({ data: { name } });
@@ -451,7 +451,6 @@ async function main() {
 
   let firstSalesDay = 1;
   let bad = 0;
-  let closingNeedsReview: { id: string; day: number }[] = [];
   console.log("Playing the days…");
   for (let d = START; d <= 0; d++) {
     const dow = new Date(`${isoDay(d)}T12:00:00Z`).getUTCDay(); // 0 Sunday
@@ -490,9 +489,6 @@ async function main() {
         if (!b.pending && !e.approvedNow) await tx((t) => decideExpense(t, { expenseId: e.expense.id, approver: owner, approve: true, note: "" }));
       }
       if (returnDays.has(d)) await returnOne(d, false);
-      // the owner reviews yesterday's difference
-      for (const c of closingNeedsReview.filter((x) => x.day < d - 1 && x.day < -3)) await tx((t) => reviewClosing(t, { closingId: c.id, reviewer: owner, note: "Checked with the attendant: change was given to a customer and not written down." }));
-      closingNeedsReview = closingNeedsReview.filter((x) => !(x.day < d - 1 && x.day < -3));
     });
 
     await batch(d, 15, async () => {
@@ -523,8 +519,8 @@ async function main() {
         bad++;
         const r = rnd();
         const diff = d === -2 ? -4500 : r < 0.72 ? 0 : r < 0.92 ? int(-8, 8) * 100 : int(-6, 6) * 700 || 1800;
-        const closing = await tx((t) => submitClosing(t, { user: amina, locationId: locId, day: "", countedCash: String(Math.max(Math.round(expected + diff), 0)), notes: diff === 0 ? null : "Counted twice, this is the real count.", deposit: null, submissionKey: key(), currencyDecimals: 0, tolerance: new D(1000) }));
-        if (closing.status === "NEEDS_REVIEW") closingNeedsReview.push({ id: closing.closing.id, day: d });
+        const closing = await tx((t) => submitClosing(t, { user: amina, locationId: locId, day: "", countedCash: String(Math.max(Math.round(expected + diff), 0)), notes: diff === 0 ? null : "Counted twice, this is the real count.", deposit: null, submissionKey: key(), currencyDecimals: 0 }));
+        void closing;
       });
     }
     if (d % 10 === 0) log(`day ${d}: ${nSales} sales`);

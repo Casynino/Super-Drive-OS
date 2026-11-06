@@ -106,18 +106,3 @@ export function ManualCashForm({ action, submissionKey, openingDone, accounts }:
     </form>
   );
 }
-
-export function ReviewClosingForm({ closingId, action, needsNote }: { closingId: string; action: Action; needsNote: boolean }) {
-  const [state, formAction] = useActionState(action, initial);
-  const fe = state.fieldErrors ?? {};
-  return (
-    <form action={formAction} className="space-y-2.5">
-      <input type="hidden" name="closingId" value={closingId} />
-      <input name="note" className={`input ${fe.note ? "input-error" : ""}`} placeholder={needsNote ? "What did you find about the difference? (required)" : "Note (optional)"} aria-label="Review note" />
-      {fe.note && <p className="field-error">{fe.note}</p>}
-      {state.error && !fe.note && <Alert>{state.error}</Alert>}
-      {state.ok && <Alert kind="success">{state.message}</Alert>}
-      <SubmitButton pendingLabel="Saving…">Sign off this closing</SubmitButton>
-    </form>
-  );
-}

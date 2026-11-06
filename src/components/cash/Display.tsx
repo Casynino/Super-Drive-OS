@@ -10,10 +10,11 @@ export function ExpenseStatusBadge({ status }: { status: ExpenseStatus }) {
   return <span className={cls}>{label}</span>;
 }
 
-export function ClosingStatusBadge({ status, difference }: { status: ClosingStatus; difference?: string }) {
-  if (status === "NEEDS_REVIEW") return <span className="badge-red">Needs review</span>;
-  if (status === "REVIEWED") return <span className="badge-blue">Reviewed</span>;
-  return <span className={difference && difference !== "0" ? "badge-yellow" : "badge-green"}>{difference && difference !== "0" ? "Within allowed" : "Matches"}</span>;
+/** Says whether the cash counted was what the system expected: correct, short (red) or extra. Older days that were "reviewed" show the same way. */
+export function ClosingStatusBadge({ difference }: { status?: ClosingStatus; difference?: string }) {
+  const n = Number(difference ?? 0);
+  if (n === 0) return <span className="badge-green">Correct</span>;
+  return n < 0 ? <span className="badge-red">Short</span> : <span className="badge-yellow">Extra</span>;
 }
 
 /** A signed difference in words and colour: shortage (red), surplus (amber), exact (green). */

@@ -89,7 +89,7 @@ export default function ClosingForm({
             diff === null ? "border-line bg-slate-50 text-slate-500" : diff === 0 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : diff < 0 ? "border-red-200 bg-brand-red-soft text-brand-red-dark" : "border-amber-200 bg-oil-soft text-yellow-900",
           )}
         >
-          {diff === null ? "Type what you counted." : diff === 0 ? "Matches exactly." : diff < 0 ? `Short by ${money(diff)}. Count again.` : `${money(diff)} extra. Count again.`}
+          {diff === null ? "Type what you counted. The system compares it with what it expects." : diff === 0 ? "Correct. This is what the system expects." : diff < 0 ? `Short by ${money(diff)}. Count again.` : `${money(diff)} extra. Count again.`}
         </div>
         {diff !== null && diff !== 0 && (
           <Field label="What caused it? (optional)" name="notes" id={id("notes")} className="mt-3">

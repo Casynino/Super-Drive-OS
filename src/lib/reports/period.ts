@@ -44,7 +44,7 @@ export type PeriodStats = {
   money: Awaited<ReturnType<typeof getMoneySummary>>;
   expensesByCategory: { name: string; value: Dec }[];
   topProducts: { name: string; value: Dec }[];
-  closings: { count: number; daysInPeriod: number; short: Dec; extra: Dec; needReview: number };
+  closings: { count: number; daysInPeriod: number; short: Dec; extra: Dec };
   banked: Dec;
   profit: Awaited<ReturnType<typeof getProfit>>;
 };
@@ -84,11 +84,10 @@ export async function getPeriodStats(db: Db, locationId: string, from: string, t
   const names = categories.length ? await db.expenseCategory.findMany({ where: { id: { in: categories.map((c) => c.categoryId) } }, select: { id: true, name: true } }) : [];
   const paid = { CASH: new D(0), MOBILE_MONEY: new D(0), BANK: new D(0) };
   for (const r of atSale) paid[r.method] = new D(r.v ?? 0);
-  let short = new D(0), extra = new D(0), needReview = 0;
+  let short = new D(0), extra = new D(0);
   for (const c of closings) {
     if (c.difference.lt(0)) short = short.plus(c.difference.abs());
     else if (c.difference.gt(0)) extra = extra.plus(c.difference);
-    if (c.status === "NEEDS_REVIEW") needReview++;
   }
   const salesPerDay = perDay.map((r) => ({ day: r.day, total: new D(r.v ?? 0), count: Number(r.n) }));
   return {
@@ -104,7 +103,7 @@ export async function getPeriodStats(db: Db, locationId: string, from: string, t
       .filter((c) => c.value.gt(0))
       .sort((a, b) => b.value.comparedTo(a.value)),
     topProducts: top.map((t) => ({ name: t.name, value: new D(t.v ?? 0) })),
-    closings: { count: closings.length, daysInPeriod: days, short, extra, needReview },
+    closings: { count: closings.length, daysInPeriod: days, short, extra },
     banked: new D(banked._sum.amount ?? 0),
     profit,
   };

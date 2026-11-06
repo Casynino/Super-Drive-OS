@@ -23,9 +23,8 @@ export async function saveCashSettings(_prev: ActionState, fd: FormData): Promis
   const values = formValues(fd);
   return guarded("settings.manage", async (user) => {
     const currency = await getCurrency();
-    const parsed = z.object({ expenseApprovalLimit: amountField(currency.decimals), closingTolerance: amountField(currency.decimals) }).safeParse({
+    const parsed = z.object({ expenseApprovalLimit: amountField(currency.decimals) }).safeParse({
       expenseApprovalLimit: formString(fd, "expenseApprovalLimit"),
-      closingTolerance: formString(fd, "closingTolerance"),
     });
     if (!parsed.success) return { ...zodErrors(parsed.error), values };
     const before = Object.fromEntries((await db.setting.findMany({ where: { key: { in: Object.keys(parsed.data) } } })).map((r) => [r.key, r.value]));

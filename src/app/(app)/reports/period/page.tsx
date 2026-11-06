@@ -68,7 +68,7 @@ export default async function PeriodReportPage({ searchParams }: { searchParams:
         <KpiCard icon={ReceiptText} tone="red" label="Spent" value={money(s.money.spent)} hint={`Expenses ${money(s.money.expenses)} · suppliers ${money(s.money.suppliers)} · owner ${money(s.money.withdrawals)}`} />
         <KpiCard icon={TrendingUp} tone={s.money.left.lt(0) ? "red" : "green"} label="What is left" value={money(s.money.left)} hint="Income − everything spent" />
         {seeProfit && <KpiCard icon={TrendingUp} tone={s.profit.net.lt(0) ? "red" : "green"} label="Profit" value={money(s.profit.net)} badge={`${s.profit.marginPct.toFixed(1)}% of sales`} hint={`Sales profit ${money(s.profit.gross)} − expenses ${money(s.money.expenses)}`} />}
-        <KpiCard icon={Scale} tone={s.closings.short.gt(0) ? "red" : "green"} label="Cash count" value={s.closings.short.gt(0) ? `Short ${money(s.closings.short)}` : "No cash missing"} hint={`${s.closings.count} of ${s.closings.daysInPeriod} days closed${s.closings.extra.gt(0) ? ` · extra ${money(s.closings.extra)}` : ""}${s.closings.needReview ? ` · ${s.closings.needReview} to review` : ""}`} href="/closing" />
+        <KpiCard icon={Scale} tone={s.closings.short.gt(0) ? "red" : "green"} label="Cash count" value={s.closings.short.gt(0) ? `Short ${money(s.closings.short)}` : "No cash missing"} hint={`${s.closings.count} of ${s.closings.daysInPeriod} days closed${s.closings.extra.gt(0) ? ` · extra ${money(s.closings.extra)}` : ""}`} href="/closing" />
       </div>
 
       <section className="card mb-5 px-4 py-4 sm:px-5">

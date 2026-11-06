@@ -71,7 +71,7 @@ export async function buildDailyReport(db: Db, locationId: string, day: string):
     db.bankDeposit.findMany({ where: { businessDate: dayToDate(day) }, orderBy: { createdAt: "asc" } }),
     getStockAlerts(db),
     db.stockMovement.groupBy({ by: ["type"], where: { createdAt: { gte: from, lte: to } }, _count: true, _sum: { quantity: true } }),
-    Promise.all([db.saleReversal.count({ where: { status: "PENDING" } }), db.expense.count({ where: { status: "PENDING" } }), db.dailyClosing.count({ where: { status: "NEEDS_REVIEW" } })]),
+    Promise.all([db.saleReversal.count({ where: { status: "PENDING" } }), db.expense.count({ where: { status: "PENDING" } })]),
     db.reseller.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" } }),
     db.$queryRaw<{ q: Prisma.Decimal | null }[]>`
       SELECT SUM(si."quantity" - COALESCE(x.q, 0)) AS q FROM "SaleItem" si JOIN "Sale" s ON s."id" = si."saleId"
@@ -103,7 +103,7 @@ export async function buildDailyReport(db: Db, locationId: string, day: string):
   const resellerColl = collections.filter((c) => c.customer?.reseller).reduce((t, c) => t + num(c.amount), 0);
   const spent = expenses.reduce((t, e) => t + num(e.amount), 0);
   const diff = num(closing.difference);
-  const status = closing.status === "NEEDS_REVIEW" ? "COMPLETED - CASH DIFFERENCE, NEEDS OWNER REVIEW" : closing.status === "REVIEWED" ? "COMPLETED AND REVIEWED" : "COMPLETED";
+  const status = diff === 0 ? "COMPLETED - CASH CORRECT" : `COMPLETED - CASH ${diff < 0 ? "SHORT" : "EXTRA"} ${m(Math.abs(diff))}`;
 
   const summary = [
     name,
@@ -210,7 +210,7 @@ export async function buildDailyReport(db: Db, locationId: string, day: string):
   movements.forEach((mv) => L.push(`${mv.type.replace(/_/g, " ").toLowerCase()}: ${mv._count} movement${mv._count === 1 ? "" : "s"}, net ${num(mv._sum.quantity).toFixed(0)} units`));
 
   section("PENDING APPROVALS");
-  L.push(`Returns/cancellations: ${approvals[0]}`, `Expenses: ${approvals[1]}`, `Closings needing review: ${approvals[2]}`);
+  L.push(`Returns/cancellations: ${approvals[0]}`, `Expenses: ${approvals[1]}`);
   section("DAILY CLOSING");
   L.push(`${closing.closingNo} · closed by ${closing.submittedBy.name} at ${hhmm(closing.submittedAt)} · ${status}`);
 

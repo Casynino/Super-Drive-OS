@@ -7,12 +7,11 @@ import { writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
 import { fail, formString, formValues, guarded, isUniqueViolation, type ActionState } from "@/lib/action";
 import { ImageError, processDocumentImage, saveAttachment } from "@/lib/cash/attachments";
-import { reviewClosing, submitClosing } from "@/lib/cash/closing";
+import { submitClosing } from "@/lib/cash/closing";
 import { postDeposit } from "@/lib/cash/deposits";
 import { CashError, defaultLocationId } from "@/lib/cash/ledger";
-import { getCashSettings } from "@/lib/cash/settings";
 import { formatMoney } from "@/lib/money";
-import { notifyPermission, notifyUser } from "@/lib/notifications";
+import { notifyPermission } from "@/lib/notifications";
 import { getCurrency } from "@/lib/settings";
 
 const refresh = () => {
@@ -36,7 +35,6 @@ export async function submitClosingAction(_prev: ActionState, fd: FormData): Pro
   const values = formValues(fd);
   const result = await guarded("closing.submit", async (user) => {
     const currency = await getCurrency();
-    const settings = await getCashSettings(db);
     const submissionKey = formString(fd, "submissionKey");
     if (submissionKey.length < 16) return fail("The form could not be read. Reload the page and try again.", undefined, values);
     const depositAmount = formString(fd, "depositAmount");
@@ -53,7 +51,7 @@ export async function submitClosingAction(_prev: ActionState, fd: FormData): Pro
           const r = await submitClosing(tx, {
             user, locationId, day: formString(fd, "day"), countedCash: formString(fd, "countedCash"), notes: formString(fd, "notes") || null,
             deposit: wantsDeposit ? { amount: depositAmount, bankReference: formString(fd, "bankReference"), notes: formString(fd, "depositNotes") || null, slipId: att?.id ?? null, bankAccountId: formString(fd, "bankAccountId") || null } : null,
-            submissionKey, currencyDecimals: currency.decimals, tolerance: settings.closingTolerance,
+            submissionKey, currencyDecimals: currency.decimals,
           });
           await writeAudit(tx, {
             user, action: "closing.submitted", entityType: "DailyClosing", entityId: r.closing.id, reference: r.closing.closingNo,
@@ -61,8 +59,8 @@ export async function submitClosingAction(_prev: ActionState, fd: FormData): Pro
           });
           const diff = r.difference.isZero() ? "no difference" : `${r.difference.gt(0) ? "surplus" : "shortage"} of ${formatMoney(r.difference.abs(), currency)}`;
           await notifyPermission(tx, "closing.approve", {
-            type: r.status === "NEEDS_REVIEW" ? "closing.needs_review" : "closing.submitted",
-            title: r.status === "NEEDS_REVIEW" ? `Closing ${r.closing.closingNo} needs your review` : `Day closed: ${r.closing.closingNo}`,
+            type: "closing.submitted",
+            title: `Day closed: ${r.closing.closingNo}`,
             body: `${user.name} counted ${formatMoney(r.closing.countedCash, currency)} - ${diff}.`,
             link: `/closing/${r.closing.id}`,
           }, user.id);
@@ -84,30 +82,6 @@ export async function submitClosingAction(_prev: ActionState, fd: FormData): Pro
   });
   if (result.ok && result.message) redirect(`/closing/${result.message}?done=1`);
   return result;
-}
-
-// ───────────── Owner reviews a closing ─────────────
-
-export async function reviewClosingAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  return guarded("closing.approve", async (user) => {
-    const closingId = formString(fd, "closingId");
-    const note = formString(fd, "note");
-    try {
-      await db.$transaction(
-        async (tx) => {
-          const r = await reviewClosing(tx, { closingId, reviewer: user, note });
-          await writeAudit(tx, { user, action: "closing.reviewed", entityType: "DailyClosing", entityId: closingId, reference: r.closing.closingNo, reason: note || undefined, after: { difference: r.closing.difference.toString() } });
-          await notifyUser(tx, r.submittedById, { type: "closing.reviewed", title: `Closing ${r.closing.closingNo} was reviewed`, body: note || "Signed off.", link: `/closing/${closingId}` });
-        },
-        { timeout: 30000 },
-      );
-      refresh();
-      return { ok: true, message: "Signed off." };
-    } catch (e) {
-      if (e instanceof CashError) return fail(e.message, e.fieldErrors);
-      throw e;
-    }
-  });
 }
 
 // ───────────── A bank deposit on its own (not part of a closing) ─────────────
