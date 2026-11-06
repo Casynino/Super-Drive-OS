@@ -17,17 +17,23 @@ const FEATURES = [
   { icon: HandCoins, label: "Credit control" },
 ];
 
+const Logo = ({ className }: { className: string }) => (
+  <Image src="/brand/logo-full.png" alt="Super Drive Oil" width={900} height={456} className={`brand-logo w-auto ${className}`} priority />
+);
+
 export default async function LoginPage() {
   if (await getSessionUser()) redirect("/dashboard");
 
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
-      {/* Desktop: full animated scene */}
-      <section className="relative hidden min-h-dvh overflow-hidden text-white lg:block">
-        <LoginScene />
-        <div className="relative z-10 flex min-h-dvh flex-col justify-between p-12">
+    <div className="relative isolate min-h-dvh overflow-hidden bg-navy-900">
+      {/* the animated scene fills the whole page */}
+      <LoginScene />
+
+      <div className="relative z-10 grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
+        {/* Words (wide screens) */}
+        <section className="hidden flex-col justify-between p-12 text-white lg:flex">
           <div className="ls-up w-fit rounded-2xl bg-white px-6 py-4 shadow-lg" style={delay(0.05)}>
-            <Image src="/brand/logo-full.png" alt="Super Drive Oil" width={900} height={456} className="brand-logo h-16 w-auto" priority />
+            <Logo className="h-16" />
           </div>
 
           <div className="mb-[clamp(190px,32vh,330px)] max-w-lg">
@@ -48,31 +54,26 @@ export default async function LoginPage() {
             </ul>
           </div>
 
-          <p className="text-xs text-white/55">Super Drive Oil · Management System</p>
-        </div>
-      </section>
+          <span aria-hidden />
+        </section>
 
-      <section className="flex min-h-dvh flex-col">
-        {/* Phone and tablet: compact version of the scene above the form */}
-        <div className="relative h-56 shrink-0 overflow-hidden lg:hidden">
-          <LoginScene variant="compact" />
-          <div className="absolute left-4 top-4 z-10 rounded-xl bg-white px-3.5 py-2 shadow-lg">
-            <Image src="/brand/logo-full.png" alt="Super Drive Oil" width={900} height={456} className="brand-logo h-10 w-auto" priority />
+        {/* Sign-in card, floating over the scene */}
+        <section className="flex flex-col items-center px-5 py-6 lg:justify-center lg:py-10">
+          <div className="mb-5 self-start rounded-xl bg-white px-3.5 py-2 shadow-lg lg:hidden">
+            <Logo className="h-10" />
           </div>
-        </div>
-
-        <div className="flex flex-1 items-center justify-center px-5 py-10">
-          <div className="ls-up w-full max-w-sm" style={delay(0.2)}>
+          <div className="ls-card ls-up w-full max-w-sm p-7 sm:p-8" style={delay(0.2)}>
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Welcome back</h1>
             <p className="mt-1.5 text-sm text-slate-500">Sign in with the username your manager gave you.</p>
             <LoginForm />
-            <p className="mt-8 flex items-center gap-2 text-xs text-slate-500">
-              <ShieldCheck size={14} className="shrink-0 text-emerald-600" />
+            <p className="mt-7 flex items-start gap-2 text-xs text-slate-500">
+              <ShieldCheck size={14} className="mt-px shrink-0 text-emerald-600" />
               Private system. Everything you do is recorded with your name.
             </p>
           </div>
-        </div>
-      </section>
+          <p className="mt-5 text-xs text-white/60">Super Drive Oil · Management System</p>
+        </section>
+      </div>
     </div>
   );
 }

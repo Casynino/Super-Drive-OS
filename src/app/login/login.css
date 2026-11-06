@@ -1,18 +1,17 @@
-/* Sign-in page: animated night-drive scene (decorative; see LoginScene.tsx). Brand: navy, red, oil yellow. */
+/* Sign-in page: full-page animated night-drive scene (decorative; see LoginScene.tsx). Brand: navy, red, oil yellow. */
 
 .ls {
+  --cw: clamp(420px, 58cqw, 1100px); /* width of one 760-unit vehicle drawing */
   position: absolute;
   inset: 0;
   overflow: hidden;
   container-type: inline-size;
   color: #fff;
   background:
-    radial-gradient(900px 520px at 80% 14%, rgba(70, 140, 230, 0.38), transparent 62%),
-    radial-gradient(700px 420px at 8% 100%, rgba(237, 28, 36, 0.2), transparent 60%),
+    radial-gradient(1000px 560px at 56% 12%, rgba(70, 140, 230, 0.4), transparent 62%),
+    radial-gradient(800px 460px at 6% 100%, rgba(237, 28, 36, 0.22), transparent 60%),
+    radial-gradient(700px 400px at 100% 70%, rgba(253, 196, 0, 0.1), transparent 60%),
     linear-gradient(180deg, #061a33 0%, #0b2f57 58%, #0a2342 100%);
-}
-.ls-compact {
-  border-radius: 1rem;
 }
 
 /* glowing road: a grid plane that streams towards the viewer */
@@ -22,7 +21,7 @@
   right: 0;
   bottom: 36%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(253, 196, 0, 0.9) 30%, rgba(237, 28, 36, 0.9) 70%, transparent);
+  background: linear-gradient(90deg, transparent, rgba(253, 196, 0, 0.9) 25%, rgba(237, 28, 36, 0.9) 75%, transparent);
   box-shadow: 0 0 22px 3px rgba(253, 196, 0, 0.45);
 }
 .ls-horizon::before {
@@ -31,7 +30,7 @@
   left: 0;
   right: 0;
   bottom: 2px;
-  height: 90px;
+  height: 110px;
   background: linear-gradient(0deg, rgba(253, 196, 0, 0.16), transparent);
 }
 .ls-floor {
@@ -56,8 +55,8 @@
   transform-origin: 50% 100%;
   transform: rotateX(72deg);
   background-image:
-    linear-gradient(rgba(253, 196, 0, 0.55) 1.5px, transparent 1.5px),
-    linear-gradient(90deg, rgba(125, 175, 255, 0.4) 1.5px, transparent 1.5px);
+    linear-gradient(rgba(253, 196, 0, 0.5) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(125, 175, 255, 0.38) 1.5px, transparent 1.5px);
   background-size: 80px 80px;
   animation: ls-grid 0.9s linear infinite;
 }
@@ -67,20 +66,42 @@
   }
 }
 
-/* car */
-.ls-car-wrap {
+/* lanes: dashed road stripe + a vehicle that laps from the left edge to the right edge and around again */
+.ls-lane {
   position: absolute;
-  left: 3cqw;
-  bottom: calc(19% - 4cqw);
-  width: 88cqw;
+  left: 0;
+  right: 0;
+  bottom: var(--b);
+  height: 3px;
+  opacity: var(--o);
+  background: linear-gradient(90deg, #fff 0 42%, transparent 42%) 0 0 / 90px 100% repeat-x;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  animation: ls-lane var(--d) linear infinite;
+}
+@keyframes ls-lane {
+  to {
+    background-position: -90px 0;
+  }
+}
+.ls-veh {
+  position: absolute;
+  left: 0;
+  width: calc(var(--cw) * var(--k) * var(--w));
+  bottom: calc(var(--b) - var(--cw) * var(--k) * 0.045);
   pointer-events: none;
+  animation: ls-drive var(--d) linear infinite;
+  animation-delay: var(--s);
 }
-.ls-compact .ls-car-wrap {
-  left: -4cqw;
-  width: 112cqw;
-  bottom: calc(19% - 5cqw);
+@keyframes ls-drive {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100cqw);
+  }
 }
-.ls-car-svg {
+.ls-veh-svg {
   display: block;
   width: 100%;
   overflow: visible;
@@ -96,16 +117,19 @@
 .ls-beam {
   animation: ls-flicker 2.6s ease-in-out infinite;
 }
+.ls-tail {
+  animation: ls-flicker 1.4s ease-in-out infinite;
+}
 @keyframes ls-flicker {
   0%, 100% {
     opacity: 1;
   }
   50% {
-    opacity: 0.72;
+    opacity: 0.7;
   }
 }
-.ls-tail {
-  animation: ls-flicker 1.4s ease-in-out infinite;
+.ls-blink {
+  animation: ls-flicker 0.7s steps(2, jump-none) infinite;
 }
 .ls-spin {
   animation: ls-spin 2s linear infinite;
@@ -117,6 +141,22 @@
 }
 .ls-wheel {
   animation-duration: 0.45s;
+}
+.ls-puff {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: ls-puff 2.1s ease-out infinite;
+}
+@keyframes ls-puff {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-30px, -34px) scale(2.6);
+    opacity: 0;
+  }
 }
 
 /* wind streaks and rising oil sparks */
@@ -163,73 +203,74 @@
   }
 }
 
-/* gauge (full variant only) */
-.ls-gauge {
+/* engine + gauge column (wide screens only) */
+.ls-power {
   position: absolute;
+  left: 41cqw;
   top: 3vh;
-  right: 32px;
-  width: min(34cqw, 28vh, 420px);
-  min-width: 170px;
-  aspect-ratio: 1;
-  filter: drop-shadow(0 0 28px rgba(70, 140, 230, 0.4));
+  width: min(28cqw, 34vh);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2vh;
+  filter: drop-shadow(0 0 22px rgba(70, 140, 230, 0.45));
   animation: ls-float 7s ease-in-out infinite;
 }
 .ls-gauge-svg {
   display: block;
+  width: 70%;
+}
+.ls-engine-svg {
+  display: block;
   width: 100%;
-  height: 100%;
-}
-/* narrow panel or short window: the gauge becomes a faint backdrop so the words stay easy to read */
-@container (max-width: 720px) {
-  .ls-gauge {
-    opacity: 0.28;
-  }
-}
-@media (max-height: 700px) {
-  .ls-gauge {
-    opacity: 0.28;
-  }
 }
 @keyframes ls-float {
   50% {
-    transform: translateY(-9px);
+    transform: translateY(-8px);
   }
 }
-.ls-needle {
-  transform-origin: 150px 150px;
-  animation: ls-rev 7s ease-in-out infinite;
+@container (max-width: 1179px) {
+  .ls-power {
+    display: none;
+  }
 }
-@keyframes ls-rev {
-  0% { transform: rotate(-128deg); }
-  14% { transform: rotate(42deg); }
-  22% { transform: rotate(20deg); }
-  40% { transform: rotate(94deg); }
-  52% { transform: rotate(32deg); }
-  70% { transform: rotate(104deg); }
-  85% { transform: rotate(-62deg); }
-  100% { transform: rotate(-128deg); }
+.ls-drip {
+  animation: ls-drip 1.5s ease-in infinite;
 }
-.ls-ring {
-  transform-origin: 150px 150px;
-  animation-duration: 30s;
+@keyframes ls-drip {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(22px);
+    opacity: 0;
+  }
+}
+.ls-oil {
+  animation: ls-wave 2.4s ease-in-out infinite alternate;
+}
+@keyframes ls-wave {
+  to {
+    transform: translateX(-9px);
+  }
 }
 
-/* gears (full variant only) */
-.ls-gears-svg {
-  position: absolute;
-  left: -120px;
-  top: 33%;
-  width: 360px;
-  opacity: 0.17;
+/* the sign-in card floats over the scene */
+.ls-card {
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.65);
 }
-.ls-gear-a {
-  transform-origin: 110px 120px;
-  animation-duration: 28s;
-}
-.ls-gear-b {
-  transform-origin: 242px 120px;
-  animation-duration: 16s;
-  animation-direction: reverse;
+html.dark .ls-card {
+  background: rgba(7, 21, 40, 0.86);
+  border-color: rgba(255, 255, 255, 0.13);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 
 /* content entrance */
@@ -253,7 +294,7 @@
   .ls-dot {
     display: none;
   }
-  .ls-needle {
-    transform: rotate(40deg);
+  .ls-veh {
+    transform: translateX(8cqw);
   }
 }
