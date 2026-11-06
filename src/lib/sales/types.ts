@@ -22,7 +22,14 @@ export type PosCustomer = {
   outstanding?: string;
 };
 
-export type CartLine = { productId: string; unitId: string; quantity: string; price: string };
+export type CartLine = {
+  productId: string;
+  unitId: string;
+  quantity: string;
+  price: string;
+  /** pieces scanned for this line (base unit only): those exact pieces are marked sold at checkout */
+  scanned?: { token: string; itemNo: string }[];
+};
 
 export const PAYMENT_METHODS = [
   { value: "CASH", label: "Cash" },

@@ -22,7 +22,7 @@ const payloadSchema = z.object({
   notes: z.string().trim().max(500).nullable(),
   discountReason: z.string().trim().max(200).nullable(),
   lines: z
-    .array(z.object({ productId: z.string().min(1), unitId: z.string().min(1), quantity: z.string().max(24), unitPrice: z.string().max(24) }))
+    .array(z.object({ productId: z.string().min(1), unitId: z.string().min(1), quantity: z.string().max(24), unitPrice: z.string().max(24), itemCodes: z.array(z.string().max(64)).max(1000).optional() }))
     .min(1, "Add at least one product.")
     .max(100),
   creditException: z.object({ reason: z.string().trim().min(5, "Give a reason for the exception (at least 5 characters).").max(300) }).nullable(),

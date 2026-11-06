@@ -1,7 +1,10 @@
 "use client";
 
-import { useActionState, useMemo, useState, useTransition } from "react";
-import { ImageOff, Minus, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
+import { useActionState, useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { ImageOff, Minus, Plus, ScanBarcode, Search, Trash2, UserPlus, X } from "lucide-react";
+import { posScan } from "@/app/(app)/scan/actions";
+import CodeScanner from "@/components/scan/CodeScanner";
+import { parseItemCode } from "@/lib/item-code";
 import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
@@ -66,6 +69,12 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
   const [exceptionReason, setExceptionReason] = useState("");
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
+  // scanning: the camera panel and the last result ("Added ..." or why a piece cannot be sold)
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanMsg, setScanMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const cartRef = useRef<CartLine[]>([]);
+  const locationIdRef = useRef("");
+  const baseUsedRef = useRef<Map<string, number>>(new Map());
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const categories = useMemo(() => [...new Map(products.map((p) => [p.categoryId, p.categoryName])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [products]);
@@ -92,6 +101,9 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
   const baseUsed = new Map<string, number>();
   for (const r of rows) baseUsed.set(r.p.id, (baseUsed.get(r.p.id) ?? 0) + r.baseQty);
   const inStock = (productId: string) => Number(stockByLocation[locationId]?.[productId] ?? 0);
+  cartRef.current = cart;
+  locationIdRef.current = locationId;
+  baseUsedRef.current = baseUsed;
 
   const partNum = Number(partAmount);
   const paidNow = mode === "FULL" ? total : mode === "CREDIT" ? 0 : Number.isFinite(partNum) ? partNum : 0;
@@ -118,7 +130,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
     reference: reference.trim() || null,
     notes: notes.trim() || null,
     discountReason: discount > 0 ? discountReason.trim() : null,
-    lines: cart.map((l) => ({ productId: l.productId, unitId: l.unitId, quantity: l.quantity, unitPrice: l.price })),
+    lines: cart.map((l) => ({ productId: l.productId, unitId: l.unitId, quantity: l.quantity, unitPrice: l.price, ...(l.scanned?.length ? { itemCodes: l.scanned.map((x) => x.token) } : {}) })),
     creditException: overLimit && perms.creditException && exception ? { reason: exceptionReason.trim() } : null,
     submissionKey,
   });
@@ -130,8 +142,11 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
       if (i >= 0) return c.map((l, idx) => (idx === i ? { ...l, quantity: String(Number(l.quantity || 0) + 1) } : l));
       return [...c, { productId: p.id, unitId: p.baseUnitId, quantity: "1", price: "" }];
     });
-  const patch = (i: number, p: Partial<CartLine>) => setCart((c) => c.map((l, idx) => (idx === i ? { ...l, ...p } : l)));
-  const step = (i: number, delta: number) => setCart((c) => c.map((l, idx) => (idx === i ? { ...l, quantity: String(Math.max(Number(l.quantity || 0) + delta, 0)) } : l)));
+  // a line can never hold more scanned pieces than its quantity: lowering the quantity drops the last scanned ones
+  const fit = (l: CartLine): CartLine => (l.scanned && l.scanned.length > Math.max(Math.floor(Number(l.quantity || 0)), 0) ? { ...l, scanned: l.scanned.slice(0, Math.max(Math.floor(Number(l.quantity || 0)), 0)) } : l);
+  const patch = (i: number, p: Partial<CartLine>) => setCart((c) => c.map((l, idx) => (idx === i ? fit({ ...l, ...p }) : l)));
+  const step = (i: number, delta: number) => setCart((c) => c.map((l, idx) => (idx === i ? fit({ ...l, quantity: String(Math.max(Number(l.quantity || 0) + delta, 0)) }) : l)));
+  const dropScanned = (i: number, token: string) => setCart((c) => c.map((l, idx) => (idx === i ? { ...l, scanned: (l.scanned ?? []).filter((x) => x.token !== token), quantity: String(Math.max(Number(l.quantity || 0) - 1, 0)) } : l)));
   const addOtherUnit = (i: number) =>
     setCart((c) => {
       const l = c[i]!;
@@ -153,9 +168,45 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
     const hasPrice = unitPrice(p) > 0;
     return { left, hasPrice, sellable: hasPrice && left > 0 };
   }
+  // One scan, from the camera or a scanner. A piece's own QR adds that exact piece; a product barcode adds one by quantity.
+  const onCode = useCallback(
+    async (raw: string) => {
+      const code = raw.trim();
+      if (parseItemCode(code)) {
+        const key = code.toUpperCase().replace(/^SDOI:/, "");
+        if (cartRef.current.some((l) => l.scanned?.some((x) => x.token === key || x.itemNo === key))) return setScanMsg({ ok: false, text: "This item is already in the cart." });
+        const r = await posScan(code, locationIdRef.current);
+        if (!r.ok) return setScanMsg({ ok: false, text: r.message });
+        const base = byId.get(r.productId)?.baseUnitId;
+        if (!base) return setScanMsg({ ok: false, text: `${r.productName} is not in the POS list.` });
+        setCart((c) => {
+          const i = c.findIndex((l) => l.productId === r.productId && l.unitId === base);
+          const item = { token: r.token, itemNo: r.itemNo };
+          if (i >= 0) return c.map((l, idx) => (idx === i ? { ...l, quantity: String(Number(l.quantity || 0) + 1), scanned: [...(l.scanned ?? []), item] } : l));
+          return [...c, { productId: r.productId, unitId: base, quantity: "1", price: "", scanned: [item] }];
+        });
+        return setScanMsg({ ok: true, text: `Added ${r.productName} (${r.itemNo})` });
+      }
+      const key = code.replace(/^SDOP:/i, "").toLowerCase();
+      const p = products.find((x) => x.sku.toLowerCase() === key || (x.barcode && x.barcode.toLowerCase() === key));
+      if (!p) return setScanMsg({ ok: false, text: "Nothing matches this code." });
+      const left = Number(stockByLocation[locationIdRef.current]?.[p.id] ?? 0) - (baseUsedRef.current.get(p.id) ?? 0);
+      if (left <= 0) return setScanMsg({ ok: false, text: `${p.name} is out of stock here.` });
+      addProduct(p);
+      setScanMsg({ ok: true, text: `Added ${p.name}` });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [byId, products, stockByLocation],
+  );
   const onSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
+    if (parseItemCode(q)) {
+      // a barcode scanner typed an item's QR text into the search box
+      void onCode(q);
+      setQ("");
+      return;
+    }
     const exact = products.find((p) => p.sku.toLowerCase() === term || (p.barcode && p.barcode.toLowerCase() === term)); // a barcode scanner types the code then presses Enter
     const pick = exact ?? (visible.length === 1 ? visible[0] : undefined);
     if (pick && cardState(pick).sellable) {
@@ -221,6 +272,21 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                 </select>
               )}
             </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" className={cn("inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition", scanOpen ? "border-navy-700 bg-navy-700 text-white" : "border-navy-200 bg-navy-50 text-navy-800 hover:bg-navy-100")} onClick={() => setScanOpen((o) => !o)} aria-pressed={scanOpen}>
+                <ScanBarcode size={18} /> {scanOpen ? "Close scanner" : "Scan to sell"}
+              </button>
+              {scanMsg && (
+                <p role="status" aria-live="polite" className={cn("min-w-0 flex-1 rounded-lg px-3 py-2 text-sm font-medium", scanMsg.ok ? "bg-emerald-50 text-emerald-800" : "bg-brand-red-soft text-brand-red-dark")}>
+                  {scanMsg.text}
+                </p>
+              )}
+            </div>
+            {scanOpen && (
+              <div className="mt-3">
+                <CodeScanner onScan={(c) => void onCode(c)} autoStart compact />
+              </div>
+            )}
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Categories">
               {[["", "All"], ...categories].map(([id, name]) => (
                 <button key={id} type="button" role="tab" aria-selected={category === id} onClick={() => setCategory(id!)} className={cn("shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition", category === id ? "border-navy-700 bg-navy-700 text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50")}>
@@ -321,7 +387,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                                 <Plus size={14} />
                               </button>
                             </div>
-                            <select className="input h-8 w-auto py-0 pr-8 text-sm" value={r.l.unitId} onChange={(e) => patch(i, { unitId: e.target.value, price: "" })} disabled={r.p.units.length === 1} aria-label="Unit">
+                            <select className="input h-8 w-auto py-0 pr-8 text-sm" value={r.l.unitId} onChange={(e) => patch(i, { unitId: e.target.value, price: "" })} disabled={r.p.units.length === 1 || Boolean(r.l.scanned?.length)} aria-label="Unit">
                               {r.p.units.filter((u) => u.id === r.l.unitId || !takenUnits.has(u.id)).map((u) => (
                                 <option key={u.id} value={u.id}>
                                   {u.name}
@@ -333,6 +399,18 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                               {r.price < r.list && r.valid && <span className="block text-[11px] text-emerald-700">−{fmt(r.lineList - r.lineTotal)}</span>}
                             </span>
                           </div>
+                          {r.l.scanned && r.l.scanned.length > 0 && (
+                            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Scanned items">
+                              {r.l.scanned.map((x) => (
+                                <li key={x.token} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-800">
+                                  {x.itemNo}
+                                  <button type="button" className="rounded-full p-0.5 hover:bg-emerald-100" onClick={() => dropScanned(i, x.token)} aria-label={`Remove ${x.itemNo}`}>
+                                    <X size={11} />
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                           {perms.discount && (
                             <div className="mt-2 flex items-center gap-2">
                               <label className="text-xs text-slate-500" htmlFor={`pos-price-${i}`}>

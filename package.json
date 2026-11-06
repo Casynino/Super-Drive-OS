@@ -15,7 +15,8 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "test:db": "bash scripts/test-db.sh",
-    "db:import-catalog": "tsx scripts/import-catalog.ts"
+    "db:import-catalog": "tsx scripts/import-catalog.ts",
+    "db:backfill-codes": "tsx scripts/backfill-codes.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",

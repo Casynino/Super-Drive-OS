@@ -4,7 +4,9 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { postAdjustment, postReceipt, postTransfer } from "./documents";
 import { itemQrText } from "@/lib/qr";
-import { formatItemNo, moveStockTracked, newToken, parseItemCode } from "./items";
+import { formatItemNo, labelExistingStock, moveStockTracked, newToken, parseItemCode, untrackedStock } from "./items";
+import { backfillBarcodes, nextBarcode, uniqueSku } from "@/lib/product-codes";
+import { isEan13 } from "@/lib/barcode";
 import { resolveLines } from "./lines";
 import { SaleError, postSale, type SaleInput } from "@/lib/sales/post-sale";
 
@@ -343,5 +345,43 @@ describe("reading codes", () => {
     expect(parseItemCode(" sdo-item-000123 ")).toEqual({ itemNo: "SDO-ITEM-000123" });
     for (const bad of ["", "hello", "2000000000015", "SDOI:SHORT", "SDO-ITEM-12"]) expect(parseItemCode(bad)).toBeNull();
     expect(itemQrText(t)).toBe(`SDOI:${t}`);
+  });
+});
+
+describe("stock that existed before items", () => {
+  it("existing stock is given item numbers once; doing it again changes nothing", async () => {
+    const l = await loc();
+    const p = await product();
+    await db.stockBalance.create({ data: { productId: p.id, locationId: l.id, quantity: 6 } }); // old stock, no items
+    expect((await untrackedStock(db)).find((r) => r.productId === p.id)?.missing).toBe(6);
+    const made = await db.$transaction((tx) => labelExistingStock(tx, userId), { timeout: 60000 });
+    expect(made).toBeGreaterThanOrEqual(6);
+    expect(await items(p.id)).toHaveLength(6);
+    expect((await untrackedStock(db)).find((r) => r.productId === p.id)).toBeUndefined();
+    const again = await db.$transaction((tx) => labelExistingStock(tx, userId));
+    expect(again).toBe(0);
+    expect(await items(p.id)).toHaveLength(6);
+    expect(await present(p.id, l.id)).toBe(6);
+    expect(await balance(p.id, l.id)).toEqual(D(6));
+  });
+});
+
+describe("automatic product codes", () => {
+  it("every product gets its own barcode and readable code, never a duplicate, even created at the same moment", async () => {
+    const codes = await Promise.all(Array.from({ length: 12 }, () => db.$transaction(async (tx) => ({ barcode: await nextBarcode(tx), sku: await uniqueSku(tx, "TST-OIL-5L") }))));
+    expect(new Set(codes.map((c) => c.barcode)).size).toBe(12);
+    for (const c of codes) expect(isEan13(c.barcode)).toBe(true);
+  });
+
+  it("a second product with the same name gets a different code (-2, -3 ...), and backfill gives old products a barcode", async () => {
+    const base = `DUP-${randomUUID().slice(0, 6).toUpperCase()}`;
+    await db.product.create({ data: { sku: base, name: "A", categoryId, baseUnitId: piece, purchasePrice: 0, sellingPrice: 1 } });
+    expect(await db.$transaction((tx) => uniqueSku(tx, base))).toBe(`${base}-2`);
+    const old = await db.product.create({ data: { sku: `OLD-${randomUUID().slice(0, 8)}`, name: "Old product", categoryId, baseUnitId: piece, purchasePrice: 0, sellingPrice: 1 } });
+    expect(old.barcode).toBeNull();
+    await backfillBarcodes(db);
+    const filled = await db.product.findUniqueOrThrow({ where: { id: old.id } });
+    expect(isEan13(filled.barcode!)).toBe(true);
+    expect(await backfillBarcodes(db)).toBe(0); // nothing left to do
   });
 });

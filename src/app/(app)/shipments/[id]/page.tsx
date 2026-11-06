@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AlertTriangle, ClipboardCheck, ImageOff } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, ImageOff, Printer } from "lucide-react";
 import { Alert, PageHeader } from "@/components/ui";
 import { CancelShipmentForm, ResolveIssueForm } from "@/components/shipments/IssueForms";
 import MarkArrivedButton from "@/components/shipments/MarkArrivedButton";
@@ -54,6 +54,7 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
   });
   if (!shipment) notFound();
 
+  const itemCount = await db.inventoryItem.count({ where: { shipmentId: id } }); // pieces that already have their own number and QR
   const sums = await db.shipmentReceivingItem.groupBy({ by: ["productId"], where: { receiving: { shipmentId: id, status: "CONFIRMED" } }, _sum: { goodQty: true, damagedQty: true } });
   const counted = new Map(sums.map((s) => [s.productId, { good: s._sum.goodQty ?? new D(0), damaged: s._sum.damagedQty ?? new D(0) }]));
 
@@ -110,7 +111,12 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
         actions={
           <>
             <PhaseBadge phase={phase} />
-            {receive && canMarkArrived(shipment) && <MarkArrivedButton shipmentId={id} action={markArrivedAction} />}
+            {itemCount > 0 && can(user, "inventory.view") && (
+              <Link href={`/items/labels?shipment=${id}`} className="btn-secondary">
+                <Printer size={16} /> Print item labels ({itemCount})
+              </Link>
+            )}
+            {receive && canMarkArrived(shipment) &&<MarkArrivedButton shipmentId={id} action={markArrivedAction} />}
             {receive && canCount(shipment) && (
               <Link href={`/shipments/${id}/receive`} className="btn-primary">
                 <ClipboardCheck size={16} /> {draft ? "Continue checking" : shipment.status === "PARTIAL" ? "Check the next delivery" : "Check this shipment"}
@@ -120,7 +126,7 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
         }
       />
       {sp.created && <div className="mb-4"><Alert kind="success">Sent. The shop has been told it is on its way. They will mark it arrived and check it; stock only goes up when they confirm the count.</Alert></div>}
-      {sp.counted && <div className="mb-4"><Alert kind="success">Check confirmed. The good items are now in stock{shipment.issue === "OPEN" ? ", and the owner has been told about the problem" : ""}.</Alert></div>}
+      {sp.counted && <div className="mb-4"><Alert kind="success">Check confirmed. The good items are now in stock{shipment.issue === "OPEN" ? ", and the owner has been told about the problem" : ""}. Every piece got its own QR code: press <strong>Print item labels</strong> to stick them on.</Alert></div>}
 
       {shipment.status !== "CANCELLED" && (
         <div className="card card-pad mb-5">

@@ -13,7 +13,10 @@
 // status or place cannot change without a movement row (the database enforces it).
 import { randomBytes, randomUUID } from "node:crypto";
 import { Prisma, type ItemEventKind, type ItemStatus, type StockMovementType } from "@/generated/prisma/client";
-import { moveStock, type Dec, type MoveInput, type Tx } from "./engine";
+import { parseItemCode } from "@/lib/item-code";
+import { lockBalance, moveStock, type Dec, type MoveInput, type Tx } from "./engine";
+
+export { parseItemCode };
 
 export type ItemErrorCode = "NOT_FOUND" | "SOLD" | "WITH_RESELLER" | "WRONG_LOCATION" | "WRONG_PRODUCT" | "NOT_AVAILABLE" | "DUPLICATE";
 
@@ -294,16 +297,6 @@ export async function moveStockTracked(tx: Tx, m: MoveInput, ctx: ItemCtx = {}):
 
 // ───────────── Looking items up ─────────────
 
-/** Turns whatever was scanned or typed (QR text, token or SDO-ITEM number) into the lookup key, or null if it is not an item code. */
-export function parseItemCode(raw: string): { token?: string; itemNo?: string } | null {
-  let v = raw.trim().toUpperCase();
-  if (!v) return null;
-  if (v.startsWith("SDOI:")) v = v.slice(5);
-  if (/^SDO-ITEM-\d{4,}$/.test(v)) return { itemNo: v };
-  if (/^[A-HJ-NP-Z2-9]{16}$/.test(v)) return { token: v };
-  return null;
-}
-
 /** Turns scanned codes into item ids (same order). An unknown or mistyped code is a plain ItemError. */
 export async function resolveItemCodes(tx: Tx, codes: string[]): Promise<string[]> {
   if (codes.length === 0) return [];
@@ -324,4 +317,30 @@ export async function findItemByCode(db: Pick<Tx, "inventoryItem">, raw: string)
   const key = parseItemCode(raw);
   if (!key) return null;
   return db.inventoryItem.findUnique({ where: key.token ? { token: key.token } : { itemNo: key.itemNo! } });
+}
+
+// ───────────── Stock that has no items yet ─────────────
+
+/** Where the shelf holds more pieces than there are items (stock received before items existed). */
+export async function untrackedStock(db: Pick<Tx, "$queryRaw">): Promise<{ productId: string; locationId: string; missing: number }[]> {
+  return db.$queryRaw`
+    SELECT b."productId", b."locationId", (b."quantity" - COALESCE(i.cnt, 0))::int AS "missing"
+      FROM "StockBalance" b
+      JOIN "Product" p ON p."id" = b."productId"
+      JOIN "Unit" u ON u."id" = p."baseUnitId" AND u."allowsDecimal" = false
+      LEFT JOIN (SELECT "productId", "locationId", count(*) AS cnt FROM "InventoryItem" WHERE "status" IN ('AVAILABLE', 'WITH_RESELLER') GROUP BY 1, 2) i
+        ON i."productId" = b."productId" AND i."locationId" = b."locationId"
+     WHERE b."quantity" > COALESCE(i.cnt, 0)`;
+}
+
+/** Gives every piece of existing stock its own number and QR (once; running it again finds nothing left to do). Returns how many items were made. */
+export async function labelExistingStock(tx: Tx, userId: string): Promise<number> {
+  let made = 0;
+  for (const r of (await untrackedStock(tx)).sort((a, b) => a.productId.localeCompare(b.productId) || a.locationId.localeCompare(b.locationId))) {
+    await lockBalance(tx, r.productId, r.locationId); // no sale can change the count while its pieces are numbered
+    const again = (await untrackedStock(tx)).find((x) => x.productId === r.productId && x.locationId === r.locationId);
+    if (!again) continue;
+    made += await createItems(tx, { productId: r.productId, locationId: r.locationId, qty: new Prisma.Decimal(again.missing), kind: "ADDED", note: "Existing stock given item numbers", referenceType: "Backfill", userId });
+  }
+  return made;
 }

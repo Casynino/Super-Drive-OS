@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { backfillBarcodes } from "../src/lib/product-codes";
 import { processProductImage } from "../src/lib/product-images";
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
@@ -58,6 +59,7 @@ async function main() {
       pictures++;
     }
   }
+  await backfillBarcodes(db as unknown as Parameters<typeof backfillBarcodes>[0]); // every product gets its own barcode
   console.log(`Catalog: ${created} product(s) created, ${pictures} picture(s) added, ${catalog.products.length - created} already existed.`);
 }
 
