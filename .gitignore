@@ -16,3 +16,6 @@ LOGO/
 PRODUCTS */
 
 .next-preview
+
+# Local backups and sample-data logins (never committed)
+.backups
