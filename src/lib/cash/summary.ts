@@ -50,7 +50,7 @@ export async function getMoneySummary(db: Pick<Tx, "$queryRaw">, locationId: str
              -SUM(t."amount") FILTER (WHERE t."type" = 'SUPPLIER_PAYMENT') AS suppliers,
              -SUM(t."amount") FILTER (WHERE t."type" = 'WITHDRAWAL') AS withdrawals,
              SUM(t."amount") FILTER (WHERE t."type" IN ('ADJUSTMENT', 'CLOSING_DIFFERENCE')) AS corrections,
-             SUM(ABS(t."amount")) FILTER (WHERE t."type" IN ('DEPOSIT_IN', 'OPENING_BALANCE')) AS moved
+             SUM(ABS(t."amount")) FILTER (WHERE t."type" IN ('DEPOSIT_IN', 'TRANSFER_IN', 'OPENING_BALANCE')) AS moved
         FROM "CashTransaction" t JOIN "CashAccount" a ON a."id" = t."accountId"
        WHERE a."locationId" = ${locationId} ${dates}`,
     db.$queryRaw<{ id: string; name: string; accountNumber: string | null; method: string; income: Dec | null }[]>`

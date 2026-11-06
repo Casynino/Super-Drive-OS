@@ -106,6 +106,7 @@ export async function loadDaySheet(db: Db, closingId: string, o: { seeProfit: bo
     ...(n(sc.refundsOut).isZero() ? [] : [{ sign: "−" as const, label: "Refunds paid", value: money(sc.refundsOut) }]),
     { sign: "−", label: "Cash expenses", value: money(sc.expensesOut) },
     ...(n(sc.withdrawals).isZero() ? [] : [{ sign: "−" as const, label: "Taken out by the owner", value: money(sc.withdrawals) }]),
+    ...(n(sc.transfers).isZero() ? [] : [{ sign: (n(sc.transfers).lt(0) ? "−" : "+") as "+" | "−", label: "Moved to or from other accounts", value: money(n(sc.transfers).abs()) }]),
     ...(n(sc.supplierPayments).isZero() ? [] : [{ sign: "−" as const, label: "Paid to suppliers", value: money(sc.supplierPayments ?? "0") }]),
     ...(n(sc.depositsOut).isZero() ? [] : [{ sign: "−" as const, label: "Banked earlier", value: money(sc.depositsOut) }]),
     ...(n(sc.corrections).isZero() ? [] : [{ sign: (n(sc.corrections).lt(0) ? "−" : "+") as "+" | "−", label: "Corrections by the owner", value: money(n(sc.corrections).abs()) }]),

@@ -1008,6 +1008,8 @@ enum CashTxType {
   ADJUSTMENT // an authorised correction
   OPENING_BALANCE // money that was already there when the system started
   CLOSING_DIFFERENCE // counted cash minus expected cash, booked when a day is closed
+  TRANSFER_OUT // the owner moved money out of this account into another of the shop's accounts
+  TRANSFER_IN // the same money arriving in the other account
 }
 
 // The append-only cash ledger. Signed amount (+ in, - out). Every row comes from a source record written in the same

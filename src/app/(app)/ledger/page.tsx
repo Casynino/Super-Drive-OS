@@ -28,7 +28,7 @@ const dayTitle = (key: string, today: string, yesterday: string) =>
   key === today ? "Today" : key === yesterday ? "Yesterday" : new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${key}T12:00:00Z`));
 
 // Moves of money between our own accounts and opening balances are not income or spending
-const INTERNAL = Prisma.sql`('DEPOSIT_IN', 'DEPOSIT_OUT', 'OPENING_BALANCE')`;
+const INTERNAL = Prisma.sql`('DEPOSIT_IN', 'DEPOSIT_OUT', 'TRANSFER_IN', 'TRANSFER_OUT', 'OPENING_BALANCE')`;
 const BADGE: Record<CashTxType, string> = {
   SALE_PAYMENT: "badge-green",
   COLLECTION: "badge-green",
@@ -42,6 +42,8 @@ const BADGE: Record<CashTxType, string> = {
   ADJUSTMENT: "badge-gray",
   OPENING_BALANCE: "badge-gray",
   CLOSING_DIFFERENCE: "badge-gray",
+  TRANSFER_OUT: "badge-blue",
+  TRANSFER_IN: "badge-blue",
 };
 /** the page of the record a ledger row came from, when there is one */
 const sourceHref = (type: string, id: string) => (type === "Payment" ? `/payments/${id}` : type === "Expense" ? `/expenses/${id}` : type === "DailyClosing" ? `/closing/${id}` : type === "BankDeposit" ? "/deposits" : null);

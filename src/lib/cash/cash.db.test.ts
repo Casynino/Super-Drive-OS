@@ -11,6 +11,7 @@ import { postDeposit, postManualCash, type ManualKind } from "./deposits";
 import { decideExpense, recordExpense, reverseExpense } from "./expenses";
 import { CashError, accountBalance, businessDay, getAccount, getBalances, postCash } from "./ledger";
 import { correctClosingCount, getClosingPreview, submitClosing, unclosedDays } from "./closing";
+import { transferMoney } from "./transfer";
 
 const D = (v: string | number) => new Prisma.Decimal(v);
 let userId: string;
@@ -351,6 +352,33 @@ describe("daily closing", () => {
     const today = await close(s, "150000"); // opening 100000 + sale 50000
     expect([today.closing.openingCash.toString(), today.closing.expectedCash.toString(), today.difference.toString()]).toEqual(["100000", "150000", "0"]);
     expect(await balance(s, "CASH")).toBe("150000");
+  });
+
+  it("the owner moves money from one account to another: nothing earned or spent, never more than the account holds, once per submit", async () => {
+    const s = await shop();
+    await manual(s, "CASH", "OPENING", "100000");
+    const [cash, bank, mm] = await db.$transaction(async (tx) => [await getAccount(tx, s.location.id, "CASH"), await getAccount(tx, s.location.id, "BANK"), await getAccount(tx, s.location.id, "MOBILE_MONEY")]);
+    const move = (fromId: string, toId: string, amount: string, reason = "Pay a supplier", key: string = randomUUID()) =>
+      db.$transaction((tx) => transferMoney(tx, { user: { id: userId }, fromId, toId, amount, reason, submissionKey: key, currencyDecimals: 0 }));
+
+    await move(cash.id, mm.id, "30000");
+    expect([await balance(s, "CASH"), await balance(s, "MOBILE_MONEY")]).toEqual(["70000", "30000"]);
+    await move(mm.id, bank.id, "10000"); // between two accounts that are not the till
+    expect([await balance(s, "MOBILE_MONEY"), await balance(s, "BANK")]).toEqual(["20000", "10000"]);
+
+    await expect(move(mm.id, bank.id, "999999")).rejects.toThrow(/only/i); // more than the account holds
+    await expect(move(cash.id, cash.id, "1")).rejects.toMatchObject({ fieldErrors: { toId: expect.any(String) } });
+    await expect(move(cash.id, bank.id, "1", "")).rejects.toMatchObject({ fieldErrors: { reason: expect.any(String) } });
+
+    const k = randomUUID();
+    await move(cash.id, bank.id, "5000", "Move to the main bank", k);
+    await expect(move(cash.id, bank.id, "5000", "Move to the main bank", k)).rejects.toThrow(); // the same form twice
+    expect(await balance(s, "BANK")).toBe("15000");
+    // the total of all the money never changed, and none of it counts as income or spending
+    expect(Number(await balance(s, "CASH")) + Number(await balance(s, "MOBILE_MONEY")) + Number(await balance(s, "BANK"))).toBe(100000);
+    const rows = await db.cashTransaction.findMany({ where: { referenceType: "Transfer", account: { locationId: s.location.id } } });
+    expect(rows.filter((r) => r.type === "TRANSFER_OUT").every((r) => r.amount.lt(0))).toBe(true);
+    expect(rows.filter((r) => r.type === "TRANSFER_IN").every((r) => r.amount.gt(0))).toBe(true);
   });
 
   it("closing can bank everything that was counted, even when it is short, with no slip reference yet", async () => {

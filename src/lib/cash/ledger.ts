@@ -43,6 +43,8 @@ export const TX_LABEL: Record<CashTxType, string> = {
   ADJUSTMENT: "Correction",
   OPENING_BALANCE: "Opening balance",
   CLOSING_DIFFERENCE: "Count difference",
+  TRANSFER_OUT: "Moved to another account",
+  TRANSFER_IN: "Moved from another account",
 };
 
 export async function defaultLocationId(tx: Pick<Tx, "location">) {

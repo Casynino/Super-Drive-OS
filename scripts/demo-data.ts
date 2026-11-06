@@ -16,8 +16,8 @@ import { join } from "node:path";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient, type PaymentMethod } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
-import { postManualCash, postDeposit } from "../src/lib/cash/deposits";
-import { decideExpense, recordExpense } from "../src/lib/cash/expenses";
+import { postManualCash } from "../src/lib/cash/deposits";
+import { recordExpense } from "../src/lib/cash/expenses";
 import { submitClosing, getClosingPreview } from "../src/lib/cash/closing";
 import { paySupplier } from "../src/lib/cash/supplier";
 import { createReseller, issueStock, reportSold, returnStock } from "../src/lib/resellers/engine";
@@ -57,6 +57,8 @@ const TZ = "Africa/Dar_es_Salaam";
 const dayStr = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(ms));
 const isoDay = (offset: number) => dayStr(Date.now() + offset * 86400000);
 const START = -70;
+/** cash the shop keeps in the till overnight; everything else counted at closing goes to the bank */
+const FLOAT = 100000;
 const key = () => randomUUID();
 const log = (m: string) => console.log(`  ${m}`);
 
@@ -154,7 +156,7 @@ async function setup(d: number) {
   await mk("Neema Joseph", "neema", "ACCOUNTANT", "0716 555 205");
 
   // settings the cash screens use
-  for (const [k, v] of [["expenseApprovalLimit", 30000]] as const) await db.setting.upsert({ where: { key: k }, update: { value: v }, create: { key: k, value: v } });
+  // no approval limit: expenses are recorded and paid at once (the shop rule since 2026-11-07)
 
   // expense categories on top of the starting ones
   for (const name of ["Rent", "Salaries", "Electricity and water", "Marketing"]) if (!(await db.expenseCategory.findFirst({ where: { name } }))) await db.expenseCategory.create({ data: { name } });
@@ -444,9 +446,9 @@ async function main() {
   at(-2, async () => { await sold(1, 0.4); });
 
   const returnDays = new Set([-52, -35, -21, -9]);
-  const bigExpenses = new Map<number, { cat: string; what: string; amount: string; method: PaymentMethod; pending?: boolean }[]>([
+  const bigExpenses = new Map<number, { cat: string; what: string; amount: string; method: PaymentMethod }[]>([
     [-40, [{ cat: "Rent", what: "Shop rent for the month", amount: "900000", method: "BANK" }, { cat: "Salaries", what: "Staff salaries", amount: "1450000", method: "BANK" }]],
-    [-10, [{ cat: "Rent", what: "Shop rent for the month", amount: "900000", method: "BANK" }, { cat: "Salaries", what: "Staff salaries", amount: "1450000", method: "BANK", pending: true }]],
+    [-10, [{ cat: "Rent", what: "Shop rent for the month", amount: "900000", method: "BANK" }, { cat: "Salaries", what: "Staff salaries", amount: "1450000", method: "BANK" }]],
   ]);
 
   let firstSalesDay = 1;
@@ -477,16 +479,16 @@ async function main() {
       }
       if (trading && chance(0.35)) {
         const e = pick([["Transport", "Delivery by motorbike"], ["Fuel", "Fuel for the delivery van"], ["Shop cleaning", "Cleaning materials"], ["Small operational purchases", "Packing tape and bags"], ["Other", "Airtime and small repairs"]] as const);
-        await tx((t) => recordExpense(t, { user: pick([amina, salim]), categoryId: expenseCat.get(e[0])!, description: e[1], amount: String(round500(int(5, 28) * 1000)), method: "CASH", expenseDate: "", notes: null, receiptId: null, submissionKey: key(), currencyDecimals: 0, approvalLimit: new D(30000), canApprove: false }));
+        await tx((t) => recordExpense(t, { user: pick([amina, salim]), categoryId: expenseCat.get(e[0])!, description: e[1], amount: String(round500(int(5, 28) * 1000)), method: "CASH", expenseDate: "", notes: null, receiptId: null, submissionKey: key(), currencyDecimals: 0, approvalLimit: new D(0), canApprove: false }));
       }
       if (trading && d >= -8 && (d === 0 || xr() < 0.6)) {
         // small cash spending in the last days too, so this month shows some
         const e = ([["Transport", "Delivery by motorbike"], ["Fuel", "Fuel for the delivery van"], ["Shop cleaning", "Cleaning materials"], ["Other", "Airtime and small repairs"]] as const)[Math.floor(xr() * 4)]!;
-        await tx((t) => recordExpense(t, { user: d % 2 ? amina : salim, categoryId: expenseCat.get(e[0])!, description: e[1], amount: String(round500((5 + Math.floor(xr() * 24)) * 1000)), method: "CASH", expenseDate: "", notes: null, receiptId: null, submissionKey: key(), currencyDecimals: 0, approvalLimit: new D(30000), canApprove: false }));
+        await tx((t) => recordExpense(t, { user: d % 2 ? amina : salim, categoryId: expenseCat.get(e[0])!, description: e[1], amount: String(round500((5 + Math.floor(xr() * 24)) * 1000)), method: "CASH", expenseDate: "", notes: null, receiptId: null, submissionKey: key(), currencyDecimals: 0, approvalLimit: new D(0), canApprove: false }));
       }
       for (const b of bigExpenses.get(d) ?? []) {
-        const e = await tx((t) => recordExpense(t, { user: amina, categoryId: expenseCat.get(b.cat)!, description: b.what, amount: b.amount, method: b.method, expenseDate: "", notes: null, receiptId: null, submissionKey: key(), currencyDecimals: 0, approvalLimit: new D(30000), canApprove: false }));
-        if (!b.pending && !e.approvedNow) await tx((t) => decideExpense(t, { expenseId: e.expense.id, approver: owner, approve: true, note: "" }));
+        const e = await tx((t) => recordExpense(t, { user: amina, categoryId: expenseCat.get(b.cat)!, description: b.what, amount: b.amount, method: b.method, expenseDate: "", notes: null, receiptId: null, submissionKey: key(), currencyDecimals: 0, approvalLimit: new D(0), canApprove: false }));
+        void e;
       }
       if (returnDays.has(d)) await returnOne(d, false);
     });
@@ -496,19 +498,7 @@ async function main() {
       for (let i = morning; i < nSales; i++) await oneSale(pick([amina, amina, salim, manager]));
       if (d === -2) {
         // a second expense waiting for the owner, and a return waiting for the manager
-        await tx((t) => recordExpense(t, { user: salim, categoryId: expenseCat.get("Electricity and water")!, description: "Electricity bill", amount: "186000", method: "MOBILE_MONEY", expenseDate: "", notes: null, receiptId: null, submissionKey: key(), currencyDecimals: 0, approvalLimit: new D(30000), canApprove: false }));
-      }
-      if (closed && dow === 5) {
-        // Friday: part of the till goes to the bank
-        const cash = await db.$queryRaw<{ s: Prisma.Decimal | null }[]>`SELECT SUM(t."amount") AS s FROM "CashTransaction" t JOIN "CashAccount" a ON a."id" = t."accountId" WHERE a."method" = 'CASH'`;
-        const amount = Math.floor((Number(cash[0]?.s ?? 0) * 0.5) / 10000) * 10000;
-        if (amount >= 100000) {
-          try {
-            await tx((t) => postDeposit(t, { user: amina, locationId: locId, amount: String(amount), bankReference: `DEP-${isoDay(d).replaceAll("-", "")}`, notes: "Weekly deposit", slipId: null, submissionKey: key(), currencyDecimals: 0 }));
-          } catch {
-            // not enough counted cash that Friday: the deposit simply waits for next week
-          }
-        }
+        await tx((t) => recordExpense(t, { user: salim, categoryId: expenseCat.get("Electricity and water")!, description: "Electricity bill", amount: "186000", method: "MOBILE_MONEY", expenseDate: "", notes: null, receiptId: null, submissionKey: key(), currencyDecimals: 0, approvalLimit: new D(0), canApprove: false }));
       }
     });
 
@@ -519,7 +509,10 @@ async function main() {
         bad++;
         const r = rnd();
         const diff = d === -2 ? -4500 : r < 0.72 ? 0 : r < 0.92 ? int(-8, 8) * 100 : int(-6, 6) * 700 || 1800;
-        const closing = await tx((t) => submitClosing(t, { user: amina, locationId: locId, day: "", countedCash: String(Math.max(Math.round(expected + diff), 0)), notes: diff === 0 ? null : "Counted twice, this is the real count.", deposit: null, submissionKey: key(), currencyDecimals: 0 }));
+        // the shop counts and banks everything except a small float for change and small expenses
+        const counted = Math.max(Math.round(expected + diff), 0);
+        const toBank = Math.floor(Math.max(counted - FLOAT, 0) / 100) * 100;
+        const closing = await tx((t) => submitClosing(t, { user: amina, locationId: locId, day: "", countedCash: String(counted), notes: diff === 0 ? null : "Counted twice, this is the real count.", deposit: toBank > 0 ? { amount: String(toBank), bankReference: `DEP-${isoDay(d).replaceAll("-", "")}`, notes: null, slipId: null } : null, submissionKey: key(), currencyDecimals: 0 }));
         void closing;
       });
     }
@@ -539,8 +532,7 @@ async function main() {
   const note = (userId: string, type: string, title: string, body: string, link: string) => db.notification.create({ data: { userId, type, title, body, link } });
   await note(owner.id, "shipment.arrived", "A purchase order has arrived at the shop", "The shop marked it arrived and is checking it.", "/shipments");
   await note(owner.id, "shipment.issue", "A purchase order needs your investigation", "Some goods never arrived.", "/shipments?tab=investigation");
-  await note(owner.id, "expense.pending", "An expense is waiting for your approval", "Electricity bill and staff salaries.", "/approvals");
-  await note(manager.id, "reversal.requested", "A return is waiting for you", "A customer brought a bottle back.", "/approvals");
+  await note(manager.id, "reversal.requested", "A return is waiting for you", "A customer brought a bottle back.", "/sales");
   await note(amina.id, "shipment.announced", "A new purchase order is on its way", "Check it when it arrives.", "/shipments");
 
   // the logins of the sample staff, kept in a private file (never printed)

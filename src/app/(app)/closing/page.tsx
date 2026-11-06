@@ -165,6 +165,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                     {Number(preview.summary.cash.refundsOut) !== 0 && <StatementRow sign="−" label="Refunds paid" value={money(preview.summary.cash.refundsOut)} />}
                     <StatementRow sign="−" label="Cash expenses" value={money(preview.summary.cash.expensesOut)} />
                     {Number(preview.summary.cash.withdrawals) !== 0 && <StatementRow sign="−" label="Taken out by the owner" value={money(preview.summary.cash.withdrawals)} />}
+                    {Number(preview.summary.cash.transfers ?? 0) !== 0 && <StatementRow sign={Number(preview.summary.cash.transfers) < 0 ? "−" : "+"} label="Moved to or from other accounts" value={money(Math.abs(Number(preview.summary.cash.transfers)))} />}
                     {Number(preview.summary.cash.supplierPayments ?? 0) !== 0 && <StatementRow sign="−" label="Paid to suppliers" value={money(preview.summary.cash.supplierPayments ?? "0")} />}
                     {Number(preview.summary.cash.depositsOut) !== 0 && <StatementRow sign="−" label="Banked earlier today" value={money(preview.summary.cash.depositsOut)} />}
                     {Number(preview.summary.cash.corrections) !== 0 && <StatementRow sign={Number(preview.summary.cash.corrections) < 0 ? "−" : "+"} label="Corrections by the owner" value={money(Math.abs(Number(preview.summary.cash.corrections)))} />}

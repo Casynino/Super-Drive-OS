@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Banknote, ChevronRight, Landmark, Plus, Smartphone, Star, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, ChevronRight, Landmark, Plus, Smartphone, Star, Wallet } from "lucide-react";
 import { Alert, PageHeader } from "@/components/ui";
 import { Prisma } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
@@ -23,7 +23,7 @@ const XL_COLS = { 1: "xl:grid-cols-1", 2: "xl:grid-cols-2", 3: "xl:grid-cols-3",
 const XL_SPAN = { 1: "xl:col-span-1", 2: "xl:col-span-2", 3: "xl:col-span-3", 4: "xl:col-span-4" } as const;
 
 /** Cash & Accounts: only the accounts. Press one to see its own balance and every movement of money in and out of it. */
-export default async function CashPage({ searchParams }: { searchParams: Promise<{ account?: string }> }) {
+export default async function CashPage({ searchParams }: { searchParams: Promise<{ account?: string; moved?: string }> }) {
   const user = await requirePagePermission("cash.view");
   const sp = await searchParams;
   if (sp.account) redirect(`/cash/${sp.account}`); // older links to one account's entries
@@ -59,6 +59,11 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
                 <Plus size={16} /> Add account
               </Link>
             )}
+            {canAdjust && (
+              <Link href="/cash/move" className="btn-secondary">
+                <ArrowLeftRight size={16} /> Move money
+              </Link>
+            )}
             <Link href="/closing" className="btn-secondary">
               End of day
             </Link>
@@ -66,6 +71,11 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         }
       />
 
+      {sp.moved && (
+        <div className="mb-4">
+          <Alert kind="success">{sp.moved}</Alert>
+        </div>
+      )}
       {noStart && (
         <div className="mb-4">
           <Alert kind="info">
