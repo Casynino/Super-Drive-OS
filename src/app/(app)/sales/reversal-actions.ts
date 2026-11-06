@@ -49,7 +49,7 @@ export async function requestReversal(_prev: ActionState, fd: FormData): Promise
           const base = { user, entityType: "SaleReversal", entityId: req.id, reference: `${req.reversalNo} · ${sale.saleNo}` };
           if (!approveNow) {
             await writeAudit(tx, { ...base, action: p.kind === "CANCEL" ? "sale.cancel_requested" : "sale.return_requested", reason: p.reason });
-            await notifyPermission(tx, "returns.approve", { type: "reversal.requested", title: `${p.kind === "CANCEL" ? "Cancellation" : "Return"} request for ${sale.saleNo}`, body: `${user.name}: ${p.reason}`, link: "/approvals" }, user.id);
+            await notifyPermission(tx, "returns.approve", { type: "reversal.requested", title: `${p.kind === "CANCEL" ? "Cancellation" : "Return"} request for ${sale.saleNo}`, body: `${user.name}: ${p.reason}`, link: `/sales/${sale.id}` }, user.id);
             return { id: req.id, done: false };
           }
           const r = await completeReversal(tx, { reversalId: req.id, approver: user, dp: currency.decimals });

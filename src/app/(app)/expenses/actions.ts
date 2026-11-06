@@ -62,7 +62,7 @@ export async function recordExpenseAction(_prev: ActionState, fd: FormData): Pro
             after: { amount: r.expense.amount.toString(), category: r.categoryName, method, description },
           });
           if (!r.approvedNow) {
-            await notifyPermission(tx, "expenses.approve", { type: "expense.requested", title: `Expense waiting for approval: ${formatMoney(r.expense.amount, currency)}`, body: `${user.name}: ${description} (${r.categoryName})`, link: "/approvals" }, user.id);
+            await notifyPermission(tx, "expenses.approve", { type: "expense.requested", title: `Expense waiting for approval: ${formatMoney(r.expense.amount, currency)}`, body: `${user.name}: ${description} (${r.categoryName})`, link: "/expenses" }, user.id);
           }
           return r;
         },

@@ -114,6 +114,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
     can(user, "inventory.view") ? db.stockBalance.aggregate({ where: { location: { type: "RESELLER" } }, _sum: { quantity: true } }) : null,
     db.dailyClosing.findFirst({ where: { locationId, businessDate: new Date(`${businessDay()}T00:00:00.000Z`) }, select: { id: true } }),
   ]);
+  const pendingReturn = data.pendingApprovals > 0 && can(user, "returns.approve") ? await db.saleReversal.findFirst({ where: { status: "PENDING" }, select: { saleId: true }, orderBy: { id: "asc" } }) : null;
   const money = { symbol: currency.symbol, decimals: currency.decimals };
   const m = (v: number) => formatMoney(v, currency);
   const compact = (v: number) => `${currency.symbol} ${Math.abs(v) >= 1_000_000 ? `${(v / 1_000_000).toFixed(v >= 100_000_000 ? 0 : 1)}M` : Math.abs(v) >= 10_000 ? `${Math.round(v / 1000)}k` : new Intl.NumberFormat("en-US").format(Math.round(v))}`;
@@ -128,9 +129,9 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   // ── What needs the owner, most urgent first ──
   const items: AttentionItem[] = [];
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  if (data.pendingApprovals > 0 && can(user, "returns.approve")) items.push({ id: "returns", group: "decisions", tone: "amber", icon: "returns", title: `${plural(data.pendingApprovals, "return or cancellation", "returns and cancellations")} waiting`, detail: "Stock and money wait for your yes.", href: "/approvals" });
-  if (pendingExpenses && pendingExpenses._count > 0) items.push({ id: "expenses", group: "decisions", tone: "amber", icon: "expense", title: `${plural(pendingExpenses._count, "expense", "expenses")} waiting for approval`, detail: "Nothing is paid out until you approve.", main: m(Number(pendingExpenses._sum.amount ?? 0)), href: "/approvals" });
-  if (closingsToReview.length > 0) items.push({ id: "closings", group: "decisions", tone: "red", icon: "closing", title: `${plural(closingsToReview.length, "daily closing", "daily closings")} where the cash did not match`, detail: "Look into the difference and sign it off.", main: m(closingsToReview.reduce((s, c) => s + Math.abs(c.difference.toNumber()), 0)), sub: "difference", href: "/approvals" });
+  if (data.pendingApprovals > 0 && can(user, "returns.approve")) items.push({ id: "returns", group: "decisions", tone: "amber", icon: "returns", title: `${plural(data.pendingApprovals, "return or cancellation", "returns and cancellations")} waiting`, detail: "Stock and money wait for your yes.", href: pendingReturn ? `/sales/${pendingReturn.saleId}` : "/sales" });
+  if (pendingExpenses && pendingExpenses._count > 0) items.push({ id: "expenses", group: "decisions", tone: "amber", icon: "expense", title: `${plural(pendingExpenses._count, "expense", "expenses")} waiting for approval`, detail: "Nothing is paid out until you approve.", main: m(Number(pendingExpenses._sum.amount ?? 0)), href: "/expenses?status=PENDING" });
+  if (closingsToReview.length > 0) items.push({ id: "closings", group: "decisions", tone: "red", icon: "closing", title: `${plural(closingsToReview.length, "daily closing", "daily closings")} where the cash did not match`, detail: "Look into the difference and sign it off.", main: m(closingsToReview.reduce((s, c) => s + Math.abs(c.difference.toNumber()), 0)), sub: "difference", href: "/closing?status=NEEDS_REVIEW" });
   if (shipmentIssues > 0) items.push({ id: "ship-issues", group: "decisions", tone: "amber", icon: "shipment", title: `${plural(shipmentIssues, "shipment", "shipments")} with damaged or missing goods`, detail: "Find out what went wrong and close the investigation.", href: "/shipments" });
   if (k.debt.overdue > 0) items.push({ id: "overdue", group: "money", tone: "red", icon: "debt", title: "Customers owe money past the due date", detail: o.oldestOwed > 0 ? `The oldest unpaid bill is ${o.oldestOwed} days old.` : "Follow these up before they get older.", main: m(k.debt.overdue), sub: `of ${m(k.debt.value)} owed in all`, href: "/credit" });
   if (resellerOverdue > 0) items.push({ id: "reseller-overdue", group: "money", tone: "red", icon: "reseller", title: "Winga have not paid on time", detail: "Money is past the settlement date.", main: m(resellerOverdue), href: "/resellers" });
@@ -142,7 +143,6 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   const pills = [
     can(user, "cash.view") && { href: "/cash", label: "Accounts", icon: Landmark, tone: "sky" as const },
     can(user, "reports.view") && { href: "/reports", label: "Reports", icon: ChartColumn, tone: "emerald" as const },
-    (can(user, "returns.approve") || can(user, "expenses.approve") || can(user, "closing.approve")) && { href: "/approvals", label: "Approvals", icon: Inbox, tone: "navy" as const, badge: data.pendingApprovals + (pendingExpenses?._count ?? 0) + closingsToReview.length },
     can(user, "shipments.manage") && { href: "/shipments", label: "Purchase orders", icon: Truck, tone: "amber" as const },
     can(user, "resellers.view") && { href: "/resellers", label: "Winga", icon: Handshake, tone: "violet" as const },
     can(user, "sales.view_all") && { href: "/sales", label: "Sales history", icon: Receipt, tone: "rose" as const },
@@ -226,11 +226,6 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
 
       {/* ── Needs you ── */}
       <Heading
-        right={
-          <Link href="/approvals" className="inline-flex items-center gap-1 text-[13px] font-medium text-navy-700 hover:underline">
-            Every decision <ArrowRight size={13} />
-          </Link>
-        }
       >
         Needs your attention <span className="ml-1.5 rounded-full bg-oil-400 px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#0a1424]">{items.length}</span>
       </Heading>

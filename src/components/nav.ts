@@ -1,7 +1,6 @@
 import {
   ArrowDownUp,
   ArrowLeftRight,
-  BadgeCheck,
   Boxes,
   Briefcase,
   Building2,
@@ -74,6 +73,7 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Overview", href: "/inventory", icon: Boxes, permissions: ["inventory.view"], ready: true },
       { label: "Orders", href: "/shipments", icon: Truck, permissions: ["shipments.manage", "shipments.receive"], ready: true, badge: "incoming", also: ["/inventory/receiving"] },
+      { label: "Suppliers", href: "/suppliers", icon: Building2, permissions: ["suppliers.view", "suppliers.manage", "suppliers.pay"], ready: true },
       { label: "Scan", href: "/scan", icon: ScanBarcode, permissions: ["inventory.view", "sales.pos"], ready: LABELS_ENABLED },
       { label: "Deliveries", href: "/inventory/receiving", icon: PackageCheck, permissions: ["inventory.receive", "inventory.movements", "purchasing.view"], ready: true, hideIfAny: ["shipments.manage", "shipments.receive"] },
       { label: "Products", href: "/products", icon: Package, permissions: ["products.view"], ready: true, also: ["/items"] },
@@ -91,14 +91,12 @@ export const NAV: NavGroup[] = [
       { label: "Expenses", href: "/expenses", icon: ReceiptText, permissions: ["expenses.view", "expenses.create"], ready: true },
       { label: "Accounts", href: "/cash", icon: Landmark, permissions: ["cash.view"], ready: true },
       { label: "End of day", href: "/closing", icon: CalendarCheck, permissions: ["closing.submit", "closing.approve"], ready: true },
-      { label: "Suppliers", href: "/suppliers", icon: Building2, permissions: ["suppliers.view", "suppliers.manage", "suppliers.pay"], ready: true },
     ],
   },
   {
     label: "Management",
     icon: Briefcase,
     items: [
-      { label: "Approvals", href: "/approvals", icon: BadgeCheck, permissions: ["returns.approve", "expenses.approve", "closing.approve"], ready: true, badge: "approvals" },
       { label: "Reports", href: "/reports", icon: ChartColumn, permissions: ["reports.view", "reports.financial"], ready: true },
       { label: "Employees", href: "/employees", icon: UserCog, permissions: ["employees.view", "employees.manage"], ready: true },
       { label: "Audit", href: "/audit", icon: ScrollText, permissions: ["audit.view"], ready: true },
