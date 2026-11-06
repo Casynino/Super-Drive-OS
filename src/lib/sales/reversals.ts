@@ -8,7 +8,8 @@
 // Lock order (consistent with sales and collections): customer row → sale row → product rows → stock balances.
 import { Prisma, type PaymentMethod, type ReturnCondition, type ReversalKind } from "@/generated/prisma/client";
 import { recordRefundCash } from "@/lib/cash/ledger";
-import { applyIncomingCost, lockProducts, moveStock, nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
+import { applyIncomingCost, lockProducts, nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
+import { moveStockTracked } from "@/lib/inventory/items";
 import { toBaseQuantity, validateQuantity } from "@/lib/units";
 import { netPaid, netTotal } from "./owed";
 import { statusFor } from "./collections";
@@ -174,11 +175,13 @@ export async function completeReversal(tx: Tx, input: { reversalId: string; appr
     const unitCost = p.saleItem.unitCost;
     if (p.line.condition === "RESELLABLE") {
       await applyIncomingCost(tx, p.line.productId, p.line.quantity, unitCost); // before the quantity moves in
-      await moveStock(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "CUSTOMER_RETURN", delta: p.line.quantity, unitCost, reason: reversal.reason });
+      // the pieces that were sold on this invoice line go back into stock
+      await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "CUSTOMER_RETURN", delta: p.line.quantity, unitCost, reason: reversal.reason }, { saleItemId: p.line.saleItemId });
     } else {
       // Damaged goods come back and are written off straight away: the ledger shows both steps, and sellable stock does not change.
-      await moveStock(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "CUSTOMER_RETURN", delta: p.line.quantity, unitCost, reason: `${reversal.reason} (damaged)` });
-      await moveStock(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "DAMAGED", delta: p.line.quantity.neg(), unitCost, reason: `Returned damaged: ${reversal.reason}` });
+      // The same pieces come back and are marked damaged.
+      const back = await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "CUSTOMER_RETURN", delta: p.line.quantity, unitCost, reason: `${reversal.reason} (damaged)` }, { saleItemId: p.line.saleItemId });
+      await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "DAMAGED", delta: p.line.quantity.neg(), unitCost, reason: `Returned damaged: ${reversal.reason}` }, { itemIds: back.itemIds });
     }
   }
 

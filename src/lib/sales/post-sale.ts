@@ -3,9 +3,11 @@
 //
 // Lock order (always the same, so concurrent sales can't deadlock):
 //   invoice number counter → customer row → product rows (shared) → stock balance rows → payment counter.
+import { randomUUID } from "node:crypto";
 import { Prisma, type PaymentMethod } from "@/generated/prisma/client";
 import { recordPaymentCash } from "@/lib/cash/ledger";
-import { lockProductsShared, moveStock, nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
+import { lockProductsShared, nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
+import { ItemError, moveStockTracked, resolveItemCodes } from "@/lib/inventory/items";
 import { resolveLines } from "@/lib/inventory/lines";
 import { parseMoney } from "@/lib/money";
 import { customerOutstanding } from "./outstanding";
@@ -47,8 +49,11 @@ export type SaleInput = {
   notes: string | null;
   /** why a discount was given; required whenever the sale has one */
   discountReason?: string | null;
-  /** unitPrice "" means "charge the list price" */
-  lines: { productId: string; unitId: string; quantity: string; unitPrice: string }[];
+  /**
+   * unitPrice "" means "charge the list price". itemCodes are the pieces scanned for this line (QR text, token or item number);
+   * only for lines sold in the base unit. Those exact pieces are marked sold; the rest of the quantity is taken by quantity.
+   */
+  lines: { productId: string; unitId: string; quantity: string; unitPrice: string; itemCodes?: string[] }[];
   creditException: { reason: string } | null;
   /**
    * A reseller's sold report: an invoice on the reseller's account for goods taken from their custody location, at the
@@ -183,6 +188,7 @@ export async function postSale(tx: Tx, input: SaleInput) {
 
   // 6. The invoice and its lines
   const sorted = [...priced].sort((a, b) => a.l.productId.localeCompare(b.l.productId) || a.l.enteredUnitId.localeCompare(b.l.enteredUnitId));
+  const lineIds = new Map(sorted.map(({ l }) => [l.index, randomUUID()])); // known up front so scanned pieces can point at their invoice line
   const dueDate = onCredit.gt(0) ? addDays(businessToday(), input.creditTermsDays) : null;
   const sale = await tx.sale.create({
     data: {
@@ -206,6 +212,7 @@ export async function postSale(tx: Tx, input: SaleInput) {
       submissionKey: input.submissionKey, // a duplicate submission fails here, before stock is touched
       items: {
         create: sorted.map(({ l, list, price, discount, lineTotal, costTotal }) => ({
+          id: lineIds.get(l.index)!,
           productId: l.productId,
           enteredQty: l.enteredQty,
           enteredUnitId: l.enteredUnitId,
@@ -224,17 +231,31 @@ export async function postSale(tx: Tx, input: SaleInput) {
 
   // 7. Stock out, one ledger row per line (refused if there isn't enough; the whole sale then rolls back)
   for (const { l } of sorted) {
-    await moveStock(tx, {
-      productId: l.productId,
-      locationId: input.locationId,
-      type: "SOLD",
-      delta: l.quantity.neg(),
-      unitCost: l.avgCost,
-      referenceType: "Sale",
-      referenceId: sale.id,
-      referenceNo: saleNo,
-      userId: input.user.id,
-    });
+    const codes = input.lines[l.index]!.itemCodes ?? [];
+    try {
+      // scanned pieces are marked sold exactly; the rest of the quantity is taken from stock without items, then the oldest pieces
+      if (codes.length > 0 && !l.factor.eq(1)) throw new ItemError("Items can only be scanned for single pieces, not cartons.", "WRONG_PRODUCT");
+      const itemIds = await resolveItemCodes(tx, codes);
+      await moveStockTracked(
+        tx,
+        {
+          productId: l.productId,
+          locationId: input.locationId,
+          type: "SOLD",
+          delta: l.quantity.neg(),
+          unitCost: l.avgCost,
+          referenceType: "Sale",
+          referenceId: sale.id,
+          referenceNo: saleNo,
+          userId: input.user.id,
+        },
+        { itemIds, saleId: sale.id, saleItemId: lineIds.get(l.index) },
+      );
+    } catch (e) {
+      // a scanned piece that cannot be sold becomes a message on that line ("This product has already been sold.")
+      if (e instanceof ItemError) throw new SaleError(e.message, { [`line.${l.index}`]: e.message });
+      throw e;
+    }
   }
 
   // 8. Money received now: a payment, allocated to this invoice (later payments follow the same path)

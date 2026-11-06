@@ -9,7 +9,8 @@
 //
 // Lock order: shipment row → GRN counter → product rows → stock balances (never touches customers or sales).
 import { Prisma } from "@/generated/prisma/client";
-import { lockProducts, moveStock, nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
+import { lockProducts, nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
+import { moveStockTracked } from "@/lib/inventory/items";
 import { postReceipt } from "@/lib/inventory/documents";
 import { resolveLines } from "@/lib/inventory/lines";
 import { todayYmd } from "@/lib/dashboard/range";
@@ -252,24 +253,31 @@ export async function confirmSession(tx: Tx, input: { shipmentId: string; sessio
       submissionKey: `shipment-receiving:${session.id}`,
       lines,
       user: input.user,
+      shipmentId: shipment.id, // every piece that arrives gets its own item number and QR, tied to this shipment
     });
     receiptNo = receipt.receiptNo;
     receiptId = receipt.id;
 
     for (const a of [...arrived].sort((x, y) => x.ri.productId.localeCompare(y.ri.productId))) {
       if (a.ri.damagedQty.lte(0)) continue;
-      await moveStock(tx, {
-        productId: a.ri.productId,
-        locationId: shipment.locationId,
-        type: "DAMAGED",
-        delta: a.ri.damagedQty.neg(),
-        unitCost: a.item.unitCost ?? pById.get(a.ri.productId)!.purchasePrice,
-        referenceType: "Shipment",
-        referenceId: shipment.id,
-        referenceNo: `${shipment.shipmentNo}#${session.sessionNo}`,
-        reason: `Damaged on arrival (${shipment.shipmentNo})`,
-        userId: input.user.id,
-      });
+      // the damaged ones are marked on exactly the pieces that arrived with this count (the newest numbers of this receipt)
+      const damagedItems = await tx.inventoryItem.findMany({ where: { receiptId: receipt.id, productId: a.ri.productId }, orderBy: { itemNo: "desc" }, take: Math.ceil(a.ri.damagedQty.toNumber()), select: { id: true } });
+      await moveStockTracked(
+        tx,
+        {
+          productId: a.ri.productId,
+          locationId: shipment.locationId,
+          type: "DAMAGED",
+          delta: a.ri.damagedQty.neg(),
+          unitCost: a.item.unitCost ?? pById.get(a.ri.productId)!.purchasePrice,
+          referenceType: "Shipment",
+          referenceId: shipment.id,
+          referenceNo: `${shipment.shipmentNo}#${session.sessionNo}`,
+          reason: `Damaged on arrival (${shipment.shipmentNo})`,
+          userId: input.user.id,
+        },
+        { itemIds: damagedItems.map((d) => d.id) },
+      );
     }
   }
 

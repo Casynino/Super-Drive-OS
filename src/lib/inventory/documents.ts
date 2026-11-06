@@ -2,6 +2,7 @@
 // (document rows + ledger + balances + cost) in that one transaction, so it all commits or none of it does.
 import { Prisma, type AdjustmentKind, type ReceiptType, type StockMovementType } from "@/generated/prisma/client";
 import { applyIncomingCost, lockBalance, lockProducts, moveStock, nextDocumentNo, type Dec, type Tx } from "./engine";
+import { isTracked, moveStockTracked, transferItems } from "./items";
 import type { ResolvedLine } from "./lines";
 
 const D = Prisma.Decimal;
@@ -25,6 +26,8 @@ export async function postReceipt(
     submissionKey: string;
     lines: ReceiptLine[];
     user: Actor;
+    /** set when the receipt comes from counting a shipment, so each new item remembers which shipment it arrived in */
+    shipmentId?: string | null;
   },
 ) {
   const lines = [...input.lines].sort(bySku);
@@ -63,18 +66,23 @@ export async function postReceipt(
     const unitCost = l.lineTotal.div(l.quantity).toDecimalPlaces(4);
     // A line with no cost known (0) must not drag the average cost down, so it is left out of the average.
     if (l.lineTotal.gt(0)) await applyIncomingCost(tx, l.productId, l.quantity, unitCost); // before the quantity moves in
-    await moveStock(tx, {
-      productId: l.productId,
-      locationId: input.locationId,
-      type: "RECEIVED",
-      delta: l.quantity,
-      unitCost,
-      referenceType: "StockReceipt",
-      referenceId: receipt.id,
-      referenceNo: receiptNo,
-      reason: input.type === "OPENING_STOCK" ? "Opening stock" : null,
-      userId: input.user.id,
-    });
+    // Every received piece gets its own item number and QR token in the same transaction.
+    await moveStockTracked(
+      tx,
+      {
+        productId: l.productId,
+        locationId: input.locationId,
+        type: "RECEIVED",
+        delta: l.quantity,
+        unitCost,
+        referenceType: "StockReceipt",
+        referenceId: receipt.id,
+        referenceNo: receiptNo,
+        reason: input.type === "OPENING_STOCK" ? "Opening stock" : null,
+        userId: input.user.id,
+      },
+      { receiptId: receipt.id, shipmentId: input.shipmentId },
+    );
   }
   return receipt;
 }
@@ -112,7 +120,15 @@ export async function postTransfer(
     const out = { ...common, locationId: input.fromLocationId, type: "TRANSFER_OUT" as StockMovementType, delta: l.quantity.neg() };
     const inn = { ...common, locationId: input.toLocationId, type: "TRANSFER_IN" as StockMovementType, delta: l.quantity };
     // Always lock the two balance rows in the same (location id) order, whichever way the transfer goes.
-    for (const m of [out, inn].sort((a, b) => a.locationId.localeCompare(b.locationId))) await moveStock(tx, m);
+    let previousQtyFrom: Dec = new D(0);
+    for (const m of [out, inn].sort((a, b) => a.locationId.localeCompare(b.locationId))) {
+      const r = await moveStock(tx, m);
+      if (m === out) previousQtyFrom = r.previousQty;
+    }
+    // The pieces follow the stock to the new location (to a reseller: with the reseller; back from one: available again).
+    if (await isTracked(tx, l.productId)) {
+      await transferItems(tx, { productId: l.productId, fromLocationId: input.fromLocationId, toLocationId: input.toLocationId, qty: l.quantity, previousQtyFrom, referenceType: "StockTransfer", referenceId: transfer.id, referenceNo: transferNo, userId: input.user.id });
+    }
   }
   return transfer;
 }
@@ -153,7 +169,8 @@ export async function postAdjustment(
     }
 
     if (!delta.isZero()) {
-      await moveStock(tx, {
+      // damaged / lost pieces are marked on the items, found stock gets new items
+      await moveStockTracked(tx, {
         productId: l.productId,
         locationId: input.locationId,
         type,

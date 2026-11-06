@@ -102,6 +102,7 @@ model User {
   expensesDecided     Expense[]           @relation("ExpenseDecider")
   expensesReversed    Expense[]           @relation("ExpenseReverser")
   bankDeposits        BankDeposit[]
+  itemMovements       ItemMovement[]
   closingsSubmitted   DailyClosing[]      @relation("ClosingSubmitter")
   closingsReviewed    DailyClosing[]      @relation("ClosingReviewer")
   attachments         Attachment[]
@@ -148,6 +149,7 @@ model Location {
   adjustments         StockAdjustment[]
   sales               Sale[]
   shipments           Shipment[]
+  items               InventoryItem[]
   cashAccounts        CashAccount[]
   expenses            Expense[]
   bankDeposits        BankDeposit[]
@@ -218,6 +220,7 @@ model Product {
   brandId             String?
   brand               Brand?                  @relation(fields: [brandId], references: [id])
   packagingType       String?
+  size                String? // e.g. "5L"; shown on labels
   baseUnitId          String
   baseUnit            Unit                    @relation(fields: [baseUnitId], references: [id])
   purchasePrice       Decimal                 @db.Decimal(14, 2) // per base unit (default/last cost)
@@ -244,6 +247,7 @@ model Product {
   resellerReturnItems ResellerReturnItem[]
   receivingItems      ShipmentReceivingItem[]
   priceHistory        ProductPriceHistory[]
+  items               InventoryItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -397,6 +401,7 @@ model StockReceipt {
   receivedBy      User               @relation(fields: [receivedById], references: [id])
   createdAt       DateTime           @default(now())
   items           StockReceiptItem[]
+  inventoryItems  InventoryItem[]
   receiving       ShipmentReceiving?
 
   @@index([createdAt])
@@ -832,6 +837,7 @@ model Shipment {
   items            ShipmentItem[]
   receivings       ShipmentReceiving[]
   supplierPayments SupplierPayment[]
+  inventoryItems   InventoryItem[]
 
   @@index([status, createdAt])
   @@index([issue])
@@ -1254,4 +1260,85 @@ model SupplierPayment {
   submissionKey String        @unique
 
   @@index([supplierId, paidAt])
+}
+
+// ───────────── Individual items (every physical unit has its own identity) ─────────────
+
+// Where one physical piece stands. Changes only together with an ItemMovement (a database trigger enforces it).
+enum ItemStatus {
+  AVAILABLE // in the shop (or another normal location), can be sold
+  SOLD
+  WITH_RESELLER // in a reseller's custody
+  DAMAGED
+  MISSING // counted as lost
+  DISPOSED // a damaged piece that was thrown away
+}
+
+enum ItemEventKind {
+  RECEIVED
+  ADDED // found stock added by an adjustment
+  SOLD
+  RETURNED // came back from a customer
+  TRANSFERRED
+  ISSUED_TO_RESELLER
+  RETURNED_FROM_RESELLER
+  SOLD_BY_RESELLER
+  DAMAGED
+  MISSING
+  RESTORED // a damaged piece put back into stock (needs authorisation)
+  DISPOSED
+}
+
+// One row per physical piece of a product whose base unit is a whole number (bottles, gallons, boxes).
+// itemNo is the short number printed on the label; token is the secret-free random reference inside the QR code.
+// Neither ever changes or is reused. Created when stock is received, never by hand.
+model InventoryItem {
+  id             String         @id @default(cuid())
+  itemNo         String         @unique // SDO-ITEM-000001
+  token          String         @unique // random, not guessable; this is what the QR code carries
+  productId      String
+  product        Product        @relation(fields: [productId], references: [id])
+  locationId     String
+  location       Location       @relation(fields: [locationId], references: [id])
+  status         ItemStatus     @default(AVAILABLE)
+  receivedAt     DateTime       @default(now())
+  receiptId      String?
+  receipt        StockReceipt?  @relation(fields: [receiptId], references: [id])
+  shipmentId     String?
+  shipment       Shipment?      @relation(fields: [shipmentId], references: [id])
+  saleId         String? // the sale it was last sold on
+  saleItemId     String?
+  lastMovementId String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  movements      ItemMovement[]
+
+  @@index([productId, locationId, status, receivedAt, itemNo])
+  @@index([status])
+  @@index([shipmentId])
+  @@index([receiptId])
+  @@index([saleItemId])
+  @@index([saleId])
+}
+
+// The history of an item. Append-only (database trigger): nothing here is ever edited or deleted.
+model ItemMovement {
+  id             String        @id @default(cuid())
+  itemId         String
+  item           InventoryItem @relation(fields: [itemId], references: [id])
+  kind           ItemEventKind
+  fromStatus     ItemStatus?
+  toStatus       ItemStatus
+  fromLocationId String?
+  toLocationId   String
+  referenceType  String?
+  referenceId    String?
+  referenceNo    String?
+  note           String?
+  auto           Boolean       @default(false) // picked by the system because the sale/adjustment was by quantity, not by scanning this piece
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@index([itemId, createdAt])
 }

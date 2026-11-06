@@ -9,6 +9,7 @@ import { writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
 import { fail, formString, guarded, type ActionState } from "@/lib/action";
 import { notifyPermission } from "@/lib/notifications";
+import { generateSku, nextBarcode, uniqueSku } from "@/lib/product-codes";
 import { ImageError, processProductImage } from "@/lib/product-images";
 import { ShipmentError, cancelShipment, confirmSession, createShipment, markArrived, resolveIssue, saveDraft } from "@/lib/shipments/engine";
 import { getCurrency } from "@/lib/settings";
@@ -189,8 +190,6 @@ export async function saveCount(_prev: ActionState, fd: FormData): Promise<Actio
 
 // ───────────── Owner: add a brand-new product while announcing a shipment ─────────────
 
-const slug = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-
 export async function createProductForShipment(fd: FormData): Promise<{ ok: true; product: PickerProduct } | { ok: false; error: string }> {
   const out: { product?: PickerProduct } = {};
   const result = await guarded("products.create", async (user) => {
@@ -233,16 +232,14 @@ export async function createProductForShipment(fd: FormData): Promise<{ ok: true
       }
     }
 
-    // A readable, unique code: BRAND-NAME-001
-    const brandPrefix = brand && !name.toLowerCase().startsWith(brand.name.toLowerCase()) ? brand.name : "";
-    const base = slug(`${brandPrefix} ${name}`).slice(0, 32) || "ITEM";
-    let sku = base;
-    for (let i = 2; await db.product.findUnique({ where: { sku }, select: { id: true } }); i++) sku = `${base}-${i}`;
-
+    let sku = "";
     const created = await db.$transaction(async (tx) => {
+      // The system makes both codes: a readable one from the name and a unique barcode.
+      sku = await uniqueSku(tx, generateSku(name, brand?.name));
       const p = await tx.product.create({
         data: {
           sku,
+          barcode: await nextBarcode(tx),
           name,
           categoryId: category.id,
           brandId: brand?.id ?? null,
@@ -264,7 +261,7 @@ export async function createProductForShipment(fd: FormData): Promise<{ ok: true
       id: created.id,
       name: created.name,
       sku: created.sku,
-      barcode: null,
+      barcode: created.barcode,
       sellingPrice: price.toString(),
       wholesalePrice: null,
       imageV: image ? Date.now() : null,

@@ -9,6 +9,7 @@ import ProductForm, { type ProductFormData } from "../ProductForm";
 import { setProductStatus } from "../actions";
 import { removeProductImage, uploadProductImage } from "../image-actions";
 import ProductImageCard from "@/components/products/ProductImageCard";
+import ProductIdentityCard from "@/components/products/ProductIdentityCard";
 
 export const metadata = { title: "Product" };
 
@@ -45,6 +46,7 @@ export default async function EditProductPage({
     categoryId: product.categoryId,
     brandId: product.brandId ?? "",
     packagingType: product.packagingType ?? "",
+    size: product.size ?? "",
     description: product.description ?? "",
     baseUnitId: product.baseUnitId,
     purchasePrice: canCost ? str(product.purchasePrice) : "",
@@ -72,6 +74,7 @@ export default async function EditProductPage({
           <Alert kind="success">Product created. Stock is added through Stock Receiving.</Alert>
         </div>
       )}
+      <ProductIdentityCard productId={product.id} sku={product.sku} barcode={product.barcode} />
       <ProductImageCard productId={product.id} productName={product.name} version={image ? image.updatedAt.getTime() : null} canEdit={canEdit} upload={uploadProductImage} remove={removeProductImage} />
       <ProductForm
         product={data}

@@ -9,21 +9,26 @@ import { diffFields, writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
 import { fail, formString, formValues, guarded, isUniqueViolation, type ActionState } from "@/lib/action";
 import { parseMoney } from "@/lib/money";
+import { generateSku, nextBarcode, uniqueSku } from "@/lib/product-codes";
+import { ImageError, processProductImage } from "@/lib/product-images";
 import { getCurrency } from "@/lib/settings";
 
 const D = Prisma.Decimal;
 
 const basicSchema = z.object({
   name: z.string().trim().min(2, "Enter the product name.").max(150, "Too long."),
+  // empty = the system makes the code from the name
   sku: z
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^[A-Z0-9][A-Z0-9._\-/]{0,39}$/, "Use letters, numbers and - _ . / only (max 40 characters)."),
+    .regex(/^[A-Z0-9][A-Z0-9._\-/]{0,39}$/, "Use letters, numbers and - _ . / only (max 40 characters).")
+    .or(z.literal("")),
   barcode: z.string().trim().max(64, "Too long.").optional(),
   categoryId: z.string().min(1, "Choose a category."),
   brandId: z.string().optional(),
   packagingType: z.string().trim().max(60, "Too long.").optional(),
+  size: z.string().trim().max(30, "Too long.").optional(),
   description: z.string().trim().max(1000, "Too long.").optional(),
   baseUnitId: z.string().optional(),
 });
@@ -112,6 +117,7 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
       categoryId: formString(fd, "categoryId"),
       brandId: formString(fd, "brandId") || undefined,
       packagingType: formString(fd, "packagingType") || undefined,
+      size: formString(fd, "size") || undefined,
       description: formString(fd, "description") || undefined,
       baseUnitId: formString(fd, "baseUnitId") || undefined,
     });
@@ -136,9 +142,10 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
       if (!v) errors[field] = currency.decimals === 0 ? "Enter a whole amount (no decimals)." : `Enter a valid amount (max ${currency.decimals} decimals).`;
       return v;
     };
-    const sellingPrice = canPrice ? money("sellingPrice", true) : null;
+    // When adding a product the prices can wait (the shipment form asks for them too); when editing they stay required.
+    const sellingPrice = canPrice ? money("sellingPrice", Boolean(id)) : null;
     const wholesalePrice = canPrice ? money("wholesalePrice", false) : null;
-    const purchasePrice = canCost ? money("purchasePrice", true) : null;
+    const purchasePrice = canCost ? money("purchasePrice", Boolean(id)) : null;
 
     const minRaw = formString(fd, "minStock") || "0";
     let minStock = new D(0);
@@ -182,7 +189,7 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
     const b = basic.data;
 
     // Friendly uniqueness checks (the DB unique indexes remain the real guard)
-    const dupSku = await db.product.findFirst({ where: { sku: b.sku, ...(id ? { NOT: { id } } : {}) }, select: { id: true } });
+    const dupSku = b.sku ? await db.product.findFirst({ where: { sku: b.sku, ...(id ? { NOT: { id } } : {}) }, select: { id: true } }) : null;
     if (dupSku) return fail("Please fix the highlighted fields.", { sku: "This SKU is already used by another product." }, values);
     if (b.barcode) {
       const dupBar = await db.product.findFirst({ where: { barcode: b.barcode, ...(id ? { NOT: { id } } : {}) }, select: { id: true } });
@@ -199,25 +206,42 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
 
     const data = {
       name: b.name,
-      sku: b.sku,
-      barcode: b.barcode ?? null,
       categoryId: b.categoryId,
       brandId: b.brandId ?? null,
       packagingType: b.packagingType ?? null,
+      size: b.size ?? null,
       description: b.description ?? null,
       minStock,
-      purchasePrice: canCost ? purchasePrice! : (existing?.purchasePrice ?? new D(0)),
-      sellingPrice: canPrice ? sellingPrice! : (existing?.sellingPrice ?? new D(0)),
+      purchasePrice: canCost ? (purchasePrice ?? new D(0)) : (existing?.purchasePrice ?? new D(0)),
+      sellingPrice: canPrice ? (sellingPrice ?? new D(0)) : (existing?.sellingPrice ?? new D(0)),
       wholesalePrice: canPrice ? wholesalePrice : (existing?.wholesalePrice ?? null),
     };
+
+    // A picture can be added while creating the product (optional); it is checked and shrunk before anything is saved.
+    let image: Awaited<ReturnType<typeof processProductImage>> | null = null;
+    const file = fd.get("image");
+    if (!existing && file instanceof File && file.size > 0) {
+      try {
+        image = await processProductImage(Buffer.from(await file.arrayBuffer()));
+      } catch (e) {
+        if (e instanceof ImageError) return fail("Please fix the highlighted fields.", { image: e.message }, values);
+        throw e;
+      }
+    }
 
     try {
       let productId = id;
       await db.$transaction(async (tx) => {
+        // Codes are made by the system: a readable code from the name and a unique barcode. Typed ones are kept; stored ones are never lost.
+        const sku = b.sku || existing?.sku || (await uniqueSku(tx, generateSku(b.name, brand?.name)));
+        const barcode = b.barcode || existing?.barcode || (await nextBarcode(tx));
+
         if (!existing) {
           const created = await tx.product.create({
             data: {
               ...data,
+              sku,
+              barcode,
               baseUnitId: baseUnitId!,
               createdById: user.id,
               units: { create: parsedUnits },
@@ -225,6 +249,7 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
             include: { units: true },
           });
           productId = created.id;
+          if (image) await tx.productImage.create({ data: { productId: created.id, mime: image.mime, full: new Uint8Array(image.full), thumb: new Uint8Array(image.thumb), width: image.width, height: image.height, updatedById: user.id } });
           const symbols = new Map((await tx.unit.findMany({ select: { id: true, symbol: true } })).map((u) => [u.id, u.symbol]));
           const initial = priceHistoryRows(created.id, user.id, null, snapshot(created), symbols).filter((r) => r.newValue && !r.newValue.isZero());
           if (initial.length) await tx.productPriceHistory.createMany({ data: initial });
@@ -233,7 +258,7 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
         }
 
         const before = snapshot(existing);
-        await tx.product.update({ where: { id: existing.id }, data });
+        await tx.product.update({ where: { id: existing.id }, data: { ...data, sku, barcode } });
 
         // Sync packaging units: remove the ones no longer listed, upsert the rest.
         const keep = parsedUnits.map((u) => u.unitId);
