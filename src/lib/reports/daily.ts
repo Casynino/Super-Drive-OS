@@ -1,3 +1,4 @@
+import { qtyText } from "@/lib/qty";
 // The owner's daily WhatsApp report, built only from recorded transactions (nothing is estimated or filled in).
 // A SUMMARY (short) and a DETAIL report (split into numbered parts) are produced once the day has been closed.
 // If the shop has not closed, only an exception notice is produced and it says so plainly.
@@ -197,7 +198,7 @@ export async function buildDailyReport(db: Db, locationId: string, day: string):
 
   section("LOW STOCK");
   if (alerts.low.length === 0) L.push("None.");
-  alerts.low.forEach((a) => L.push(`${a.name}: ${a.qty} ${a.symbol} left (minimum ${a.min})`));
+  alerts.low.forEach((a) => L.push(`${a.name}: ${qtyText(Number(a.qty), a.pack, a.symbol).main} left (minimum ${qtyText(Number(a.min), a.pack, a.symbol).main})`));
   section("OUT OF STOCK");
   if (alerts.out.length === 0) L.push("None.");
   alerts.out.forEach((a) => L.push(a.name));

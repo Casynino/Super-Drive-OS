@@ -258,6 +258,7 @@ model Product {
   priceHistory          ProductPriceHistory[]
   items                 InventoryItem[]
   issueDecisions        ShipmentIssueDecision[]
+  issueVariantOf        ShipmentIssueDecision[] @relation("IssueVariant")
 
   @@index([categoryId])
   @@index([brandId])
@@ -894,6 +895,8 @@ enum IssueAction {
   NOT_DELIVERED // the supplier never delivered them: a shortage (optionally carried to a new order); no stock is added
   WRITE_OFF // damaged pieces cannot be sold: they are thrown away for good
   KEEP // extra pieces are accepted
+  DISCOUNT_SELL // damaged pieces can be sold, at a lower price, as a separate "damaged packaging" product
+  DISMISS // removed from the list without changing stock or money (a reason is always kept)
 }
 
 model ShipmentIssueDecision {
@@ -912,6 +915,9 @@ model ShipmentIssueDecision {
   stockReceipt      StockReceipt? @relation(fields: [stockReceiptId], references: [id])
   movedToShipmentId String? // set when a shortage was carried to a new purchase order
   movedToShipment   Shipment?     @relation("IssueMovedTo", fields: [movedToShipmentId], references: [id])
+  discountPrice     Decimal?      @db.Decimal(14, 2) // per base unit (piece) for DISCOUNT_SELL
+  variantProductId  String? // the "damaged packaging" product the pieces were moved into
+  variantProduct    Product?      @relation("IssueVariant", fields: [variantProductId], references: [id])
   submissionKey     String        @unique // blocks a double submit
   decidedById       String
   decidedBy         User          @relation("IssueDecider", fields: [decidedById], references: [id])

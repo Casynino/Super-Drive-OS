@@ -5,6 +5,8 @@ import { Alert, PageHeader } from "@/components/ui";
 import StatTile from "@/components/dashboard/StatTile";
 import { SaleStatusBadge } from "../../sales/StatusBadge";
 import { can } from "@/lib/auth/can";
+import { qtyText } from "@/lib/qty";
+import { getUnitMode } from "@/lib/unit-mode";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
@@ -19,6 +21,7 @@ export const metadata = { title: "Reseller" };
 type Search = { created?: string; saved?: string; reported?: string; returned?: string };
 
 export default async function ResellerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
+  const unitMode = await getUnitMode();
   const user = await requirePagePermission("resellers.view");
   const { id } = await params;
   const sp = await searchParams;
@@ -118,10 +121,10 @@ export default async function ResellerPage({ params, searchParams }: { params: P
                   {products.map((p) => (
                     <tr key={p.productId}>
                       <td className="font-medium">{p.name}</td>
-                      <td className="text-right tabular-nums">{p.issued.toString()}</td>
-                      <td className="text-right tabular-nums">{p.sold.toString()}</td>
-                      <td className="hidden text-right tabular-nums sm:table-cell">{p.returned.toString()}</td>
-                      <td className="text-right font-semibold tabular-nums">{p.remaining.toString()} {p.symbol}</td>
+                      <td className="text-right tabular-nums">{qtyText(Number(p.issued), p.pack, p.symbol, unitMode).main}</td>
+                      <td className="text-right tabular-nums">{qtyText(Number(p.sold), p.pack, p.symbol, unitMode).main}</td>
+                      <td className="hidden text-right tabular-nums sm:table-cell">{qtyText(Number(p.returned), p.pack, p.symbol, unitMode).main}</td>
+                      <td className="text-right font-semibold tabular-nums">{qtyText(Number(p.remaining), p.pack, p.symbol, unitMode).main}</td>
                       <td className="hidden text-right tabular-nums md:table-cell">{m(p.basePrice)}</td>
                     </tr>
                   ))}

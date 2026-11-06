@@ -60,7 +60,7 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
   if (!shipment) notFound();
 
   // the problem products of this order (missing, damaged, extra) with what was decided about each; never includes costs
-  const issueViews = toIssueViews(await loadIssueRecords(db, { shipmentIds: [id] }));
+  const issueViews = toIssueViews(await loadIssueRecords(db, { shipmentIds: [id], withCost: manage }));
   const itemCount = await db.inventoryItem.count({ where: { shipmentId: id } }); // pieces that already have their own number and QR
   const sums = await db.shipmentReceivingItem.groupBy({ by: ["productId"], where: { receiving: { shipmentId: id, status: "CONFIRMED" } }, _sum: { goodQty: true, damagedQty: true } });
   const counted = new Map(sums.map((s) => [s.productId, { good: s._sum.goodQty ?? new D(0), damaged: s._sum.damagedQty ?? new D(0) }]));
@@ -163,7 +163,7 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
               </p>
             </div>
           </div>
-          <IssueRecords mode={await getUnitMode()} records={issueViews} canAct={manage} closed={shipment.issue === "RESOLVED" && issueViews.some((r) => r.open > 0)} action={decideIssueAction} />
+          <IssueRecords mode={await getUnitMode()} currencySymbol={currency.symbol} records={issueViews} canAct={manage} closed={shipment.issue === "RESOLVED" && issueViews.some((r) => r.open > 0)} action={decideIssueAction} />
           {manage && shipment.issue === "OPEN" && (
             <details className="border-t border-line px-5 py-3">
               <summary className="cursor-pointer select-none text-sm font-medium text-slate-600 hover:text-slate-900">Close the whole investigation with one note instead</summary>

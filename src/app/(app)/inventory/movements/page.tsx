@@ -7,6 +7,8 @@ import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { MOVEMENT_LABELS, documentHref } from "@/lib/inventory/labels";
 import { formatMoney } from "@/lib/money";
+import { largestPack, qtyText } from "@/lib/qty";
+import { getUnitMode } from "@/lib/unit-mode";
 import { getCurrency } from "@/lib/settings";
 import { formatDateTime } from "@/lib/utils";
 
@@ -17,6 +19,7 @@ type Search = { q?: string; location?: string; type?: string; from?: string; to?
 const isDate = (s?: string) => Boolean(s && /^\d{4}-\d{2}-\d{2}$/.test(s));
 
 export default async function MovementsPage({ searchParams }: { searchParams: Promise<Search> }) {
+  const unitMode = await getUnitMode();
   const user = await requirePagePermission("inventory.movements");
   const sp = await searchParams;
   const currency = await getCurrency();
@@ -43,7 +46,7 @@ export default async function MovementsPage({ searchParams }: { searchParams: Pr
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: { product: { select: { name: true, sku: true, baseUnit: { select: { symbol: true } } } }, location: { select: { name: true } }, user: { select: { name: true } } },
+      include: { product: { select: { name: true, sku: true, baseUnit: { select: { symbol: true } }, units: { select: { factor: true, unit: { select: { symbol: true } } } } } }, location: { select: { name: true } }, user: { select: { name: true } } },
     }),
     db.stockMovement.count({ where }),
     db.location.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -135,10 +138,13 @@ export default async function MovementsPage({ searchParams }: { searchParams: Pr
                       </td>
                       <td className={`whitespace-nowrap text-right font-semibold ${neg ? "text-brand-red-dark" : "text-emerald-700"}`}>
                         {neg ? "" : "+"}
-                        {m.quantity.toString()} {m.product.baseUnit.symbol}
+                        {qtyText(Math.abs(Number(m.quantity)), largestPack(m.product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor }))), m.product.baseUnit.symbol, unitMode).main}
                       </td>
                       <td className="hidden whitespace-nowrap text-right text-slate-600 md:table-cell">
-                        {m.previousQty.toString()} → {m.newQty.toString()}
+                        {(() => {
+                          const pk = largestPack(m.product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
+                          return `${qtyText(Number(m.previousQty), pk, m.product.baseUnit.symbol, unitMode).main} → ${qtyText(Number(m.newQty), pk, m.product.baseUnit.symbol, unitMode).main}`;
+                        })()}
                       </td>
                       {showCost && <td className="hidden text-right lg:table-cell">{m.unitCost ? formatMoney(m.unitCost, { ...currency, decimals: Math.max(currency.decimals, 2) }) : "—"}</td>}
                       <td className="hidden lg:table-cell">

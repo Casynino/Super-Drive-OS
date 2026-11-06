@@ -74,7 +74,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   const tab: Tab = wantDeliveries ? "deliveries" : sp.tab && sp.tab in TAB_PHASES ? (sp.tab as PhaseTab) : fallback;
   const list = tab === "deliveries" ? [] : inTab(tab);
   // Investigation shows the problem products themselves (not just the orders), each with its choices
-  const issueViews = tab === "investigation" && list.length > 0 ? toIssueViews(await loadIssueRecords(db, { shipmentIds: list.map((r) => r.s.id) })) : [];
+  const issueViews = tab === "investigation" && list.length > 0 ? toIssueViews(await loadIssueRecords(db, { shipmentIds: list.map((r) => r.s.id), withCost: manage })) : [];
 
   const units = (s: (typeof shipments)[number]) => s.items.filter((i) => !i.unexpected).reduce((sum, i) => sum + Number(i.expectedQty), 0);
   const productCount = (s: (typeof shipments)[number]) => s.items.filter((i) => !i.unexpected).length;
@@ -208,7 +208,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
                   <span className="badge-red">{open > 0 ? `${open} product${open === 1 ? "" : "s"} to decide` : "Open"}</span>
                 </div>
                 {mine.length > 0 ? (
-                  <IssueRecords mode={unitMode} records={mine} canAct={manage} action={decideIssueAction} />
+                  <IssueRecords mode={unitMode} currencySymbol={currency.symbol} records={mine} canAct={manage} action={decideIssueAction} />
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-slate-600">
                     <span>This order has a problem on record. Open it to see the details.</span>

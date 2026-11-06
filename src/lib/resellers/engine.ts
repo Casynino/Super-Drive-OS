@@ -3,6 +3,7 @@
 //
 // Lock order: reseller document counter -> (transfer counter -> stock balance rows) for issues and returns;
 // sold reports follow the normal sale order (INV counter -> customer -> products -> balances -> PAY counter).
+import { largestPack } from "@/lib/qty";
 import { Prisma } from "@/generated/prisma/client";
 import { postAdjustment, postTransfer } from "@/lib/inventory/documents";
 import { nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
@@ -277,10 +278,10 @@ export async function getResellerProducts(db: Pick<Tx, "$queryRaw" | "stockBalan
   const [mi, ms, mr] = [q(issued), q(sold), q(returned)];
   const held = new Map(stock.map((b) => [b.productId, b.quantity]));
   const ids = [...new Set([...mi.keys(), ...held.keys()])];
-  const names = await db.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, sku: true, baseUnit: { select: { symbol: true } } }, orderBy: { name: "asc" } });
+  const names = await db.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, sku: true, baseUnit: { select: { symbol: true } }, units: { select: { factor: true, unit: { select: { symbol: true } } } } }, orderBy: { name: "asc" } });
   return names.map((p) => {
     const price = prices.get(p.id) ?? new D(0);
     const remaining = held.get(p.id) ?? new D(0);
-    return { productId: p.id, name: p.name, sku: p.sku, symbol: p.baseUnit.symbol, issued: mi.get(p.id) ?? new D(0), sold: ms.get(p.id) ?? new D(0), returned: mr.get(p.id) ?? new D(0), remaining, basePrice: price, remainingValue: remaining.mul(price) };
+    return { productId: p.id, name: p.name, sku: p.sku, symbol: p.baseUnit.symbol, pack: largestPack(p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor }))), issued: mi.get(p.id) ?? new D(0), sold: ms.get(p.id) ?? new D(0), returned: mr.get(p.id) ?? new D(0), remaining, basePrice: price, remainingValue: remaining.mul(price) };
   });
 }

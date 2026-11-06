@@ -1,3 +1,4 @@
+import type { IssueAction } from "@/generated/prisma/client";
 import type { IssueRecord } from "./issues";
 import { ISSUE_TYPE_LABEL } from "./issues";
 import { formatDateTime } from "@/lib/utils";
@@ -14,6 +15,7 @@ export type IssueView = {
   sku: string;
   imageV: number | null;
   unit: string;
+  normalPrice: number | null;
   pack: { symbol: string; factor: number } | null;
   kind: IssueRecord["kind"];
   typeLabel: string;
@@ -21,8 +23,12 @@ export type IssueView = {
   resolved: number;
   open: number;
   description: string;
+  expected: number;
+  arrived: number;
+  /** what one piece cost: only for the owner, never sent to the shop */
+  unitCost: number | null;
   reported: string | null;
-  history: { at: string; by: string; text: string; note: string | null }[];
+  history: { at: string; by: string; action: IssueAction; quantity: number; receiptNo: string | null; newOrderNo: string | null; variantName: string | null; discountPrice: number | null; note: string | null }[];
 };
 
 export function toIssueViews(records: IssueRecord[]): IssueView[] {
@@ -37,6 +43,7 @@ export function toIssueViews(records: IssueRecord[]): IssueView[] {
     sku: r.sku,
     imageV: r.imageV,
     unit: r.unit,
+    normalPrice: r.normalPrice,
     pack: r.pack,
     kind: r.kind,
     typeLabel: ISSUE_TYPE_LABEL[r.type],
@@ -44,7 +51,10 @@ export function toIssueViews(records: IssueRecord[]): IssueView[] {
     resolved: r.resolved,
     open: r.open,
     description: r.description,
+    expected: r.expected,
+    arrived: r.arrived,
+    unitCost: r.unitCost,
     reported: r.reportedAt ? `${formatDateTime(r.reportedAt)}${r.reportedBy ? ` by ${r.reportedBy}` : ""}` : r.reportedBy ? `by ${r.reportedBy}` : null,
-    history: r.history.map((h) => ({ at: formatDateTime(h.at), by: h.by, text: h.text, note: h.note })),
+    history: r.history.map((h) => ({ ...h, at: formatDateTime(h.at) })),
   }));
 }

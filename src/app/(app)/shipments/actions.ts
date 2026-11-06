@@ -142,10 +142,11 @@ const decideSchema = z.object({
   shipmentId: z.string().min(1),
   shipmentItemId: z.string().min(1),
   kind: z.enum(["MISSING", "DAMAGED", "EXTRA"]),
-  action: z.enum(["FOUND", "NOT_DELIVERED", "WRITE_OFF", "KEEP"]),
+  action: z.enum(["FOUND", "NOT_DELIVERED", "WRITE_OFF", "KEEP", "DISCOUNT_SELL", "DISMISS"]),
   quantity: z.string().max(24),
   note: z.string().trim().max(500),
   newOrder: z.boolean(),
+  discountPrice: z.string().max(24),
   submissionKey: z.string().min(16).max(80),
 });
 
@@ -160,11 +161,14 @@ export async function decideIssueAction(_prev: ActionState, fd: FormData): Promi
       quantity: formString(fd, "quantity"),
       note: formString(fd, "note"),
       newOrder: formString(fd, "newOrder") === "on",
+      discountPrice: formString(fd, "discountPrice"),
       submissionKey: formString(fd, "submissionKey"),
     });
     if (!parsed.success) return fail(BAD);
     const p = parsed.data;
     const currency = await getCurrency();
+    // Setting a new selling price is a pricing right, not just an investigation right (the server checks it, whatever the screen shows).
+    if (p.action === "DISCOUNT_SELL" && !can(user, "products.price")) return fail("You are not allowed to set selling prices.");
     // Quantities are typed in cartons first; the engine counts in base units, so a carton quantity is converted here from the product's own pack size.
     if (formString(fd, "qtyUnit") === "pack") {
       const it = await db.shipmentItem.findUnique({ where: { id: p.shipmentItemId }, select: { productId: true } });
@@ -190,7 +194,7 @@ export async function decideIssueAction(_prev: ActionState, fd: FormData): Promi
       revalidatePath(`/shipments/${p.shipmentId}`);
       revalidatePath("/inventory");
       revalidatePath("/products");
-      const message = p.action === "FOUND" ? `Back in stock${r.receiptNo ? ` (receipt ${r.receiptNo})` : ""}.` : p.action === "NOT_DELIVERED" ? `Shortage recorded${r.newOrderNo ? ` and added to the new order ${r.newOrderNo}` : ""}.` : p.action === "WRITE_OFF" ? "Written off." : "Kept in stock.";
+      const message = p.action === "FOUND" ? `Back in stock${r.receiptNo ? ` (receipt ${r.receiptNo})` : ""}.` : p.action === "NOT_DELIVERED" ? `Shortage recorded${r.newOrderNo ? ` and added to the new order ${r.newOrderNo}` : ""}.` : p.action === "WRITE_OFF" ? "Written off." : p.action === "DISMISS" ? "Removed from the list. It stays in the history." : p.action === "DISCOUNT_SELL" ? "On sale at the discounted price, as a separate \"damaged packaging\" product." : "Kept in stock.";
       return { ok: true, message: r.closed ? `${message} Nothing is left to decide, so the investigation is closed.` : message };
     } catch (e) {
       if (e instanceof ShipmentError) return fail(e.message, e.fieldErrors);

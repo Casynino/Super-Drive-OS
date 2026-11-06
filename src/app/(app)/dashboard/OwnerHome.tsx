@@ -1,3 +1,5 @@
+import { qtyText } from "@/lib/qty";
+import { getUnitMode } from "@/lib/unit-mode";
 import Link from "next/link";
 import { ArrowRight, Banknote, Boxes, CalendarCheck, ChartColumn, Handshake, HandCoins, Inbox, Landmark, Package, PiggyBank, Receipt, ReceiptText, ScrollText, ShoppingBag, Smartphone, TrendingUp, Truck, Wallet } from "lucide-react";
 import AttentionPanel, { type AttentionItem } from "@/components/dashboard/AttentionPanel";
@@ -96,6 +98,7 @@ const PILL = {
 } as const;
 
 export default async function OwnerHome({ user }: { user: SessionUser }) {
+  const unitMode = await getUnitMode();
   const range = resolveRange("month");
   const financials = can(user, "dashboard.financials");
   const locationId = await defaultLocationId(db);
@@ -618,7 +621,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
                   )}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{a.name}</span>
-                <span className={a.out ? "badge-red" : "badge-yellow"}>{a.out ? "Out" : `${Number(a.qty)} left`}</span>
+                <span className={a.out ? "badge-red" : "badge-yellow"}>{a.out ? "Out" : `${qtyText(Number(a.qty), a.pack, a.symbol, unitMode).main} left`}</span>
               </li>
             ))}
           </ul>

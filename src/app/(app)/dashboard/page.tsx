@@ -1,3 +1,5 @@
+import { qtyText } from "@/lib/qty";
+import { getUnitMode } from "@/lib/unit-mode";
 import Link from "next/link";
 import { CalendarCheck, Handshake, Banknote, Boxes, HandCoins, Package, PackageCheck, Receipt, ReceiptText, ShoppingCart, Undo2, Users, Wallet } from "lucide-react";
 import StatTile from "@/components/dashboard/StatTile";
@@ -33,6 +35,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 // ───────────────────────── Shop attendant ─────────────────────────
 
 async function ShopDashboard({ user }: { user: SessionUser }) {
+  const unitMode = await getUnitMode();
   const currency = await getCurrency();
   const m = (v: number | Prisma.Decimal) => formatMoney(v, currency);
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
@@ -155,7 +158,7 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
                       )}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{a.name}</span>
-                    <span className={a.out ? "badge-red" : "badge-yellow"}>{a.out ? "Out of stock" : `${Number(a.qty)} left`}</span>
+                    <span className={a.out ? "badge-red" : "badge-yellow"}>{a.out ? "Out of stock" : `${qtyText(Number(a.qty), a.pack, a.symbol, unitMode).main} left`}</span>
                   </li>
                 ))}
               </ul>
