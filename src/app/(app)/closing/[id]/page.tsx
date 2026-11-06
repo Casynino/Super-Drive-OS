@@ -16,7 +16,7 @@ import { getCurrency } from "@/lib/settings";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { reviewClosingAction } from "../actions";
 
-export const metadata = { title: "Closing report" };
+export const metadata = { title: "End of day report" };
 
 const D = Prisma.Decimal;
 
@@ -52,7 +52,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
 
   return (
     <>
-      <PageHeader title={`Closing · ${formatDate(c.businessDate)}`} back={{ href: "/closing", label: "Closing" }} description={`${c.closingNo} · ${c.submittedBy.name} · ${formatDateTime(c.submittedAt)}`} actions={<ClosingStatusBadge status={c.status} difference={c.difference.toString()} />} />
+      <PageHeader title={`End of day · ${formatDate(c.businessDate)}`} back={{ href: "/closing", label: "End of day" }} description={`${c.closingNo} · ${c.submittedBy.name} · ${formatDateTime(c.submittedAt)}`} actions={<ClosingStatusBadge status={c.status} difference={c.difference.toString()} />} />
 
       {sp.done && (
         <div className="mb-4">

@@ -19,7 +19,7 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { recordDepositAction } from "./actions";
 import { submitClosingAction } from "./actions";
 
-export const metadata = { title: "Closing" };
+export const metadata = { title: "End of day" };
 
 /** Closing: one place for the end of the day. The shop counts the cash, banks some of it and closes; the owner sees every day's report. */
 export default async function ClosingPage({ searchParams }: { searchParams: Promise<{ status?: string; banked?: string }> }) {
@@ -59,7 +59,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title="Closing" description={canSubmit ? "Count the cash, bank it, close the day." : "Every closed day and its report."} />
+      <PageHeader title="End of day" description={canSubmit ? "Count the cash, bank it, close the day." : "Every closed day and its report."} />
 
       {sp.banked && (
         <div className="mb-4">

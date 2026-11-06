@@ -60,7 +60,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
               </Link>
             )}
             <Link href="/closing" className="btn-secondary">
-              Closing
+              End of day
             </Link>
           </>
         }
