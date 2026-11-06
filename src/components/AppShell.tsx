@@ -6,8 +6,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Bell, ChevronDown, LogOut, Menu, X } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
-import UnitToggle from "@/components/UnitToggle";
-import type { UnitMode } from "@/lib/qty";
 import { cn } from "@/lib/utils";
 import { NAV, type NavItem } from "./nav";
 
@@ -20,8 +18,6 @@ type Props = {
   unread: number;
   /** numbers shown beside menu items that need someone to act */
   badges: { approvals: number; incoming: number };
-  /** how quantities are shown (the CTN | PCS switch) */
-  unitMode: UnitMode;
   children: React.ReactNode;
 };
 
@@ -34,7 +30,7 @@ function initials(name: string) {
     .join("");
 }
 
-export default function AppShell({ businessName, user, visibleHrefs, logoutAction, unread, badges, unitMode, children }: Props) {
+export default function AppShell({ businessName, user, visibleHrefs, logoutAction, unread, badges, children }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -151,7 +147,6 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         <p className="hidden text-sm font-medium text-slate-500 lg:block">{businessName}</p>
 
         <div className="flex items-center gap-2 sm:gap-2.5">
-          <UnitToggle mode={unitMode} />
           <ThemeToggle />
           <Link href="/notifications" className="btn-secondary btn-sm relative" title="Notifications">
             <Bell size={15} />

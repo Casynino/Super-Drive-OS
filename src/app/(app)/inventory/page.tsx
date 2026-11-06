@@ -179,9 +179,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const cardProps = ({ p, qty, away, status, value }: (typeof rows)[number]) => {
     const unit = p.baseUnit.symbol;
     const hasMin = p.minStock.gt(0);
-    // cartons first, pieces as the small second line
+    // cartons are shown by default; the card has its own CTN | PCS switch, so it gets the plain numbers
     const pk = largestPack(p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
-    const shown = qtyText(Number(qty.toString()), pk, unit, mode);
     return {
       id: p.id,
       name: p.name,
@@ -189,13 +188,13 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       category: p.category.name,
       brand: p.brand?.name ?? null,
       imageV: p.image ? p.image.updatedAt.getTime() : null,
-      qty: shown.main,
-      unit: "",
-      pack: packNote(pk, unit),
-      min: hasMin ? qtyText(Number(p.minStock.toString()), pk, unit, mode).main : null,
+      qtyBase: Number(qty.toString()),
+      minBase: hasMin ? Number(p.minStock.toString()) : null,
+      awayBase: away.gt(0) ? Number(away.toString()) : null,
+      pack: pk,
+      baseSymbol: unit,
       levelPct: hasMin ? Math.min(100, (Number(qty.toString()) / (Number(p.minStock.toString()) * 3)) * 100) : null,
       status,
-      away: away.gt(0) ? qtyText(Number(away.toString()), pk, unit, mode).main : null,
       value: canValue ? formatMoney(value, currency) : null,
       href: canOpenProduct ? `/products/${p.id}` : null,
     };

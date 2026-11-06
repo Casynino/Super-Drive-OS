@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { ImageOff } from "lucide-react";
+import QtySwitch from "@/components/QtySwitch";
 import { qtyText, type Pack, type UnitMode } from "@/lib/qty";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +32,9 @@ export type ProductLevel = {
  * One product's level at a glance: the big number is what is in the shop now, the bar shows where every piece of it went
  * (in the shop, with resellers, damaged, sold). Pressing the card shows only that product's pieces.
  */
-export default function ProductLevelCard({ p, href, active, showStock = true, mode = "ctn" }: { p: ProductLevel; href: string; active?: boolean; /** false for people who may not see stock: only the product and its price */ showStock?: boolean; /** the CTN | PCS switch */ mode?: UnitMode }) {
+export default function ProductLevelCard({ p, href, active, showStock = true, mode: startMode = "ctn" }: { p: ProductLevel; href: string; active?: boolean; /** false for people who may not see stock: only the product and its price */ showStock?: boolean; /** the CTN | PCS switch */ mode?: UnitMode }) {
+  // cartons by default; the small switch changes only this product's numbers
+  const [mode, setMode] = useState<UnitMode>(startMode);
   const out = p.available === 0;
   const low = !out && p.minStock > 0 && p.available <= p.minStock;
   const pct = (n: number) => (p.total > 0 ? (n / p.total) * 100 : 0);
@@ -69,7 +75,10 @@ export default function ProductLevelCard({ p, href, active, showStock = true, mo
             {fmt(p.available)}
             <span className="ml-1.5 text-xs font-medium text-slate-500">in the shop</span>
           </p>
-          <p className="text-xs text-slate-500">{fmt(p.total)} in all</p>
+          <div className="flex flex-col items-end gap-1">
+            {p.pack && <QtySwitch mode={mode} onChange={setMode} />}
+            <p className="text-xs text-slate-500">{fmt(p.total)} in all</p>
+          </div>
         </div>
 
         <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={segments.filter((s) => s.n > 0).map((s) => `${s.n} ${s.label}`).join(", ")}>

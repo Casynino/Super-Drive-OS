@@ -2,9 +2,10 @@ import Link from "next/link";
 import { ImageOff } from "lucide-react";
 import { StatusBadge } from "@/components/ui";
 import type { RecordStatus } from "@/generated/prisma/client";
-import { qtyText, type Pack, type UnitMode } from "@/lib/qty";
+import type { Pack } from "@/lib/qty";
+import HeroStockPanel, { type HeroStock } from "./HeroStockPanel";
 
-export type HeroStock = { available: number; reseller: number; sold: number; returned: number; damaged: number; missing: number };
+export type { HeroStock };
 
 /**
  * The top of a product page: picture, name, codes and prices, then where its pieces are (shelf, resellers, sold, returned, damaged)
@@ -23,7 +24,6 @@ export default function ProductHero({
   stock,
   pack = null,
   baseSymbol = "",
-  mode = "ctn",
 }: {
   id: string;
   name: string;
@@ -38,30 +38,10 @@ export default function ProductHero({
   /** cartons first: the biggest pack and the base unit's label */
   pack?: Pack | null;
   baseSymbol?: string;
-  mode?: UnitMode;
 }) {
-  const fmt = (n: number) => qtyText(n, pack, baseSymbol, mode);
-  const total = stock ? stock.available + stock.reseller + stock.sold + stock.damaged : 0;
+  // badges in the header do not depend on how the numbers are written
   const out = stock ? stock.available === 0 : false;
   const low = stock ? !out && minStock > 0 && stock.available <= minStock : false;
-  const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
-  const tiles = stock
-    ? [
-        { k: "In the shop", v: stock.available, tone: out ? "text-brand-red-dark" : low ? "text-yellow-700" : "text-emerald-700" },
-        { k: "With resellers", v: stock.reseller, tone: "text-blue-700" },
-        { k: "Sold", v: stock.sold, tone: "text-slate-900" },
-        { k: "Returned", v: stock.returned, tone: "text-slate-900" },
-        { k: "Damaged", v: stock.damaged, tone: stock.damaged > 0 ? "text-brand-red-dark" : "text-slate-900" },
-      ]
-    : [];
-  const segments = stock
-    ? [
-        { n: stock.available, cls: out ? "bg-brand-red" : low ? "bg-oil-400" : "bg-emerald-500", label: "in the shop" },
-        { n: stock.reseller, cls: "bg-blue-500", label: "with resellers" },
-        { n: stock.damaged, cls: "bg-brand-red", label: "damaged" },
-        { n: stock.sold, cls: "bg-slate-300", label: "sold" },
-      ]
-    : [];
 
   return (
     <section className="card mb-5 overflow-hidden">
@@ -96,26 +76,7 @@ export default function ProductHero({
         </div>
       </div>
 
-      {stock && (
-        <div className="border-t border-line px-5 pb-5 pt-4">
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-5">
-            {tiles.map((t) => (
-              <div key={t.k}>
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{t.k}</dt>
-                <dd className={`mt-0.5 text-2xl font-bold leading-tight ${t.tone}`}>{fmt(t.v).main}</dd>
-                {fmt(t.v).pieces && <dd className="text-xs text-slate-500">{fmt(t.v).pieces}</dd>}
-              </div>
-            ))}
-          </dl>
-          <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={segments.filter((s) => s.n > 0).map((s) => `${s.n} ${s.label}`).join(", ")}>
-            {segments.map((s) => (s.n > 0 ? <span key={s.label} className={s.cls} style={{ width: `${pct(s.n)}%` }} title={`${s.n} ${s.label}`} /> : null))}
-          </div>
-          <p className="mt-1.5 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
-            <span>{fmt(total).main} in all{minStock > 0 && <> · reorder when {fmt(minStock).main} or less is left</>}</span>
-            {stock.missing > 0 && <span className="text-yellow-700">{fmt(stock.missing).main} marked missing</span>}
-          </p>
-        </div>
-      )}
+      {stock && <HeroStockPanel stock={stock} pack={pack} baseSymbol={baseSymbol} minStock={minStock} />}
     </section>
   );
 }

@@ -3,9 +3,8 @@
 // Pure functions: no database, safe on the server and in the browser.
 
 export type Pack = { symbol: string; factor: number };
-/** How quantities are shown: cartons (the default) or pieces. Chosen with the CTN | PCS switch in the top bar. */
+/** How quantities are shown: cartons (the default) or pieces. Each product has its own CTN | PCS switch. */
 export type UnitMode = "ctn" | "pcs";
-export const UNIT_COOKIE = "sd-unit";
 type Loose = { symbol: string; factor: string | number | { toString(): string } };
 
 const nf = new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 });

@@ -166,6 +166,21 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
     );
   const patch = (i: number, p: Partial<CartLine>) => setCart((c) => c.map((l, idx) => (idx === i ? fit({ ...l, ...p }) : l)));
   const step = (i: number, delta: number) => setCart((c) => c.map((l, idx) => (idx === i ? fit({ ...l, quantity: String(Math.max(Number(l.quantity || 0) + delta, 0)) }) : l)));
+  // Pieces that make whole cartons count as cartons (12 PCS of a 12-piece carton become 1 CTN, at the carton price).
+  // Done when the person finishes typing or presses + / -, never while typing, so "120" is never turned into "1 CTN" half way.
+  const normalize = (i: number) =>
+    setCart((c) => {
+      const l = c[i];
+      const p = l ? products.find((x) => x.id === l.productId) : undefined;
+      if (!l || !p || l.unitId !== p.baseUnitId || l.scanned?.length) return c;
+      const pack = [...p.units].filter((u) => Number(u.factor) > 1).sort((a, b) => Number(b.factor) - Number(a.factor))[0];
+      const q = Number(l.quantity);
+      if (!pack || !(q > 0) || !Number.isInteger(q / Number(pack.factor))) return c;
+      const cartons = q / Number(pack.factor);
+      const other = c.findIndex((x, idx) => idx !== i && x.productId === l.productId && x.unitId === pack.id);
+      if (other >= 0) return c.map((x, idx) => (idx === other ? { ...x, quantity: String(Number(x.quantity || 0) + cartons) } : x)).filter((_, idx) => idx !== i);
+      return c.map((x, idx) => (idx === i ? { ...x, unitId: pack.id, quantity: String(cartons), price: "" } : x));
+    });
   const dropScanned = (i: number, token: string) => setCart((c) => c.map((l, idx) => (idx === i ? { ...l, scanned: (l.scanned ?? []).filter((x) => x.token !== token), quantity: String(Math.max(Number(l.quantity || 0) - 1, 0)) } : l)));
   const addOtherUnit = (i: number) =>
     setCart((c) => {
@@ -401,11 +416,11 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                           </p>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <div className="flex items-center gap-1">
-                              <button type="button" className="btn-secondary btn-sm px-2" onClick={() => step(i, -1)} aria-label="Decrease quantity">
+                              <button type="button" className="btn-secondary btn-sm px-2" onClick={() => { step(i, -1); normalize(i); }} aria-label="Decrease quantity">
                                 <Minus size={14} />
                               </button>
-                              <input className="input h-8 w-14 min-w-0 px-1 text-center" inputMode="decimal" value={r.l.quantity} onChange={(e) => patch(i, { quantity: e.target.value })} aria-label={`Quantity of ${r.p.name}`} />
-                              <button type="button" className="btn-secondary btn-sm px-2" onClick={() => step(i, 1)} aria-label="Increase quantity">
+                              <input className="input h-8 w-14 min-w-0 px-1 text-center" inputMode="decimal" value={r.l.quantity} onChange={(e) => patch(i, { quantity: e.target.value })} onBlur={() => normalize(i)} aria-label={`Quantity of ${r.p.name}`} />
+                              <button type="button" className="btn-secondary btn-sm px-2" onClick={() => { step(i, 1); normalize(i); }} aria-label="Increase quantity">
                                 <Plus size={14} />
                               </button>
                             </div>

@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { Package } from "lucide-react";
+import QtySwitch from "@/components/QtySwitch";
+import { packNote, qtyText, type Pack, type UnitMode } from "@/lib/qty";
 import { cn } from "@/lib/utils";
 
 export type StockCardProps = {
@@ -9,22 +14,29 @@ export type StockCardProps = {
   category: string;
   brand: string | null;
   imageV: number | null;
-  qty: string;
-  unit: string;
-  pack: string | null;
-  min: string | null;
+  /** quantities in the base unit (pieces); the card writes them as cartons or pieces */
+  qtyBase: number;
+  minBase: number | null;
+  awayBase: number | null;
+  pack: Pack | null;
+  baseSymbol: string;
   /** 0-100: how full the shelf is against 3x the minimum (the minimum sits at one third); null when no minimum is set */
   levelPct: number | null;
   status: "ok" | "low" | "out";
-  away: string | null;
   value: string | null;
   href: string | null;
 };
 
 const BAR = { ok: "bg-emerald-500", low: "bg-oil-400", out: "bg-brand-red" } as const;
 
-/** One product on the stock overview: picture, what is on the shelf, and a level bar against its minimum. */
+/**
+ * One product on the stock overview: picture, what is on the shelf, and a level bar against its minimum.
+ * Cartons are the default; the small CTN | PCS switch changes only THIS product's numbers.
+ */
 export default function StockCard(p: StockCardProps) {
+  const [mode, setMode] = useState<UnitMode>("ctn");
+  const f = (n: number) => qtyText(n, p.pack, p.baseSymbol, mode).main;
+  const min = p.minBase !== null ? f(p.minBase) : null;
   const body = (
     <div className={cn("card flex h-full flex-col overflow-hidden transition", p.href && "hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md")}>
       <div className="flex gap-4 p-4">
@@ -47,31 +59,30 @@ export default function StockCard(p: StockCardProps) {
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">On the shelf</p>
-            <p className="mt-0.5 truncate text-2xl font-bold leading-none tracking-tight text-slate-900">
-              {p.qty} <span className="text-sm font-medium text-slate-500">{p.unit}</span>
-            </p>
-            {p.pack && <p className="mt-1 text-xs text-slate-500">{p.pack}</p>}
+            <p className="mt-0.5 truncate text-2xl font-bold leading-none tracking-tight text-slate-900">{f(p.qtyBase)}</p>
+            {p.pack && <p className="mt-1 text-xs text-slate-500">{packNote(p.pack, p.baseSymbol)}</p>}
           </div>
-          {p.status === "out" ? <span className="badge-red">Out of stock</span> : p.status === "low" ? <span className="badge-yellow">Low</span> : <span className="badge-green">In stock</span>}
+          <div className="flex flex-col items-end gap-1.5">
+            {p.pack && <QtySwitch mode={mode} onChange={setMode} />}
+            {p.status === "out" ? <span className="badge-red">Out of stock</span> : p.status === "low" ? <span className="badge-yellow">Low</span> : <span className="badge-green">In stock</span>}
+          </div>
         </div>
 
         {p.levelPct !== null ? (
           <div className="mt-3">
-            <div className="relative h-2 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Stock level against a minimum of ${p.min}`}>
+            <div className="relative h-2 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Stock level against a minimum of ${min}`}>
               <div className={cn("h-full rounded-full transition-all", BAR[p.status])} style={{ width: `${Math.max(p.status === "out" ? 0 : 4, p.levelPct)}%` }} />
               <span className="absolute inset-y-0 left-1/3 w-px bg-slate-400/70" />
             </div>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Minimum {p.min}
-            </p>
+            <p className="mt-1 text-[11px] text-slate-500">Minimum {min}</p>
           </div>
         ) : (
           <p className="mt-3 text-[11px] text-slate-400">No minimum set, so no low-stock alert</p>
         )}
 
-        {(p.away || p.value) && (
+        {((p.awayBase ?? 0) > 0 || p.value) && (
           <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
-            <span>{p.away ? `${p.away} with resellers` : ""}</span>
+            <span>{(p.awayBase ?? 0) > 0 ? `${f(p.awayBase!)} with resellers` : ""}</span>
             {p.value && <span className="font-medium text-slate-700">{p.value}</span>}
           </div>
         )}

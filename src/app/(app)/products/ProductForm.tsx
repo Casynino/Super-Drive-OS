@@ -222,7 +222,7 @@ export default function ProductForm({ product, categories, brands, units, curren
             ].map((f) => (
               <Field key={f.name} label={f.label} name={f.name} hint={f.hint}>
                 <select id={f.name} name={f.name} defaultValue={v(f.name as keyof ProductFormData)} disabled={disabled} className={inputClass()}>
-                  <option value="">Carton (biggest pack)</option>
+                  <option value="">Carton (CTN), the normal way</option>
                   {baseUnit && <option value={baseUnit.id}>{baseUnit.name} ({baseUnit.symbol})</option>}
                   {packRows.map((r) => {
                     const u = units.find((x) => x.id === r.unitId);
