@@ -249,8 +249,8 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                           if (corr.isZero()) return <Difference value={c.difference.toString()} currency={currency} />;
                           return (
                             <>
-                              {net.isZero() ? <span className="font-semibold text-emerald-700">Corrected</span> : <Difference value={net.toString()} currency={currency} />}
-                              <span className="block text-xs text-slate-500">was {c.difference.lt(0) ? "short" : "extra"} {money(c.difference.abs())}</span>
+                              {net.isZero() ? <span className="font-semibold text-emerald-700">OK</span> : <Difference value={net.toString()} currency={currency} />}
+                              <span className="block text-xs text-slate-500">was {c.difference.lt(0) ? "−" : "+"} {money(c.difference.abs())}</span>
                             </>
                           );
                         })()}

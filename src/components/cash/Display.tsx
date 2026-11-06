@@ -17,12 +17,12 @@ export function ClosingStatusBadge({ difference }: { status?: ClosingStatus; dif
   return n < 0 ? <span className="badge-red">Short</span> : <span className="badge-yellow">Extra</span>;
 }
 
-/** A signed difference in words and colour: shortage (red), surplus (amber), exact (green). */
+/** A signed difference, kept short: OK (green), − amount for a shortage (red), + amount for a surplus (amber). */
 export function Difference({ value, currency, className }: { value: string; currency: CurrencyConfig; className?: string }) {
   const n = Number(value);
   return (
     <span className={cn("font-semibold tabular-nums", n === 0 ? "text-emerald-700" : n < 0 ? "text-brand-red-dark" : "text-yellow-800", className)}>
-      {n === 0 ? "No difference" : `${n < 0 ? "Short " : "Extra "}${formatMoney(Math.abs(n), currency)}`}
+      {n === 0 ? "OK" : `${n < 0 ? "−" : "+"} ${formatMoney(Math.abs(n), currency)}`}
     </span>
   );
 }
