@@ -295,6 +295,24 @@ export async function moveStockTracked(tx: Tx, m: MoveInput, ctx: ItemCtx = {}):
   return { ...r, itemIds };
 }
 
+// ───────────── Damaged pieces thrown away ─────────────
+
+/**
+ * The owner decided that pieces which arrived damaged cannot be sold: they are marked DISPOSED for good.
+ * No stock changes (damaged pieces were already taken off the shelf count when they were counted in); this only records what happened to the pieces.
+ * Returns how many pieces were marked (products that are not tracked piece by piece have none).
+ */
+export async function disposeDamagedItems(tx: Tx, i: { shipmentId: string; productId: string; qty: Dec } & Refs): Promise<number> {
+  if (!(await isTracked(tx, i.productId))) return 0;
+  const n = whole(i.qty);
+  const rows = await tx.$queryRaw<Row[]>`
+    SELECT "id", "status", "locationId" FROM "InventoryItem"
+     WHERE "shipmentId" = ${i.shipmentId} AND "productId" = ${i.productId} AND "status" = 'DAMAGED'
+     ORDER BY "itemNo" DESC LIMIT ${n} FOR UPDATE`;
+  if (rows.length) await transition(tx, rows, { kind: "DISPOSED", toStatus: "DISPOSED", auto: false, referenceType: i.referenceType, referenceId: i.referenceId, referenceNo: i.referenceNo, note: i.note, userId: i.userId });
+  return rows.length;
+}
+
 // ───────────── Looking items up ─────────────
 
 /** Turns scanned codes into item ids (same order). An unknown or mistyped code is a plain ItemError. */

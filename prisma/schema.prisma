@@ -62,54 +62,55 @@ model RolePermission {
 }
 
 model User {
-  id                  String              @id @default(cuid())
-  username            String              @unique // stored lowercase
+  id                  String                  @id @default(cuid())
+  username            String                  @unique // stored lowercase
   name                String
-  email               String?             @unique
+  email               String?                 @unique
   phone               String?
   passwordHash        String
   roleId              String
-  role                Role                @relation(fields: [roleId], references: [id])
-  status              RecordStatus        @default(ACTIVE)
-  mustChangePassword  Boolean             @default(false)
-  failedLoginCount    Int                 @default(0)
+  role                Role                    @relation(fields: [roleId], references: [id])
+  status              RecordStatus            @default(ACTIVE)
+  mustChangePassword  Boolean                 @default(false)
+  failedLoginCount    Int                     @default(0)
   lockedUntil         DateTime?
   lastLoginAt         DateTime?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
   sessions            Session[]
   auditLogs           AuditLog[]
   stockMovements      StockMovement[]
   stockReceipts       StockReceipt[]
   stockTransfers      StockTransfer[]
   stockAdjustments    StockAdjustment[]
-  sales               Sale[]              @relation("SaleSalesperson")
-  creditApprovals     Sale[]              @relation("SaleCreditApprover")
+  sales               Sale[]                  @relation("SaleSalesperson")
+  creditApprovals     Sale[]                  @relation("SaleCreditApprover")
   paymentsReceived    Payment[]
   customersCreated    Customer[]
   creditApplications  CreditApplication[]
   notifications       Notification[]
-  shipmentsCreated    Shipment[]          @relation("ShipmentCreator")
-  shipmentsResolved   Shipment[]          @relation("ShipmentResolver")
-  shipmentsClosed     Shipment[]          @relation("ShipmentCloser")
-  shipmentsArrived    Shipment[]          @relation("ShipmentArriver")
-  receivingsStarted   ShipmentReceiving[] @relation("ReceivingStarter")
-  receivingsConfirmed ShipmentReceiving[] @relation("ReceivingConfirmer")
-  reversalsRequested  SaleReversal[]      @relation("ReversalRequester")
-  reversalsDecided    SaleReversal[]      @relation("ReversalDecider")
+  shipmentsCreated    Shipment[]              @relation("ShipmentCreator")
+  shipmentsResolved   Shipment[]              @relation("ShipmentResolver")
+  shipmentsClosed     Shipment[]              @relation("ShipmentCloser")
+  shipmentsArrived    Shipment[]              @relation("ShipmentArriver")
+  receivingsStarted   ShipmentReceiving[]     @relation("ReceivingStarter")
+  receivingsConfirmed ShipmentReceiving[]     @relation("ReceivingConfirmer")
+  reversalsRequested  SaleReversal[]          @relation("ReversalRequester")
+  reversalsDecided    SaleReversal[]          @relation("ReversalDecider")
   cashTransactions    CashTransaction[]
-  expensesRequested   Expense[]           @relation("ExpenseRequester")
-  expensesDecided     Expense[]           @relation("ExpenseDecider")
-  expensesReversed    Expense[]           @relation("ExpenseReverser")
+  expensesRequested   Expense[]               @relation("ExpenseRequester")
+  expensesDecided     Expense[]               @relation("ExpenseDecider")
+  expensesReversed    Expense[]               @relation("ExpenseReverser")
   bankDeposits        BankDeposit[]
   itemMovements       ItemMovement[]
-  closingsSubmitted   DailyClosing[]      @relation("ClosingSubmitter")
-  closingsReviewed    DailyClosing[]      @relation("ClosingReviewer")
+  closingsSubmitted   DailyClosing[]          @relation("ClosingSubmitter")
+  closingsReviewed    DailyClosing[]          @relation("ClosingReviewer")
   attachments         Attachment[]
   resellersCreated    Reseller[]
   resellerIssues      ResellerIssue[]
   resellerReturns     ResellerReturn[]
   supplierPayments    SupplierPayment[]
+  issuesDecided       ShipmentIssueDecision[] @relation("IssueDecider")
 
   @@index([roleId])
 }
@@ -248,6 +249,7 @@ model Product {
   receivingItems      ShipmentReceivingItem[]
   priceHistory        ProductPriceHistory[]
   items               InventoryItem[]
+  issueDecisions      ShipmentIssueDecision[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -385,24 +387,25 @@ model StockMovement {
 }
 
 model StockReceipt {
-  id              String             @id @default(cuid())
-  receiptNo       String             @unique
-  type            ReceiptType        @default(PURCHASE)
+  id              String                  @id @default(cuid())
+  receiptNo       String                  @unique
+  type            ReceiptType             @default(PURCHASE)
   supplierId      String?
-  supplier        Supplier?          @relation(fields: [supplierId], references: [id])
+  supplier        Supplier?               @relation(fields: [supplierId], references: [id])
   locationId      String
-  location        Location           @relation(fields: [locationId], references: [id])
+  location        Location                @relation(fields: [locationId], references: [id])
   supplierInvoice String?
-  receivedDate    DateTime           @db.Date
+  receivedDate    DateTime                @db.Date
   notes           String?
-  totalCost       Decimal            @db.Decimal(14, 2)
-  submissionKey   String             @unique // blocks duplicate form submissions
+  totalCost       Decimal                 @db.Decimal(14, 2)
+  submissionKey   String                  @unique // blocks duplicate form submissions
   receivedById    String
-  receivedBy      User               @relation(fields: [receivedById], references: [id])
-  createdAt       DateTime           @default(now())
+  receivedBy      User                    @relation(fields: [receivedById], references: [id])
+  createdAt       DateTime                @default(now())
   items           StockReceiptItem[]
   inventoryItems  InventoryItem[]
   receiving       ShipmentReceiving?
+  issueDecisions  ShipmentIssueDecision[]
 
   @@index([createdAt])
   @@index([supplierId])
@@ -809,36 +812,38 @@ enum ReceivingStatus {
 }
 
 model Shipment {
-  id               String              @id @default(cuid())
-  shipmentNo       String              @unique
-  supplierId       String?
-  supplier         Supplier?           @relation(fields: [supplierId], references: [id])
-  reference        String? // tracking number / container / supplier invoice (older shipments; the form now asks for the cargo company)
-  cargoName        String? // the cargo company that brings the goods
-  expectedDate     DateTime?           @db.Date
-  locationId       String
-  location         Location            @relation(fields: [locationId], references: [id])
-  notes            String?
-  status           ShipmentStatus      @default(EXPECTED)
-  issue            ShipmentIssue       @default(NONE)
-  resolutionNote   String?
-  resolvedById     String?
-  resolvedBy       User?               @relation("ShipmentResolver", fields: [resolvedById], references: [id])
-  resolvedAt       DateTime?
-  arrivedAt        DateTime? // the shop pressed "Mark as arrived": counting can only start after this
-  arrivedById      String?
-  arrivedBy        User?               @relation("ShipmentArriver", fields: [arrivedById], references: [id])
-  closedAt         DateTime? // set when the shop says nothing more is coming
-  closedById       String?
-  closedBy         User?               @relation("ShipmentCloser", fields: [closedById], references: [id])
-  createdById      String
-  createdBy        User                @relation("ShipmentCreator", fields: [createdById], references: [id])
-  submissionKey    String              @unique
-  createdAt        DateTime            @default(now())
-  items            ShipmentItem[]
-  receivings       ShipmentReceiving[]
-  supplierPayments SupplierPayment[]
-  inventoryItems   InventoryItem[]
+  id                String                  @id @default(cuid())
+  shipmentNo        String                  @unique
+  supplierId        String?
+  supplier          Supplier?               @relation(fields: [supplierId], references: [id])
+  reference         String? // tracking number / container / supplier invoice (older shipments; the form now asks for the cargo company)
+  cargoName         String? // the cargo company that brings the goods
+  expectedDate      DateTime?               @db.Date
+  locationId        String
+  location          Location                @relation(fields: [locationId], references: [id])
+  notes             String?
+  status            ShipmentStatus          @default(EXPECTED)
+  issue             ShipmentIssue           @default(NONE)
+  resolutionNote    String?
+  resolvedById      String?
+  resolvedBy        User?                   @relation("ShipmentResolver", fields: [resolvedById], references: [id])
+  resolvedAt        DateTime?
+  arrivedAt         DateTime? // the shop pressed "Mark as arrived": counting can only start after this
+  arrivedById       String?
+  arrivedBy         User?                   @relation("ShipmentArriver", fields: [arrivedById], references: [id])
+  closedAt          DateTime? // set when the shop says nothing more is coming
+  closedById        String?
+  closedBy          User?                   @relation("ShipmentCloser", fields: [closedById], references: [id])
+  createdById       String
+  createdBy         User                    @relation("ShipmentCreator", fields: [createdById], references: [id])
+  submissionKey     String                  @unique
+  createdAt         DateTime                @default(now())
+  items             ShipmentItem[]
+  receivings        ShipmentReceiving[]
+  supplierPayments  SupplierPayment[]
+  inventoryItems    InventoryItem[]
+  issueDecisions    ShipmentIssueDecision[] @relation("IssueShipment")
+  issueReplacements ShipmentIssueDecision[] @relation("IssueMovedTo")
 
   @@index([status, createdAt])
   @@index([issue])
@@ -863,9 +868,49 @@ model ShipmentItem {
   wholesalePrice Decimal?                @db.Decimal(14, 2) // same, wholesale
   priceAppliedAt DateTime? // the new prices go live when this line's stock is first counted in
   receivingItems ShipmentReceivingItem[]
+  issueDecisions ShipmentIssueDecision[]
 
   @@unique([shipmentId, productId])
   @@index([productId])
+}
+
+// What the owner decided about a problem product of a received shipment (missing, damaged, extra). Append-only: a decision is never edited.
+enum IssueKind {
+  MISSING
+  DAMAGED
+  EXTRA
+}
+
+enum IssueAction {
+  FOUND // missing pieces turned up: they go into stock now (a normal receipt, tied to the shipment)
+  NOT_DELIVERED // the supplier never delivered them: a shortage (optionally carried to a new order); no stock is added
+  WRITE_OFF // damaged pieces cannot be sold: they are thrown away for good
+  KEEP // extra pieces are accepted
+}
+
+model ShipmentIssueDecision {
+  id                String        @id @default(cuid())
+  shipmentId        String
+  shipment          Shipment      @relation("IssueShipment", fields: [shipmentId], references: [id])
+  shipmentItemId    String
+  shipmentItem      ShipmentItem  @relation(fields: [shipmentItemId], references: [id])
+  productId         String
+  product           Product       @relation(fields: [productId], references: [id])
+  kind              IssueKind
+  action            IssueAction
+  quantity          Decimal       @db.Decimal(14, 3)
+  note              String?
+  stockReceiptId    String? // set when pieces were found and received
+  stockReceipt      StockReceipt? @relation(fields: [stockReceiptId], references: [id])
+  movedToShipmentId String? // set when a shortage was carried to a new purchase order
+  movedToShipment   Shipment?     @relation("IssueMovedTo", fields: [movedToShipmentId], references: [id])
+  submissionKey     String        @unique // blocks a double submit
+  decidedById       String
+  decidedBy         User          @relation("IssueDecider", fields: [decidedById], references: [id])
+  decidedAt         DateTime      @default(now())
+
+  @@index([shipmentId])
+  @@index([shipmentItemId])
 }
 
 model ShipmentReceiving {

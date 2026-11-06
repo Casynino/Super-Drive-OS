@@ -5,6 +5,9 @@ import { Alert, PageHeader } from "@/components/ui";
 import { CancelShipmentForm, ResolveIssueForm } from "@/components/shipments/IssueForms";
 import MarkArrivedButton from "@/components/shipments/MarkArrivedButton";
 import ShipmentSteps from "@/components/shipments/ShipmentSteps";
+import IssueRecords from "@/components/shipments/IssueRecords";
+import { loadIssueRecords } from "@/lib/shipments/issues";
+import { toIssueViews } from "@/lib/shipments/issue-view";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { Prisma } from "@/generated/prisma/client";
 import { can, canAny } from "@/lib/auth/can";
@@ -15,7 +18,7 @@ import { canCount, canMarkArrived, shipmentPhase } from "@/lib/shipments/phase";
 import { getCurrency } from "@/lib/settings";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { Banknote, Coins, TrendingUp, Truck } from "lucide-react";
-import { cancelShipmentAction, markArrivedAction, resolveIssueAction } from "../actions";
+import { cancelShipmentAction, decideIssueAction, markArrivedAction, resolveIssueAction } from "../actions";
 import { PhaseBadge } from "../badges";
 
 export const metadata = { title: "Purchase order" };
@@ -54,6 +57,8 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
   });
   if (!shipment) notFound();
 
+  // the problem products of this order (missing, damaged, extra) with what was decided about each; never includes costs
+  const issueViews = toIssueViews(await loadIssueRecords(db, { shipmentIds: [id] }));
   const itemCount = await db.inventoryItem.count({ where: { shipmentId: id } }); // pieces that already have their own number and QR
   const sums = await db.shipmentReceivingItem.groupBy({ by: ["productId"], where: { receiving: { shipmentId: id, status: "CONFIRMED" } }, _sum: { goodQty: true, damagedQty: true } });
   const counted = new Map(sums.map((s) => [s.productId, { good: s._sum.goodQty ?? new D(0), damaged: s._sum.damagedQty ?? new D(0) }]));
@@ -139,7 +144,35 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
         </div>
       )}
 
-      {shipment.issue === "OPEN" && (
+      {issueViews.length > 0 && (
+        <section className={`card mb-5 overflow-hidden ${shipment.issue === "OPEN" ? "border-brand-red/40" : ""}`} aria-label="Investigation">
+          <div className="flex items-start gap-3 border-b border-line px-5 py-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-red-soft text-brand-red-dark">
+              <AlertTriangle size={20} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base font-semibold text-slate-900">{shipment.issue === "OPEN" ? "Under investigation" : "Investigation"}</h2>
+              <p className="text-sm text-slate-600">
+                {shipment.issue === "OPEN"
+                  ? manage
+                    ? "These pieces are not on the shelf. Decide what happens to each one. You can decide part of a quantity now and the rest later."
+                    : "These pieces are not on the shelf. The owner has been told and will decide what happens to them."
+                  : "Everything on this order was looked into. The history of each product is below."}
+              </p>
+            </div>
+          </div>
+          <IssueRecords records={issueViews} canAct={manage} closed={shipment.issue === "RESOLVED" && issueViews.some((r) => r.open > 0)} action={decideIssueAction} />
+          {manage && shipment.issue === "OPEN" && (
+            <details className="border-t border-line px-5 py-3">
+              <summary className="cursor-pointer select-none text-sm font-medium text-slate-600 hover:text-slate-900">Close the whole investigation with one note instead</summary>
+              <div className="mt-3">
+                <ResolveIssueForm shipmentId={id} action={resolveIssueAction} />
+              </div>
+            </details>
+          )}
+        </section>
+      )}
+      {shipment.issue === "OPEN" && issueViews.length === 0 && (
         <div className="card card-pad mb-5 border-brand-red/40 bg-brand-red-soft/40">
           <div className="flex items-start gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-red-soft text-brand-red-dark">

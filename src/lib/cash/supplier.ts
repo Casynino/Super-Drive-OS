@@ -41,15 +41,16 @@ export async function paySupplier(
 
 export type SupplierBalance = { id: string; name: string; purchases: number; paid: number; owed: number };
 
-/** What each supplier has supplied (shipment costs + purchase receipts not already counted through a shipment), what was paid, and the balance. */
+/** What each supplier has supplied (shipment costs + purchase receipts not already counted through a shipment, minus shortages the owner confirmed were never delivered), what was paid, and the balance. */
 export async function getSupplierBalances(db: Pick<Db, "$queryRaw">): Promise<SupplierBalance[]> {
-  const rows = await db.$queryRaw<{ id: string; name: string; shipments: Prisma.Decimal; receipts: Prisma.Decimal; paid: Prisma.Decimal }[]>`
+  const rows = await db.$queryRaw<{ id: string; name: string; shipments: Prisma.Decimal; receipts: Prisma.Decimal; shortages: Prisma.Decimal; paid: Prisma.Decimal }[]>`
     SELECT s."id", s."name",
       COALESCE((SELECT SUM(i."lineCost") FROM "ShipmentItem" i JOIN "Shipment" sh ON sh."id" = i."shipmentId" WHERE sh."supplierId" = s."id" AND sh."status" <> 'CANCELLED' AND i."unexpected" = false), 0) AS shipments,
-      COALESCE((SELECT SUM(r."totalCost") FROM "StockReceipt" r WHERE r."supplierId" = s."id" AND r."type" = 'PURCHASE' AND NOT EXISTS (SELECT 1 FROM "ShipmentReceiving" sr WHERE sr."stockReceiptId" = r."id")), 0) AS receipts,
+      COALESCE((SELECT SUM(r."totalCost") FROM "StockReceipt" r WHERE r."supplierId" = s."id" AND r."type" = 'PURCHASE' AND NOT EXISTS (SELECT 1 FROM "ShipmentReceiving" sr WHERE sr."stockReceiptId" = r."id") AND NOT EXISTS (SELECT 1 FROM "ShipmentIssueDecision" d WHERE d."stockReceiptId" = r."id")), 0) AS receipts,
+      COALESCE((SELECT SUM(ROUND(d."quantity" * i."unitCost", 2)) FROM "ShipmentIssueDecision" d JOIN "ShipmentItem" i ON i."id" = d."shipmentItemId" JOIN "Shipment" sh ON sh."id" = d."shipmentId" WHERE sh."supplierId" = s."id" AND sh."status" <> 'CANCELLED' AND d."action" = 'NOT_DELIVERED' AND i."unitCost" IS NOT NULL), 0) AS shortages,
       COALESCE((SELECT SUM(p."amount") FROM "SupplierPayment" p WHERE p."supplierId" = s."id"), 0) AS paid
       FROM "Supplier" s ORDER BY s."name"`;
-  return rows.map((r) => ({ id: r.id, name: r.name, purchases: n(r.shipments) + n(r.receipts), paid: n(r.paid), owed: n(r.shipments) + n(r.receipts) - n(r.paid) }));
+  return rows.map((r) => ({ id: r.id, name: r.name, purchases: n(r.shipments) + n(r.receipts) - n(r.shortages), paid: n(r.paid), owed: n(r.shipments) + n(r.receipts) - n(r.shortages) - n(r.paid) }));
 }
 
 void D;

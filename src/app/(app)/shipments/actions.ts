@@ -11,6 +11,7 @@ import { fail, formString, guarded, isUniqueViolation, type ActionState } from "
 import { notifyPermission } from "@/lib/notifications";
 import { generateSku, nextBarcode, uniqueSku } from "@/lib/product-codes";
 import { ImageError, processProductImage } from "@/lib/product-images";
+import { decideIssue } from "@/lib/shipments/issues";
 import { ShipmentError, cancelShipment, confirmSession, createShipment, markArrived, resolveIssue, saveDraft } from "@/lib/shipments/engine";
 import { getCurrency } from "@/lib/settings";
 import { parseMoney } from "@/lib/money";
@@ -132,6 +133,60 @@ export async function resolveIssueAction(_prev: ActionState, fd: FormData): Prom
     revalidatePath("/shipments");
     revalidatePath(`/shipments/${shipmentId}`);
     return { ok: true, message: "Investigation closed." };
+  });
+}
+
+// ───────────── Owner: decide about one problem product ─────────────
+
+const decideSchema = z.object({
+  shipmentId: z.string().min(1),
+  shipmentItemId: z.string().min(1),
+  kind: z.enum(["MISSING", "DAMAGED", "EXTRA"]),
+  action: z.enum(["FOUND", "NOT_DELIVERED", "WRITE_OFF", "KEEP"]),
+  quantity: z.string().max(24),
+  note: z.string().trim().max(500),
+  newOrder: z.boolean(),
+  submissionKey: z.string().min(16).max(80),
+});
+
+export async function decideIssueAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  // Returning goods to stock, writing them off and crediting the supplier are owner decisions: checked here, never only in the screen.
+  return guarded("shipments.manage", async (user) => {
+    const parsed = decideSchema.safeParse({
+      shipmentId: formString(fd, "shipmentId"),
+      shipmentItemId: formString(fd, "shipmentItemId"),
+      kind: formString(fd, "kind"),
+      action: formString(fd, "action"),
+      quantity: formString(fd, "quantity"),
+      note: formString(fd, "note"),
+      newOrder: formString(fd, "newOrder") === "on",
+      submissionKey: formString(fd, "submissionKey"),
+    });
+    if (!parsed.success) return fail(BAD);
+    const p = parsed.data;
+    const currency = await getCurrency();
+    try {
+      const r = await db.$transaction(
+        async (tx) => {
+          const res = await decideIssue(tx, { ...p, note: p.note || null, user, currencyDecimals: currency.decimals });
+          if (!res.repeated) {
+            const sh = await tx.shipment.findUniqueOrThrow({ where: { id: p.shipmentId }, select: { shipmentNo: true } });
+            await writeAudit(tx, { user, action: "shipment.issue_decision", entityType: "Shipment", entityId: p.shipmentId, reference: sh.shipmentNo, reason: p.note || undefined, after: { kind: p.kind, action: p.action, quantity: p.quantity, productId: res.decision.productId, receipt: res.receiptNo, newOrder: res.newOrderNo, closed: res.closed } });
+          }
+          return res;
+        },
+        { timeout: 30000, maxWait: 15000 },
+      );
+      revalidatePath("/shipments");
+      revalidatePath(`/shipments/${p.shipmentId}`);
+      revalidatePath("/inventory");
+      revalidatePath("/products");
+      const message = p.action === "FOUND" ? `Back in stock${r.receiptNo ? ` (receipt ${r.receiptNo})` : ""}.` : p.action === "NOT_DELIVERED" ? `Shortage recorded${r.newOrderNo ? ` and added to the new order ${r.newOrderNo}` : ""}.` : p.action === "WRITE_OFF" ? "Written off." : "Kept in stock.";
+      return { ok: true, message: r.closed ? `${message} Nothing is left to decide, so the investigation is closed.` : message };
+    } catch (e) {
+      if (e instanceof ShipmentError) return fail(e.message, e.fieldErrors);
+      throw e;
+    }
   });
 }
 

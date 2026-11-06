@@ -4,6 +4,9 @@ import { ClipboardCheck, PackageCheck, PackageOpen, Plus, Search as SearchIcon, 
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
 import ReceiptsTable from "@/components/inventory/ReceiptsTable";
+import IssueRecords from "@/components/shipments/IssueRecords";
+import { loadIssueRecords } from "@/lib/shipments/issues";
+import { toIssueViews } from "@/lib/shipments/issue-view";
 import MarkArrivedButton from "@/components/shipments/MarkArrivedButton";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -13,7 +16,7 @@ import { formatMoney } from "@/lib/money";
 import { canCount, canMarkArrived, shipmentPhase, type ShipmentPhase } from "@/lib/shipments/phase";
 import { getCurrency } from "@/lib/settings";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
-import { markArrivedAction } from "./actions";
+import { decideIssueAction, markArrivedAction } from "./actions";
 import { PhaseBadge } from "./badges";
 
 export const metadata = { title: "Purchase orders" };
@@ -68,6 +71,8 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   const fallback: PhaseTab = manage && counts.investigation > 0 ? "investigation" : receive && counts.check > 0 ? "check" : counts.way > 0 ? "way" : counts.check > 0 ? "check" : counts.investigation > 0 ? "investigation" : "history";
   const tab: Tab = wantDeliveries ? "deliveries" : sp.tab && sp.tab in TAB_PHASES ? (sp.tab as PhaseTab) : fallback;
   const list = tab === "deliveries" ? [] : inTab(tab);
+  // Investigation shows the problem products themselves (not just the orders), each with its choices
+  const issueViews = tab === "investigation" && list.length > 0 ? toIssueViews(await loadIssueRecords(db, { shipmentIds: list.map((r) => r.s.id) })) : [];
 
   const units = (s: (typeof shipments)[number]) => s.items.filter((i) => !i.unexpected).reduce((sum, i) => sum + Number(i.expectedQty), 0);
   const productCount = (s: (typeof shipments)[number]) => s.items.filter((i) => !i.unexpected).length;
@@ -180,6 +185,40 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
             showCost={showCost}
           />
         </section>
+      ) : tab === "investigation" && list.length > 0 ? (
+        <div className="space-y-4">
+          {list.map((r) => {
+            const s = r.s;
+            const mine = issueViews.filter((v) => v.shipmentId === s.id);
+            const open = mine.filter((v) => v.open > 0).length;
+            return (
+              <section key={s.id} className="card overflow-hidden" aria-label={`Investigation ${s.shipmentNo}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+                  <div>
+                    <Link href={`/shipments/${s.id}`} className="font-semibold text-navy-700 hover:underline">
+                      {s.shipmentNo}
+                    </Link>
+                    <span className="ml-2 text-sm text-slate-500">
+                      {[s.supplier?.name, s.cargoName ?? s.reference].filter(Boolean).join(" · ")}
+                      {s.arrivedAt ? ` · arrived ${formatDateTime(s.arrivedAt)}` : ""}
+                    </span>
+                  </div>
+                  <span className="badge-red">{open > 0 ? `${open} product${open === 1 ? "" : "s"} to decide` : "Open"}</span>
+                </div>
+                {mine.length > 0 ? (
+                  <IssueRecords records={mine} canAct={manage} action={decideIssueAction} />
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-slate-600">
+                    <span>This order has a problem on record. Open it to see the details.</span>
+                    <Link href={`/shipments/${s.id}`} className="btn-primary btn-sm">
+                      Open order
+                    </Link>
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
       ) : (
       <section className="card overflow-hidden">
         {list.length === 0 ? (
