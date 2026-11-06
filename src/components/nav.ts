@@ -87,7 +87,7 @@ export const NAV: NavGroup[] = [
     label: "Money",
     icon: Wallet,
     items: [
-      { label: "Payments", href: "/payments", icon: Wallet, permissions: ["payments.view"], ready: true },
+      { label: "Income", href: "/payments", icon: Wallet, permissions: ["payments.view"], ready: true },
       { label: "Expenses", href: "/expenses", icon: ReceiptText, permissions: ["expenses.view", "expenses.create"], ready: true },
       { label: "Accounts", href: "/cash", icon: Landmark, permissions: ["cash.view"], ready: true },
       { label: "Deposits", href: "/deposits", icon: Banknote, permissions: ["deposits.record", "cash.view"], ready: true },

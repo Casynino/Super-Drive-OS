@@ -5,7 +5,7 @@ import { ACCOUNT_NAME } from "@/lib/cash/ledger";
 import { cn } from "@/lib/utils";
 
 export function ExpenseStatusBadge({ status }: { status: ExpenseStatus }) {
-  const map = { PENDING: ["badge-yellow", "Waiting for approval"], APPROVED: ["badge-green", "Paid"], REJECTED: ["badge-red", "Rejected"], REVERSED: ["badge-gray", "Reversed"] } as const;
+  const map = { PENDING: ["badge-yellow", "Waiting for owner's OK"], APPROVED: ["badge-green", "Paid"], REJECTED: ["badge-red", "Rejected"], REVERSED: ["badge-gray", "Reversed"] } as const;
   const [cls, label] = map[status];
   return <span className={cls}>{label}</span>;
 }
