@@ -69,7 +69,7 @@ export const NAV: NavGroup[] = [
     label: "Stock",
     icon: Boxes,
     items: [
-      { label: "Stock Overview", href: "/inventory", icon: Boxes, permissions: ["inventory.view"], ready: true },
+      { label: "Overview", href: "/inventory", icon: Boxes, permissions: ["inventory.view"], ready: true },
       { label: "Purchase Orders", href: "/shipments", icon: Truck, permissions: ["shipments.manage", "shipments.receive"], ready: true, badge: "incoming" },
       { label: "Scan", href: "/scan", icon: ScanBarcode, permissions: ["inventory.view", "sales.pos"], ready: true },
       { label: "Items", href: "/items", icon: QrCode, permissions: ["inventory.view"], ready: true },
