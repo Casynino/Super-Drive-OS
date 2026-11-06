@@ -78,16 +78,20 @@ export function ManualCashForm({ action, submissionKey, openingDone, accounts }:
             ))}
           </select>
         </Field>
-        <Field label="Account" name="accountId" id={id("account")} error={fe.accountId}>
-          <select id={id("account")} name="accountId" value={accountId} onChange={(e) => setAccountId(e.target.value)} className={inputClass(fe.accountId)}>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-                {a.accountNumber ? ` · ${a.accountNumber}` : ""}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {accounts.length === 1 ? (
+          <input type="hidden" name="accountId" value={accounts[0]!.id} />
+        ) : (
+          <Field label="Account" name="accountId" id={id("account")} error={fe.accountId}>
+            <select id={id("account")} name="accountId" value={accountId} onChange={(e) => setAccountId(e.target.value)} className={inputClass(fe.accountId)}>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                  {a.accountNumber ? ` · ${a.accountNumber}` : ""}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label="Amount" name="amount" id={id("amount")} error={fe.amount} required>
           <input id={id("amount")} name="amount" inputMode="numeric" autoComplete="off" defaultValue={v.amount ?? ""} placeholder="0" className={`${inputClass(fe.amount)} font-semibold`} />
         </Field>

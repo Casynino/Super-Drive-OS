@@ -46,6 +46,6 @@ export async function manualCashAction(_prev: ActionState, fd: FormData): Promis
       throw e;
     }
   });
-  if (result.ok) redirect("/cash?done=1");
+  if (result.ok) redirect(`/cash/${formString(fd, "accountId")}?done=1`);
   return result;
 }
