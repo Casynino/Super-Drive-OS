@@ -31,3 +31,15 @@ export function cleanPhone(raw: string) {
   return d.length >= 8 && d.length <= 15 ? d : null;
 }
 export const maskPhone = (p: string) => (p.length > 6 ? `${p.slice(0, 4)}…${p.slice(-3)}` : "…");
+
+export const shiftDay = (ymd: string, days: number) => new Date(new Date(`${ymd}T12:00:00Z`).getTime() + days * 86_400_000).toISOString().slice(0, 10);
+
+/** Sunday report day = a week (Mon-Sun); last day of a month = that month. */
+export function periodsEndingOn(day: string): { kind: "WEEKLY" | "MONTHLY"; from: string; to: string }[] {
+  const out: { kind: "WEEKLY" | "MONTHLY"; from: string; to: string }[] = [];
+  const d = new Date(`${day}T12:00:00Z`);
+  if (d.getUTCDay() === 0) out.push({ kind: "WEEKLY", from: shiftDay(day, -6), to: day });
+  if (shiftDay(day, 1).slice(8) === "01") out.push({ kind: "MONTHLY", from: `${day.slice(0, 8)}01`, to: day });
+  return out;
+}
+

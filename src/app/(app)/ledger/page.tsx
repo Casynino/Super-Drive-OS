@@ -1,9 +1,12 @@
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, ScrollText, Search } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, ScrollText, Search, TrendingUp } from "lucide-react";
+import KpiCard from "@/components/dashboard/KpiCard";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { Prisma, type CashTxType } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
+import { getMoneySummary } from "@/lib/cash/summary";
+import { getProfit } from "@/lib/reports/period";
 import { TX_LABEL, defaultLocationId, listAccounts } from "@/lib/cash/ledger";
 import { todayYmd } from "@/lib/dashboard/range";
 import { db } from "@/lib/db";
@@ -11,7 +14,7 @@ import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Ledger" };
+export const metadata = { title: "The Ledger" };
 
 const PAGE_SIZE = 40;
 const TZ = "Africa/Dar_es_Salaam";
@@ -131,6 +134,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
     : [];
   const perDay = new Map(dayTotals.map((d) => [d.day, d]));
 
+  const seeProfit = can(user, "dashboard.financials") || can(user, "reports.financial");
+  const profit = seeProfit ? await getProfit(db, (await getMoneySummary(db, locationId, { from: isDate(sp.from) ? sp.from : undefined, to: isDate(sp.to) ? sp.to : undefined })).expenses, isDate(sp.from) ? sp.from : undefined, isDate(sp.to) ? sp.to : undefined) : null;
   const total = Number(sums[0]?.n ?? 0);
   const moneyIn = dec(sums[0]?.inn);
   const moneyOut = dec(sums[0]?.out);
@@ -154,23 +159,41 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="General ledger" description="Income and expenses, one line each: what came in, what went out, in which account and who recorded it. Choose a day, a week or a month. Nothing here can be edited: a mistake is put right with a new entry." />
+      <PageHeader title="The Ledger" description="Money in and out, one line each." />
 
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        <Link href="/ledger" className={cn("rounded-full border px-3.5 py-1.5 text-sm font-medium transition", !sp.from && !sp.to ? "border-navy-700 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900")}>
-          All time
-        </Link>
-        {periods.map((p) => (
-          <Link key={p.label} href={link({ from: p.from, to: p.to, page: undefined })} className={cn("rounded-full border px-3.5 py-1.5 text-sm font-medium transition", activePeriod === p ? "border-navy-700 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900")}>
-            {p.label}
-          </Link>
-        ))}
+      <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
+        <KpiCard icon={ArrowDownLeft} tone="green" label="Money in" value={money(moneyIn)} hint="Payments received at sales and on debts" href={link({ dir: dir === "in" ? undefined : "in", page: undefined })} active={dir === "in"} />
+        <KpiCard icon={ArrowUpRight} tone="red" label="Money out" value={money(moneyOut)} badge={moneyIn.gt(0) ? `${moneyOut.div(moneyIn).mul(100).toFixed(0)}% of money in` : undefined} hint="Expenses, suppliers, refunds and owner withdrawals" href={link({ dir: dir === "out" ? undefined : "out", page: undefined })} active={dir === "out"} />
+        {profit && <KpiCard icon={TrendingUp} tone={profit.net.lt(0) ? "red" : "green"} label="Profit" value={money(profit.net)} badge={`${profit.marginPct.toFixed(1)}% of sales`} hint={`Sales profit ${money(profit.gross)} − expenses ${money(profit.gross.minus(profit.net))}`} />}
       </div>
 
-      <form method="get" action="/ledger" className="card card-pad mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <div className="relative sm:col-span-2 lg:col-span-6">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <nav className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="In or out">
+          {([[undefined, "All"], ["in", "Money in"], ["out", "Money out"]] as const).map(([k, label]) => (
+            <Link key={label} href={link({ dir: k, page: undefined })} aria-current={dir === k ? "page" : undefined} className={cn("inline-flex shrink-0 items-center rounded-full border px-3.5 py-1.5 text-sm font-medium transition", dir === k ? "border-navy-700 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900")}>
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <nav className="-mx-1 flex flex-wrap gap-1.5 px-1 pb-1" aria-label="Period">
+          <Link href={link({ from: undefined, to: undefined, page: undefined })} aria-current={!sp.from && !sp.to ? "page" : undefined} className={cn("inline-flex shrink-0 items-center rounded-full border px-3.5 py-1.5 text-sm font-medium transition", !sp.from && !sp.to ? "border-navy-700 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900")}>
+            All time
+          </Link>
+          {periods.map((p) => (
+            <Link key={p.label} href={link({ from: p.from, to: p.to, page: undefined })} aria-current={activePeriod === p ? "page" : undefined} className={cn("inline-flex shrink-0 items-center rounded-full border px-3.5 py-1.5 text-sm font-medium transition", activePeriod === p ? "border-navy-700 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900")}>
+              {p.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+
+      <form method="get" action="/ledger" className="card card-pad mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto_auto]">
+        {dir && <input type="hidden" name="dir" value={dir} />}
+        {sp.from && <input type="hidden" name="from" value={sp.from} />}
+        {sp.to && <input type="hidden" name="to" value={sp.to} />}
+        <div className="relative sm:col-span-2 lg:col-span-1">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input name="q" defaultValue={q} placeholder="Customer, receipt or reference, expense, account, person..." className="input pl-9" aria-label="Search the ledger" />
+          <input name="q" defaultValue={q} placeholder="Customer, reference, expense or person" className="input pl-9" aria-label="Search the ledger" />
         </div>
         <select name="type" defaultValue={type ?? ""} className="input" aria-label="Type">
           <option value="">All types</option>
@@ -179,11 +202,6 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
               {label}
             </option>
           ))}
-        </select>
-        <select name="dir" defaultValue={dir ?? ""} className="input" aria-label="In or out">
-          <option value="">In &amp; out</option>
-          <option value="in">Money in</option>
-          <option value="out">Money out</option>
         </select>
         <select name="account" defaultValue={sp.account ?? ""} className="input" aria-label="Account">
           <option value="">All accounts</option>
@@ -202,32 +220,17 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
             </option>
           ))}
         </select>
-        <input type="date" name="from" defaultValue={sp.from ?? ""} className="input" aria-label="From date" />
-        <input type="date" name="to" defaultValue={sp.to ?? ""} className="input" aria-label="To date" />
-        <div className="flex gap-2 sm:col-span-2 lg:col-span-6">
-          <button className="btn-primary" type="submit">
-            Apply
-          </button>
-          {hasFilters && (
-            <Link href="/ledger" className="btn-secondary">
-              Clear
-            </Link>
-          )}
-        </div>
+        <button className="btn-primary" type="submit">
+          Apply
+        </button>
+        {hasFilters ? (
+          <Link href="/ledger" className="btn-secondary">
+            Clear
+          </Link>
+        ) : (
+          <span className="hidden lg:block" />
+        )}
       </form>
-
-      <section className="card mb-5 grid overflow-hidden md:grid-cols-2 md:divide-x md:divide-line">
-        <div className="bg-emerald-500/[0.06] px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Income</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-700 sm:text-3xl">{money(moneyIn)}</p>
-          <p className="mt-1 text-xs text-slate-500">Payments received at sales and on debts</p>
-        </div>
-        <div className="border-t border-line bg-red-500/[0.06] px-5 py-4 md:border-t-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Expenses and money out</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-brand-red-dark sm:text-3xl">{money(moneyOut)}</p>
-          <p className="mt-1 text-xs text-slate-500">Expenses, suppliers, refunds and what the owner took out</p>
-        </div>
-      </section>
 
       <div className="card overflow-hidden">
         {rows.length === 0 ? (

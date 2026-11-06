@@ -70,7 +70,7 @@ export default async function ResellersPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader
         title="Winga"
-        description="People who take our stock to sell elsewhere. Stock they hold is still ours: it is off the shop shelf but counted under their name until it is sold or returned."
+        description="People who sell our stock. Press one to see their stock and money."
         actions={
           canManage && (
             <Link href="/resellers/new" className="btn-primary">

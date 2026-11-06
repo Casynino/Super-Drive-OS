@@ -143,7 +143,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Expenses" description={seeAll ? "Everything the shop spent. Money leaves the account it was paid from." : "Money you spent for the shop. Record it here so the owner can see it and the day's cash adds up."} />
+      <PageHeader title="Expenses" description={seeAll ? "Everything the shop spent." : "Money you spent for the shop."} />
 
       {sp.recorded && (
         <div className="mb-4">

@@ -1,82 +1,110 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
-import { AlertTriangle, CalendarCheck, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarCheck, CheckCircle2, Clock, Landmark, Receipt, Smartphone, TrendingUp } from "lucide-react";
 import ClosingForm from "@/components/cash/ClosingForm";
+import { DepositForm } from "@/components/cash/CashForms";
 import { ClosingStatusBadge, ClosingSummaryView, Difference } from "@/components/cash/Display";
-import { Alert, EmptyState, PageHeader, Stat } from "@/components/ui";
+import KpiCard from "@/components/dashboard/KpiCard";
+import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import type { Prisma, ClosingStatus } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { getClosingPreview, unclosedDays } from "@/lib/cash/closing";
-import { businessDay, defaultLocationId, getBalances, listAccounts } from "@/lib/cash/ledger";
+import { businessDay, defaultLocationId, getAccountBalances, listAccounts } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import { recordDepositAction } from "./actions";
 import { submitClosingAction } from "./actions";
 
-export const metadata = { title: "Daily Closing" };
+export const metadata = { title: "Closing" };
 
-export default async function ClosingPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+/** Closing: one place for the end of the day. The shop counts the cash, banks some of it and closes; the owner sees every day's report. */
+export default async function ClosingPage({ searchParams }: { searchParams: Promise<{ status?: string; banked?: string }> }) {
   const user = await requireUser();
   const canSubmit = can(user, "closing.submit");
   const canReview = can(user, "closing.approve");
+  const canDeposit = can(user, "deposits.record");
   if (!canSubmit && !canReview) redirect("/forbidden");
   const sp = await searchParams;
   const currency = await getCurrency();
+  const money = (v: Prisma.Decimal | string | number) => formatMoney(v, currency);
   const today = businessDay();
   const locationId = await defaultLocationId(db);
 
   const statusFilter: ClosingStatus | undefined = sp.status === "NEEDS_REVIEW" || sp.status === "REVIEWED" || sp.status === "SUBMITTED" ? sp.status : undefined;
   const where: Prisma.DailyClosingWhereInput = { ...(canReview ? {} : { submittedById: user.id }), ...(statusFilter ? { status: statusFilter } : {}) };
+  const depositWhere: Prisma.BankDepositWhereInput = canReview ? {} : { createdById: user.id };
 
-  const [preview, older, history, needReview, balances] = await Promise.all([
+  const [preview, older, history, needReview, accounts, deposits, monthBanked] = await Promise.all([
     canSubmit ? getClosingPreview(db, locationId, today) : Promise.resolve(null),
     canSubmit ? unclosedDays(db, locationId, today) : Promise.resolve([] as string[]),
     db.dailyClosing.findMany({ where, orderBy: { businessDate: "desc" }, take: 30, include: { submittedBy: { select: { name: true } } } }),
     canReview ? db.dailyClosing.count({ where: { status: "NEEDS_REVIEW" } }) : Promise.resolve(0),
-    canReview ? getBalances(db, locationId, today) : Promise.resolve([]),
+    getAccountBalances(db, locationId, today),
+    db.bankDeposit.findMany({ where: depositWhere, orderBy: { createdAt: "desc" }, take: 12, include: { createdBy: { select: { name: true } } } }),
+    db.bankDeposit.aggregate({ where: { ...depositWhere, businessDate: { gte: new Date(`${today.slice(0, 8)}01T00:00:00Z`) } }, _sum: { amount: true } }),
   ]);
   const last = history[0];
+  const cash = accounts.find((a) => a.method === "CASH");
+  const bankAccounts = (await listAccounts(db, locationId)).filter((a) => a.method === "BANK");
+  // the bank account each deposit went into is the account of its ledger row
+  const into = deposits.length
+    ? await db.cashTransaction.findMany({ where: { type: "DEPOSIT_IN", referenceType: "BankDeposit", referenceId: { in: deposits.map((d) => d.id) } }, select: { referenceId: true, account: { select: { name: true } } } })
+    : [];
+  const intoName = new Map(into.map((r) => [r.referenceId, r.account.name]));
+  const others = accounts.filter((a) => a.method !== "CASH" && a.status === "ACTIVE");
 
   return (
     <>
-      <PageHeader
-        title="Daily Closing"
-        description={canSubmit ? "End of the day: check the day's figures, count the cash in the till and close. The system does all the calculations." : "Every day's closing: what the system expected, what was counted, and the difference."}
-      />
+      <PageHeader title="Closing" description={canSubmit ? "Count the cash, bank it, close the day." : "Every closed day and its report."} />
+
+      {sp.banked && (
+        <div className="mb-4">
+          <Alert kind="success">
+            Deposit <strong>{sp.banked}</strong> is recorded. The cash left the till and entered the bank account.
+          </Alert>
+        </div>
+      )}
 
       {canReview && (
-        <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <Stat label="Waiting for your review" value={needReview} hint={needReview ? "Cash did not match" : "Nothing to review"} />
-          <Stat label="Cash on hand" value={formatMoney(balances.find((b) => b.method === "CASH")?.balance ?? 0, currency)} />
-          <Stat label="Last closing" value={last ? formatDate(last.businessDate) : "—"} hint={last ? last.closingNo : "No day closed yet"} />
-          <Stat label="Last difference" value={last ? <Difference value={last.difference.toString()} currency={currency} className="text-xl" /> : "—"} />
+        <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
+          <KpiCard icon={Clock} tone={needReview ? "red" : "slate"} label="Waiting for your review" value={String(needReview)} hint={needReview ? "Cash did not match" : "Nothing to review"} href={needReview ? "/closing?status=NEEDS_REVIEW" : undefined} />
+          <KpiCard icon={Banknote} tone="yellow" label="Cash in the till" value={money(cash?.balance ?? 0)} hint="Now" />
+          <KpiCard icon={Landmark} tone="navy" label="Banked this month" value={money(monthBanked._sum.amount ?? 0)} hint="Cash taken to the bank" />
+          <KpiCard icon={CalendarCheck} tone={last && !last.difference.isZero() ? "red" : "green"} label="Last closing" value={last ? formatDate(last.businessDate) : "—"} hint={last ? (last.difference.isZero() ? "No difference" : last.difference.lt(0) ? `Short ${money(last.difference.abs())}` : `Extra ${money(last.difference)}`) : "No day closed yet"} />
         </div>
       )}
 
       {canSubmit && preview && (
         <section className="mb-6">
           {preview.closed ? (
-            <div className="card card-pad flex flex-wrap items-center justify-between gap-3 border-emerald-200 bg-emerald-50/60">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 text-emerald-600" size={22} />
-                <div>
-                  <p className="font-semibold text-emerald-900">Today is closed</p>
-                  <p className="text-sm text-emerald-800">{preview.closed.closingNo}. Any money that comes in after this goes into tomorrow&apos;s closing.</p>
+            <div className="card overflow-hidden border-emerald-300/60">
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-emerald-50/70 px-4 py-4 sm:px-5">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 text-emerald-600" size={22} />
+                  <div>
+                    <p className="font-semibold text-emerald-900">Today is closed</p>
+                    <p className="text-sm text-emerald-800">{preview.closed.closingNo}. New money goes into tomorrow&apos;s closing.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <Link href={`/closing/${preview.closed.id}`} className="btn-secondary">
-                  See today&apos;s closing
+                <Link href={`/closing/${preview.closed.id}`} className="btn-primary">
+                  See the report
                 </Link>
-                {can(user, "deposits.record") && (
-                  <Link href="/deposits" className="btn-primary">
-                    Bank deposit
-                  </Link>
-                )}
               </div>
+              {canDeposit && bankAccounts.length > 0 && (
+                <details className="group border-t border-line">
+                  <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-slate-900 sm:px-5">
+                    Take more cash to the bank
+                    <span className="text-xs font-normal text-slate-500 group-open:hidden">Cash in the till: {money(cash?.balance ?? 0)}</span>
+                  </summary>
+                  <div className="border-t border-line px-4 py-4 sm:px-5">
+                    <DepositForm key={sp.banked ?? "new"} action={recordDepositAction} submissionKey={randomUUID()} cashBalance={money(cash?.balance ?? 0)} bankAccounts={bankAccounts} />
+                  </div>
+                </details>
+              )}
             </div>
           ) : (
             <>
@@ -85,34 +113,37 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                   <Alert kind="info">
                     <span className="flex items-start gap-2">
                       <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                      <span>Cash from {older.length === 1 ? "an earlier day" : "earlier days"} ({older.slice(0, 5).map((d) => formatDate(`${d}T00:00:00Z`)).join(", ")}{older.length > 5 ? ` and ${older.length - 5} more` : ""}) was never closed. It is included in today&apos;s figures below.</span>
+                      <span>Cash from {older.length === 1 ? "an earlier day" : "earlier days"} ({older.slice(0, 5).map((d) => formatDate(`${d}T00:00:00Z`)).join(", ")}{older.length > 5 ? ` and ${older.length - 5} more` : ""}) was never closed. It is included below.</span>
                     </span>
                   </Alert>
                 </div>
               )}
-              <div className="grid gap-5 lg:grid-cols-[1fr_400px]">
-                <div>
-                  <h2 className="mb-3 text-base font-semibold text-slate-900">Today · {formatDate(`${today}T00:00:00Z`)}</h2>
+              <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
+                <KpiCard icon={Receipt} tone="navy" label={`Sold today · ${formatDate(`${today}T00:00:00Z`)}`} value={money(preview.summary.sales.total)} hint={`${preview.summary.sales.count} sale${preview.summary.sales.count === 1 ? "" : "s"}${Number(preview.summary.sales.creditGiven) > 0 ? ` · ${money(preview.summary.sales.creditGiven)} on credit` : ""}`} />
+                <KpiCard icon={Banknote} tone="yellow" label="Cash expected in the till" value={money(preview.expectedCash)} hint={`Start ${money(preview.summary.cash.opening)} + in − out`} />
+                {others.map((a) => (
+                  <KpiCard key={a.id} icon={a.method === "BANK" ? Landmark : Smartphone} tone={a.method === "BANK" ? "blue" : "green"} label={a.name} value={money(a.balance)} hint={`Received today ${money(a.inToday)} · nothing to count`} />
+                ))}
+              </div>
+
+              <div className="card px-4 py-5 sm:px-6">
+                <ClosingForm action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={canDeposit} submissionKey={randomUUID()} bankAccounts={bankAccounts} />
+              </div>
+
+              <details className="group mt-4">
+                <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-navy-700 hover:underline">
+                  <TrendingUp size={15} /> See the day&apos;s figures
+                </summary>
+                <div className="mt-3">
                   <ClosingSummaryView s={preview.summary} currency={currency} />
                 </div>
-                <aside className="lg:sticky lg:top-20 lg:self-start">
-                  <div className="card">
-                    <div className="border-b border-line px-4 py-4 sm:px-5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cash that should be in the till</p>
-                      <p className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">{formatMoney(preview.expectedCash, currency)}</p>
-                    </div>
-                    <div className="px-4 py-4 sm:px-5">
-                      <ClosingForm action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={can(user, "deposits.record")} submissionKey={randomUUID()} bankAccounts={(await listAccounts(db, locationId)).filter((a) => a.method === "BANK")} />
-                    </div>
-                  </div>
-                </aside>
-              </div>
+              </details>
             </>
           )}
         </section>
       )}
 
-      <section>
+      <section className="mb-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-slate-900">{canReview ? "All closings" : "Your closings"}</h2>
           {canReview && (
@@ -138,6 +169,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                     <th className="text-right">Expected</th>
                     <th className="text-right">Counted</th>
                     <th>Difference</th>
+                    <th className="text-right">Banked</th>
                     <th className="hidden lg:table-cell">By</th>
                     <th>Status</th>
                   </tr>
@@ -151,11 +183,12 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                         </Link>
                       </td>
                       <td className="hidden text-slate-500 sm:table-cell">{c.closingNo}</td>
-                      <td className="text-right tabular-nums">{formatMoney(c.expectedCash, currency)}</td>
-                      <td className="text-right tabular-nums">{formatMoney(c.countedCash, currency)}</td>
+                      <td className="text-right tabular-nums">{money(c.expectedCash)}</td>
+                      <td className="text-right tabular-nums">{money(c.countedCash)}</td>
                       <td>
                         <Difference value={c.difference.toString()} currency={currency} />
                       </td>
+                      <td className="text-right tabular-nums">{c.depositedNow.gt(0) ? money(c.depositedNow) : <span className="text-slate-400">—</span>}</td>
                       <td className="hidden lg:table-cell">
                         {c.submittedBy.name}
                         <span className="block text-xs text-slate-400">{formatDateTime(c.submittedAt)}</span>
@@ -171,6 +204,56 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
           )}
         </div>
       </section>
+
+      {deposits.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-base font-semibold text-slate-900">Taken to the bank</h2>
+          <div className="card overflow-hidden">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Into</th>
+                    <th>Reference</th>
+                    <th className="hidden md:table-cell">By</th>
+                    <th className="text-right">Amount</th>
+                    <th className="hidden sm:table-cell">Slip</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deposits.map((d) => (
+                    <tr key={d.id}>
+                      <td className="whitespace-nowrap">
+                        {d.closingId ? (
+                          <Link href={`/closing/${d.closingId}`} className="font-medium text-navy-700 hover:underline">
+                            {formatDate(d.businessDate)}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-slate-800">{formatDate(d.businessDate)}</span>
+                        )}
+                      </td>
+                      <td>{intoName.get(d.id) ?? "Bank"}</td>
+                      <td className="text-slate-600">{d.bankReference}</td>
+                      <td className="hidden md:table-cell">{d.createdBy.name}</td>
+                      <td className="text-right font-medium tabular-nums">{money(d.amount)}</td>
+                      <td className="hidden sm:table-cell">
+                        {d.slipId ? (
+                          <a href={`/api/attachment/${d.slipId}`} target="_blank" rel="noreferrer" className="text-navy-700 hover:underline">
+                            View photo
+                          </a>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
     </>
   );
 }

@@ -11,6 +11,7 @@ import { getBusinessProfile, getCurrency } from "@/lib/settings";
 import type { ClosingSummary } from "@/lib/cash/closing";
 import { dayToDate } from "@/lib/cash/ledger";
 import { longDate, splitIntoParts } from "./format";
+import { appBaseUrl } from "./links";
 
 const D = Prisma.Decimal;
 const num = (v: unknown) => Number(v ?? 0);
@@ -135,13 +136,14 @@ export async function buildDailyReport(db: Db, locationId: string, day: string):
     `Low Stock Products: ${alerts.low.length}`,
     `Out of Stock Products: ${alerts.out.length}`,
     "",
-    "RESELLERS",
+    "WINGA",
     `Active Winga: ${resellers.length}`,
-    `Outstanding Settlements: ${m(resellerOwed)}${resellerOverdue > 0 ? ` (overdue ${m(resellerOverdue)})` : ""}`,
+    `Winga Owe Us: ${m(resellerOwed)}${resellerOverdue > 0 ? ` (overdue ${m(resellerOverdue)})` : ""}`,
     "",
     "DAILY CLOSING",
     `Status: ${status}`,
     `Recorded By: ${closing.submittedBy.name}`,
+    ...(appBaseUrl() ? ["", "Full report:", `${appBaseUrl()}/closing/${closing.id}`] : []),
     "",
     `${name} MANAGEMENT SYSTEM`,
   ].join("\n");
@@ -164,16 +166,16 @@ export async function buildDailyReport(db: Db, locationId: string, day: string):
   const cc = collections.filter((c) => !c.customer?.reseller);
   if (cc.length === 0) L.push("None.");
   cc.forEach((c) => L.push(`${c.paymentNo} ${hhmm(c.receivedAt)} · ${c.customer?.name ?? "—"} · ${c.method} ${m(num(c.amount))}`));
-  section("RESELLER COLLECTIONS");
+  section("WINGA COLLECTIONS");
   const rc = collections.filter((c) => c.customer?.reseller);
   if (rc.length === 0) L.push("None.");
   rc.forEach((c) => L.push(`${c.paymentNo} ${hhmm(c.receivedAt)} · ${c.customer?.name ?? "—"} · ${c.method} ${m(num(c.amount))}`));
 
   const issues = await db.resellerIssue.findMany({ where: { createdAt: { gte: from, lte: to } }, orderBy: { createdAt: "asc" }, include: { reseller: { select: { name: true } }, items: { include: { product: { select: { name: true } } } } } });
-  section("RESELLER STOCK ISSUED");
+  section("WINGA STOCK ISSUED");
   if (issues.length === 0) L.push("None.");
   issues.forEach((i) => L.push(`${i.issueNo} · ${i.reseller.name} · ${m(num(i.expectedValue))}`, ...i.items.map((it) => `   ${it.enteredQty.toString()} x ${it.product.name}`)));
-  section("RESELLER STOCK REMAINING");
+  section("WINGA STOCK REMAINING");
   const holding = accounts.filter((a) => a.remainingQty.gt(0) || a.outstanding.gt(0));
   if (holding.length === 0) L.push("None.");
   holding.forEach((a) => L.push(`${a.reseller.name}: holds ${a.remainingQty.toString()} items (${m(a.remainingValue.toNumber())}), owes ${m(a.outstanding.toNumber())}${a.overdue.gt(0) ? `, overdue ${m(a.overdue.toNumber())}` : ""}`));

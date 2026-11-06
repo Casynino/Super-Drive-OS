@@ -1276,6 +1276,8 @@ enum ReportKind {
   SUMMARY
   DETAIL
   EXCEPTION // the shop has not closed the day
+  WEEKLY // the business report of a week (sent after the Sunday closing)
+  MONTHLY // the business report of a month (sent after the closing of its last day)
 }
 
 enum ReportTrigger {

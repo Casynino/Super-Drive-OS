@@ -10,6 +10,8 @@ import type { ReportKind, ReportTrigger } from "@/generated/prisma/client";
 import type { Db } from "@/lib/db";
 import { businessDay, dayToDate, defaultLocationId } from "@/lib/cash/ledger";
 import { buildDailyReport } from "./daily";
+import { appBaseUrl } from "./links";
+import { buildPeriodMessage, periodsEndingOn } from "./period";
 import { cleanPhone, maskPhone } from "./format";
 
 export type SendResult = { ok: boolean; error?: string };
@@ -60,6 +62,21 @@ export type RunResult = {
   total: number;
 };
 
+type PlannedRow = { kind: ReportKind; part: number; parts: number; content: string };
+
+/** After a closed Sunday the week's report goes too; after the last day of a month, the month's. A failure here never stops the daily report. */
+async function periodRows(db: Db, locationId: string, day: string): Promise<PlannedRow[]> {
+  const out: PlannedRow[] = [];
+  for (const p of periodsEndingOn(day)) {
+    try {
+      out.push({ kind: p.kind, part: 1, parts: 1, content: await buildPeriodMessage(db, locationId, p.kind, p.from, p.to, appBaseUrl()) });
+    } catch {
+      /* skipped: the daily report must still be sent */
+    }
+  }
+  return out;
+}
+
 export async function runDailyReport(
   db: Db,
   input: { day?: string; trigger: ReportTrigger; requestedById?: string | null; sender?: Sender; sleep?: (ms: number) => Promise<void>; now?: Date; budgetMs?: number },
@@ -87,9 +104,10 @@ export async function runDailyReport(
     if (closedKinds.length > 0) {
       rows = closedKinds;
     } else {
-      const report = await buildDailyReport(db, await defaultLocationId(db), day);
-      const planned: { kind: ReportKind; part: number; parts: number; content: string }[] = report.closed
-        ? [{ kind: "SUMMARY", part: 1, parts: 1, content: report.summary }, ...report.detail.map((c, i) => ({ kind: "DETAIL" as const, part: i + 1, parts: report.detail.length, content: c }))]
+      const locationId = await defaultLocationId(db);
+      const report = await buildDailyReport(db, locationId, day);
+      const planned: PlannedRow[] = report.closed
+        ? [{ kind: "SUMMARY", part: 1, parts: 1, content: report.summary }, ...report.detail.map((c, i) => ({ kind: "DETAIL" as const, part: i + 1, parts: report.detail.length, content: c })), ...(await periodRows(db, locationId, day))]
         : [{ kind: "EXCEPTION", part: 1, parts: 1, content: report.exception }];
       for (const p of planned) {
         // a unique clash means another run created it a moment ago: use that one
@@ -99,9 +117,10 @@ export async function runDailyReport(
       rows = await db.whatsAppReport.findMany({ where: { businessDate: dayToDate(day), trigger: "SCHEDULED", kind: { in: kinds } }, orderBy: [{ kind: "asc" }, { part: "asc" }] });
     }
   } else {
-    const report = await buildDailyReport(db, await defaultLocationId(db), day);
-    const planned: { kind: ReportKind; part: number; parts: number; content: string }[] = report.closed
-      ? [{ kind: "SUMMARY", part: 1, parts: 1, content: report.summary }, ...report.detail.map((c, i) => ({ kind: "DETAIL" as const, part: i + 1, parts: report.detail.length, content: c }))]
+    const locationId = await defaultLocationId(db);
+    const report = await buildDailyReport(db, locationId, day);
+    const planned: PlannedRow[] = report.closed
+      ? [{ kind: "SUMMARY", part: 1, parts: 1, content: report.summary }, ...report.detail.map((c, i) => ({ kind: "DETAIL" as const, part: i + 1, parts: report.detail.length, content: c })), ...(await periodRows(db, locationId, day))]
       : [{ kind: "EXCEPTION", part: 1, parts: 1, content: report.exception }];
     for (const p of planned) rows.push(await db.whatsAppReport.create({ data: { businessDate: dayToDate(day), trigger: "MANUAL", requestedById: input.requestedById ?? null, toPhone: maskPhone(phone), ...p } }));
   }

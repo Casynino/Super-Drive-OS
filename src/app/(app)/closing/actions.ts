@@ -127,7 +127,7 @@ export async function recordDepositAction(_prev: ActionState, fd: FormData): Pro
           const att = slip.buffer ? await saveAttachment(tx, { kind: "DEPOSIT_SLIP", data: slip.buffer, userId: user.id }) : null;
           const d = await postDeposit(tx, { user, locationId, amount: formString(fd, "depositAmount"), bankReference: formString(fd, "bankReference"), notes: formString(fd, "notes") || null, slipId: att?.id ?? null, bankAccountId: formString(fd, "bankAccountId") || null, submissionKey, currencyDecimals: currency.decimals });
           await writeAudit(tx, { user, action: "deposit.recorded", entityType: "BankDeposit", entityId: d.id, reference: d.depositNo, after: { amount: d.amount.toString(), bankReference: d.bankReference } });
-          await notifyPermission(tx, "cash.view", { type: "deposit.recorded", title: `Bank deposit ${d.depositNo}: ${formatMoney(d.amount, currency)}`, body: `${user.name} · ref ${d.bankReference}`, link: "/deposits" }, user.id);
+          await notifyPermission(tx, "cash.view", { type: "deposit.recorded", title: `Bank deposit ${d.depositNo}: ${formatMoney(d.amount, currency)}`, body: `${user.name} · ref ${d.bankReference}`, link: "/closing" }, user.id);
           return d;
         },
         { timeout: 30000, maxWait: 15000 },
@@ -143,6 +143,6 @@ export async function recordDepositAction(_prev: ActionState, fd: FormData): Pro
       throw e;
     }
   });
-  if (result.ok && result.message) redirect(`/deposits?recorded=${encodeURIComponent(result.message)}`);
+  if (result.ok && result.message) redirect(`/closing?banked=${encodeURIComponent(result.message)}`);
   return result;
 }

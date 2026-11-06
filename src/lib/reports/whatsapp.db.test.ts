@@ -52,7 +52,12 @@ describe("the daily WhatsApp report", () => {
     expect(b.sent[1]).toContain("DAILY DETAILED REPORT");
     expect(b.sent[1]).toMatch(/PART 1\/\d+/);
     await run(day, b.sender);
-    expect(b.sent.length).toBe(1 + (await db.whatsAppReport.count({ where: { businessDate: dayToDate(day), kind: "DETAIL" } })));
+    // 1 March 2020 was a Sunday: the week's report goes out after the daily ones, once
+    expect(b.sent.length).toBe(1 + (await db.whatsAppReport.count({ where: { businessDate: dayToDate(day), kind: { in: ["DETAIL", "WEEKLY"] } } })));
+    const week = b.sent.find((t) => t.includes("WEEKLY BUSINESS REPORT"));
+    expect(week).toContain("24 February 2020 to 01 March 2020");
+    expect(week).toContain("Profit:");
+    expect(b.sent.filter((t) => t.includes("WEEKLY BUSINESS REPORT"))).toHaveLength(1);
     expect(await db.whatsAppReport.count({ where: { businessDate: dayToDate(day), status: { not: "SENT" } } })).toBe(0);
   });
 

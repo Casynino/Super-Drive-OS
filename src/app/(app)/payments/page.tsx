@@ -8,6 +8,7 @@ import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { defaultLocationId, listAccounts } from "@/lib/cash/ledger";
 import { getMoneySummary } from "@/lib/cash/summary";
+import { getProfit } from "@/lib/reports/period";
 import { todayYmd } from "@/lib/dashboard/range";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
@@ -135,17 +136,20 @@ export default async function IncomePage({ searchParams }: { searchParams: Promi
     { key: "DEBT_COLLECTION" as const, label: "Debts collected", count: countOf("DEBT_COLLECTION") },
   ];
   const periodLabel = activePeriod?.label.toLowerCase() ?? "this period";
+  const seeProfit = can(user, "dashboard.financials") || can(user, "reports.financial");
+  const profit = seeProfit ? await getProfit(db, summary.expenses, from, to) : null;
   const landed = summary.byAccount.filter((a) => a.income.gt(0));
   const landedTotal = landed.reduce((t, a) => t.plus(a.income), new D(0));
 
   return (
     <>
-      <PageHeader title="Income" description="Every shilling received from customers, and the account it landed in. A payment on a credit invoice is income when the money arrives, never a new sale." />
+      <PageHeader title="Income" description="Every payment received and the account it went into." />
 
       <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
         <KpiCard icon={Wallet} tone="navy" label="Income received" value={money(summary.income)} hint={`${summary.payments} payment${summary.payments === 1 ? "" : "s"} · ${periodLabel}${summary.refunds.gt(0) ? ` · ${money(summary.refunds)} paid back is taken off` : ""}`} />
-        {seeMoney && <KpiCard icon={ReceiptText} tone="red" label="Spent" value={money(summary.spent)} hint={`Expenses ${money(summary.expenses)} · suppliers ${money(summary.suppliers)} · owner ${money(summary.withdrawals)}`} href={`/ledger?dir=out${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`} />}
+        {seeMoney && <KpiCard icon={ReceiptText} tone="red" label="Spent" value={money(summary.spent)} badge={summary.income.gt(0) ? `${summary.spent.div(summary.income).mul(100).toFixed(0)}% of income` : undefined} hint={`Expenses ${money(summary.expenses)} · suppliers ${money(summary.suppliers)} · owner ${money(summary.withdrawals)}`} href={`/ledger?dir=out${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`} />}
         {seeMoney && <KpiCard icon={TrendingUp} tone={summary.left.lt(0) ? "red" : "green"} label="What is left" value={money(summary.left)} hint={summary.corrections.isZero() ? "Income − everything spent" : `Income − spent, with ${money(summary.corrections)} of counting corrections`} href={`/ledger${from ? `?from=${from}${to ? `&to=${to}` : ""}` : ""}`} />}
+        {profit && <KpiCard icon={TrendingUp} tone={profit.net.lt(0) ? "red" : "green"} label="Profit" value={money(profit.net)} badge={`${profit.marginPct.toFixed(1)}% of sales`} hint={`Sales profit ${money(profit.gross)} − expenses ${money(summary.expenses)}`} />}
         {seeDebts && <KpiCard icon={HandCoins} tone="yellow" label="Still to collect" value={money(dec(toCollect[0]?.owed))} hint={`${n(toCollect[0]?.n)} invoice${n(toCollect[0]?.n) === 1 ? "" : "s"} billed, not paid yet`} href="/credit" />}
       </div>
 

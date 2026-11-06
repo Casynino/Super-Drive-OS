@@ -51,7 +51,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
     <>
       <PageHeader
         title="Accounts"
-        description="Where the money is. Press an account to see its balance and every movement of money in and out of it: each balance is the total of its own entries, so it can always be traced."
+        description="Where the money is. Press an account to see its entries."
         actions={
           <>
             {canAdjust && (
@@ -60,10 +60,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
               </Link>
             )}
             <Link href="/closing" className="btn-secondary">
-              Daily closings
-            </Link>
-            <Link href="/deposits" className="btn-secondary">
-              Bank deposits
+              Closing
             </Link>
           </>
         }
