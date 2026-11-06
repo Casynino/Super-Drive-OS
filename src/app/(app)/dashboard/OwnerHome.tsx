@@ -88,14 +88,9 @@ function Metric({ icon: Icon, label, value, hint, change, upIsGood = true, tone,
   );
 }
 
-const PILL = {
-  sky: "border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-400/40 dark:bg-sky-500/15 dark:text-sky-200 dark:hover:bg-sky-500/25",
-  emerald: "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-200 dark:hover:bg-emerald-500/25",
-  rose: "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-400/40 dark:bg-rose-500/15 dark:text-rose-200 dark:hover:bg-rose-500/25",
-  amber: "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/25",
-  violet: "border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:bg-violet-500/25",
-  navy: "border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100",
-} as const;
+// One calm style for every shortcut (Nino: too many colours); only the Approvals count is red
+const PILL_BASE = "border-line bg-white text-slate-800 hover:border-sky-400/60 hover:bg-slate-50";
+const PILL = { sky: PILL_BASE, emerald: PILL_BASE, rose: PILL_BASE, amber: PILL_BASE, violet: PILL_BASE, navy: PILL_BASE } as const;
 
 export default async function OwnerHome({ user }: { user: SessionUser }) {
   const unitMode = await getUnitMode();
@@ -175,36 +170,43 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
 
   return (
     <>
-      {/* ── Banner ── */}
+      {/* ── Banner: the greeting, the three numbers that matter, and the shop's real products ── */}
       <section className="relative mb-4 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_320px_at_85%_-10%,rgba(47,111,208,0.55),transparent_60%),radial-gradient(500px_260px_at_0%_110%,rgba(237,28,36,0.22),transparent_60%)]" aria-hidden />
-        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-r from-brand-red via-brand-red to-oil-400" aria-hidden />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_380px_at_78%_25%,rgba(47,111,208,0.42),transparent_62%)]" aria-hidden />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/banner-products.webp" alt="" aria-hidden className="pointer-events-none absolute bottom-0 right-0 hidden h-full w-auto max-w-[56%] select-none object-contain object-right-bottom xl:block" />
 
-        <div className="relative px-5 pb-6 pt-6 sm:px-8 sm:pb-7 sm:pt-7">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-rose-300">Management · Owner</p>
-            <h1 className="mt-2 text-[1.7rem] font-bold leading-tight tracking-tight sm:text-4xl">
-              {greeting()}, {firstName}
-            </h1>
-            <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-white/85">
-              {balances.length > 0 && (
-                <>
-                  <strong className="text-white">{m(usable)}</strong> you can use right now ·{" "}
-                </>
-              )}
-              <strong className="text-emerald-300">{m(o.today.collected)}</strong> collected today · <strong className="text-oil-400">{m(k.debt.value)}</strong> owed by customers
-            </p>
-            <p className="mt-1.5 text-xs text-white/55">
-              {todayLabel} · {profile.name}
-            </p>
-          </div>
+        <div className="relative px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-7">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-oil-400">Management · Owner</p>
+          <h1 className="mt-2 text-[1.7rem] font-bold leading-tight tracking-tight sm:text-4xl">
+            {greeting()}, {firstName}
+          </h1>
+          <p className="mt-1 text-sm text-white/60">
+            {todayLabel} · {profile.name}
+          </p>
+          <dl className="mt-5 flex flex-wrap gap-x-9 gap-y-4">
+            {balances.length > 0 && (
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">You can use now</dt>
+                <dd className="mt-0.5 text-xl font-bold tabular-nums">{m(usable)}</dd>
+              </div>
+            )}
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Collected today</dt>
+              <dd className="mt-0.5 text-xl font-bold tabular-nums text-emerald-300">{m(o.today.collected)}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Owed by customers</dt>
+              <dd className="mt-0.5 text-xl font-bold tabular-nums text-oil-400">{m(k.debt.value)}</dd>
+            </div>
+          </dl>
         </div>
       </section>
 
       <nav className="-mx-1 mb-6 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" aria-label="Shortcuts">
         {pills.map((l) => (
           <Link key={l.href} href={l.href} className={cn("inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition", PILL[l.tone])}>
-            <l.icon size={15} /> {l.label}
+            <l.icon size={15} className="text-sky-500" /> {l.label}
             {l.badge ? <span className="rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white">{l.badge}</span> : null}
           </Link>
         ))}
