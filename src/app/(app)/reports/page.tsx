@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { AlertTriangle, Download, ExternalLink, FileText, Info, Printer, TrendingUp } from "lucide-react";
 import StatTile from "@/components/dashboard/StatTile";
 import { DonutChart, SalesTrendChart, TopProductsChart } from "@/components/dashboard/Charts";
-import { EmptyState } from "@/components/ui";
-import HealthPanel, { HealthGauge } from "@/components/reports/HealthPanel";
+import { EmptyState, PageHeader } from "@/components/ui";
+import HealthPanel from "@/components/reports/HealthPanel";
+import BarList from "@/components/reports/BarList";
 import { computeHealth, healthInputFrom } from "@/lib/reports/health";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -56,44 +57,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const t = sales.totals;
   const net = financials && t.profit !== null ? t.profit - fin.expenseTotal : null;
   const health = computeHealth(healthInputFrom(sales, inv, fin), m);
-  const periodHref = (extra = "") => `/print/report?from=${r.fromYmd}&to=${r.toYmd}${extra}`;
 
   return (
     <>
-      {/* The cover of the report book: the period, the health of the business and the report as a document */}
-      <section className="relative mb-5 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(800px_320px_at_85%_30%,rgba(47,111,208,0.4),transparent_62%)]" aria-hidden />
-        <div className="relative flex flex-wrap items-center justify-between gap-6 px-5 py-6 sm:px-8">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-oil-400">Management · Reports</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Business report</h1>
-            <p className="mt-1 text-sm text-white/65">
-              {r.label} · {formatDate(new Date(`${r.fromYmd}T12:00:00Z`))} to {formatDate(new Date(`${r.toYmd}T12:00:00Z`))}
-            </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <Link href={periodHref()} target="_blank" className="inline-flex items-center gap-2 rounded-lg bg-oil-400 px-3.5 py-2 text-sm font-semibold text-[#0a1424] hover:brightness-95">
-                <ExternalLink size={15} /> Open the report
-              </Link>
-              <Link href={periodHref("&print=1&save=1")} target="_blank" className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-medium text-white ring-1 ring-white/25 hover:bg-white/15">
-                <Download size={15} /> Download PDF
-              </Link>
-              <Link href={periodHref("&print=1")} target="_blank" className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-medium text-white ring-1 ring-white/25 hover:bg-white/15">
-                <Printer size={15} /> Print
-              </Link>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <HealthGauge health={health} size={200} onDark />
-            <div className="hidden text-sm text-white/70 sm:block">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Business health</p>
-              <p className="mt-1 max-w-[11rem] leading-snug">{health.advice[0]}</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <PageHeader title="Reports" description={`How the business is doing · ${r.label}`} />
 
       {(() => {
-        // ready-made reports as paper documents: open them, download them as PDF or print them
+        // reports as paper documents: open them, download them as PDF or print them
         const today = businessDay();
         const dow = new Date(`${today}T12:00:00Z`).getUTCDay();
         const weekStart = shiftDay(today, -((dow + 6) % 7));
@@ -101,42 +71,45 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         const lastMonthEnd = shiftDay(monthStart, -1);
         const short = (ymd: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${ymd}T12:00:00Z`));
         const ready = [
-          { label: "This week", from: weekStart, to: today },
-          { label: "Last week", from: shiftDay(weekStart, -7), to: shiftDay(weekStart, -1) },
-          { label: "This month", from: monthStart, to: today },
-          { label: "Last month", from: `${lastMonthEnd.slice(0, 8)}01`, to: lastMonthEnd },
+          { label: `Selected: ${r.label}`, sub: "", from: r.fromYmd, to: r.toYmd },
+          { label: "This week", sub: "", from: weekStart, to: today },
+          { label: "Last week", sub: "", from: shiftDay(weekStart, -7), to: shiftDay(weekStart, -1) },
+          { label: "This month", sub: "", from: monthStart, to: today },
+          { label: "Last month", sub: "", from: `${lastMonthEnd.slice(0, 8)}01`, to: lastMonthEnd },
         ];
         const href = (from: string, to: string, extra = "") => `/print/report?from=${from}&to=${to}${extra}`;
         return (
-          <section className="card mb-5 px-4 py-4 sm:px-5" aria-label="Make a report">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <section className="card mb-5 overflow-hidden" aria-label="Make a report">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-4 py-3 sm:px-5">
               <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
                 <FileText size={17} /> Make a report
               </h2>
-              <p className="text-xs text-slate-500">Sales and growth, products, money, expenses, customers and cash on paper</p>
+              <p className="text-xs text-slate-500">Business health, sales and growth, products, money, expenses, customers and cash, as a document</p>
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <ul className="grid divide-y divide-line sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-5 lg:divide-x">
               {ready.map((x) => (
-                <div key={x.label} className="rounded-xl border border-line px-3.5 py-3">
+                <li key={x.label} className="px-4 py-4 sm:px-5">
                   <p className="text-sm font-semibold text-slate-900">{x.label}</p>
                   <p className="text-xs text-slate-500">
                     {short(x.from)} – {short(x.to)}
+                    {x.sub ? ` · ${x.sub}` : ""}
                   </p>
-                  <div className="mt-2.5 flex items-center gap-1.5">
+                  <div className="mt-3 flex flex-wrap gap-1.5">
                     <Link href={href(x.from, x.to)} target="_blank" className="btn-secondary btn-sm">
                       <ExternalLink size={14} /> Open
                     </Link>
-                    <Link href={href(x.from, x.to, "&print=1&save=1")} target="_blank" className="btn-secondary btn-sm !px-2" title="Download as PDF" aria-label={`Download ${x.label} as PDF`}>
-                      <Download size={15} />
+                    <Link href={href(x.from, x.to, "&print=1&save=1")} target="_blank" className="btn-secondary btn-sm" aria-label={`Download ${x.label} as PDF`}>
+                      <Download size={14} /> Download
                     </Link>
-                    <Link href={href(x.from, x.to, "&print=1")} target="_blank" className="btn-secondary btn-sm !px-2" title="Print" aria-label={`Print ${x.label}`}>
-                      <Printer size={15} />
+                    <Link href={href(x.from, x.to, "&print=1")} target="_blank" className="btn-secondary btn-sm" aria-label={`Print ${x.label}`}>
+                      <Printer size={14} /> Print
                     </Link>
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
-            <form method="get" action="/print/report" target="_blank" className="mt-3 flex flex-wrap items-end gap-3 border-t border-line pt-3">
+            </ul>
+            <form method="get" action="/print/report" target="_blank" className="flex flex-wrap items-end gap-3 border-t border-line bg-slate-50/60 px-4 py-3 sm:px-5">
+              <span className="pb-2 text-sm font-medium text-slate-700">Any dates</span>
               <label className="text-xs text-slate-500">
                 From
                 <input type="date" name="from" defaultValue={weekStart} max={today} className="input mt-1 block" />
@@ -148,18 +121,16 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               <button type="submit" className="btn-secondary">
                 <ExternalLink size={15} /> Open
               </button>
-              <button type="submit" name="save" value="1" className="btn-secondary !px-3" title="Download as PDF" aria-label="Download as PDF">
-                <Download size={16} />
+              <button type="submit" name="save" value="1" className="btn-secondary">
+                <Download size={15} /> Download
               </button>
-              <button type="submit" name="print" value="1" className="btn-secondary !px-3" title="Print" aria-label="Print">
-                <Printer size={16} />
+              <button type="submit" name="print" value="1" className="btn-secondary">
+                <Printer size={15} /> Print
               </button>
-              <span className="pb-2 text-xs text-slate-500">Any dates you choose</span>
             </form>
           </section>
         );
       })()}
-
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <nav className="flex gap-1 rounded-xl bg-white p-1 shadow-[0_1px_2px_rgba(15,27,45,0.06)] ring-1 ring-line" aria-label="Report">
@@ -225,7 +196,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </section>
             <section className="card card-pad">
               <h2 className="mb-3 text-base font-semibold text-slate-900">Sales by category</h2>
-              <div className="h-52">
+              <div className="h-80">
                 <DonutChart data={sales.byCategory} money={money} centre={m(t.sales)} />
               </div>
             </section>
@@ -234,19 +205,15 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <section className="card card-pad">
               <h2 className="mb-3 text-base font-semibold text-slate-900">Best-selling products</h2>
-              <div className="h-64">
-                <TopProductsChart data={sales.byProduct.slice(0, 6).map((p) => ({ name: p.name, value: p.revenue }))} money={money} empty="No sales in this period yet" />
-              </div>
+              <BarList rows={sales.byProduct.slice(0, 6).map((p) => ({ label: p.name, value: p.revenue, text: m(p.revenue) }))} empty="No sales in this period yet" />
             </section>
             <section className="card card-pad">
               <h2 className="mb-3 text-base font-semibold text-slate-900">Busiest days of the week</h2>
-              <div className="h-64">
-                <TopProductsChart data={sales.weekday} money={money} empty="No sales in this period yet" />
-              </div>
+              <BarList rows={[...sales.weekday].sort((a, b) => b.value - a.value).map((d) => ({ label: d.name, value: d.value, text: m(d.value) }))} empty="No sales in this period yet" />
             </section>
             <section className="card card-pad">
               <h2 className="mb-3 text-base font-semibold text-slate-900">Where the money went</h2>
-              <div className="h-64">
+              <div className="h-80">
                 <DonutChart data={fin.expenses} money={money} centre={m(fin.expenseTotal)} />
               </div>
             </section>
@@ -319,25 +286,19 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <div className="mb-5 grid gap-4 lg:grid-cols-2">
             <section className="card card-pad">
               <h2 className="mb-3 text-base font-semibold text-slate-900">Best-selling products</h2>
-              <div className="h-72">
-                <TopProductsChart data={sales.byProduct.slice(0, 8).map((p) => ({ name: p.name, value: p.revenue }))} money={money} />
-              </div>
+              <BarList rows={sales.byProduct.slice(0, 8).map((p) => ({ label: p.name, value: p.revenue, text: m(p.revenue), note: t.sales > 0 ? `${((p.revenue / t.sales) * 100).toFixed(0)}% of sales` : undefined }))} empty="No sales in this period yet" />
             </section>
             <section className="card card-pad">
               <h2 className="mb-3 text-base font-semibold text-slate-900">Sales by day of the week</h2>
-              <div className="h-72">
-                <TopProductsChart data={sales.weekday} money={money} empty="No sales in this period yet" />
-              </div>
+              <BarList rows={[...sales.weekday].sort((a, b) => b.value - a.value).map((d) => ({ label: d.name, value: d.value, text: m(d.value) }))} empty="No sales in this period yet" />
             </section>
             <section className="card card-pad">
               <h2 className="mb-3 text-base font-semibold text-slate-900">Sales by employee</h2>
-              <div className="h-56">
-                <TopProductsChart data={sales.byEmployee.map((e) => ({ name: e.name, value: e.sales }))} money={money} empty="No sales in this period yet" />
-              </div>
+              <BarList rows={sales.byEmployee.map((e) => ({ label: e.name, value: e.sales, text: m(e.sales), note: `${e.count} sale${e.count === 1 ? "" : "s"}` }))} empty="No sales in this period yet" />
             </section>
             <section className="card card-pad">
               <h2 className="mb-3 text-base font-semibold text-slate-900">Sales by category</h2>
-              <div className="h-56">
+              <div className="h-80">
                 <DonutChart data={sales.byCategory} money={money} centre={m(t.sales)} />
               </div>
             </section>
@@ -389,9 +350,34 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <StatTile icon={AlertTriangle} tone={inv.dead.length ? "red" : "slate"} label="Dead stock" value={inv.dead.length} hint="No sale in 60 days" />
           </div>
 
+          <div className="mb-5 grid gap-4 lg:grid-cols-3">
+            <section className="card card-pad">
+              <h2 className="mb-3 text-base font-semibold text-slate-900">Stock health</h2>
+              <div className="h-80">
+                <DonutChart
+                  data={[
+                    { name: "In stock", value: Math.max(inv.list.length - inv.low.length - inv.out.length, 0) },
+                    { name: "Running low", value: inv.low.length },
+                    { name: "Out of stock", value: inv.out.length },
+                  ].filter((x) => x.value > 0)}
+                  money={{ symbol: "", decimals: 0 }}
+                  centre={`${inv.list.length} products`}
+                />
+              </div>
+            </section>
+            <section className="card card-pad">
+              <h2 className="mb-0.5 text-base font-semibold text-slate-900">Selling fastest</h2>
+              <p className="mb-3 text-xs text-slate-500">Units sold in the last 30 days</p>
+              <BarList tone="green" rows={inv.fast.map((p) => ({ label: p.name, value: p.sold30, text: `${p.sold30.toFixed(0)} sold`, note: p.cover !== null ? `about ${Math.max(1, Math.round(p.cover))} days of stock left` : undefined, warn: p.cover !== null && p.cover <= 7 }))} empty="No sales in the last 30 days." />
+            </section>
+            <section className="card card-pad">
+              <h2 className="mb-0.5 text-base font-semibold text-slate-900">Selling slowest</h2>
+              <p className="mb-3 text-xs text-slate-500">Stock on the shelf that moves least</p>
+              <BarList tone="red" highlightFirst={false} rows={inv.slow.map((p) => ({ label: p.name, value: p.shelf, text: `${p.shelf.toFixed(0)} ${p.symbol}`, note: `${p.sold30.toFixed(0)} sold in 30 days` }))} empty="Nothing on the shelf." />
+            </section>
+          </div>
+
           <div className="mb-5 grid gap-4 lg:grid-cols-2">
-            <ListCard title="Selling fastest (last 30 days)" rows={inv.fast.map((p) => [p.name, `${p.sold30.toFixed(0)} sold`, p.cover !== null ? `~${Math.max(1, Math.round(p.cover))} days of stock` : ""])} empty="No sales in the last 30 days." note="Days of stock is an estimate from the last 30 days." />
-            <ListCard title="Selling slowest (stock on the shelf)" rows={inv.slow.map((p) => [p.name, `${p.sold30.toFixed(0)} sold`, `${p.shelf.toFixed(0)} ${p.symbol} on shelf`])} empty="Nothing on the shelf." />
             <ListCard title="Dead stock" rows={inv.dead.map((p) => [p.name, p.lastSale ? `last sold ${inv.age(p.lastSale)} days ago` : "never sold", `${p.shelf.toFixed(0)} ${p.symbol}`])} empty="No dead stock." />
             <ListCard title="Often running out (last 90 days)" rows={inv.frequentlyOut.map((p) => [p.name, `${p.stockouts90} times`, ""])} empty="Nothing ran out repeatedly." />
           </div>
@@ -442,55 +428,88 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <StatTile icon={Banknote} tone={net !== null && net < 0 ? "red" : "green"} label="Net operating result" value={net !== null ? m(net) : "—"} hint={net === null ? "Needs permission to see profit" : "Profit minus expenses (before supplier costs not yet paid)"} />
           </div>
 
-          <div className="mb-5 grid gap-4 lg:grid-cols-2">
+          <div className="mb-5 grid gap-4 lg:grid-cols-3">
             <section className="card card-pad">
-              <h2 className="mb-3 text-base font-semibold text-slate-900">Who owes us</h2>
-              <dl className="space-y-3 text-sm">
-                <div className="flex items-center justify-between"><dt className="text-slate-600">Customers</dt><dd className="font-semibold tabular-nums">{m(fin.customerOwed)} {fin.customerOverdue > 0 && <span className="badge-red ml-2">{m(fin.customerOverdue)} overdue</span>}</dd></div>
-                <div className="flex items-center justify-between"><dt className="text-slate-600">Winga</dt><dd className="font-semibold tabular-nums">{m(fin.resellerOwed)} {fin.resellerOverdue > 0 && <span className="badge-red ml-2">{m(fin.resellerOverdue)} overdue</span>}</dd></div>
-                <div className="flex items-center justify-between border-t border-line pt-3"><dt className="text-slate-600">Supplier obligations</dt><dd className="font-semibold tabular-nums">{m(supplierOwed)}</dd></div>
-              </dl>
+              <h2 className="mb-0.5 text-base font-semibold text-slate-900">Who owes us</h2>
+              <p className="mb-3 text-xs text-slate-500">And what we owe suppliers, today</p>
+              <BarList
+                highlightFirst={false}
+                tone="navy"
+                rows={[
+                  { label: "Customers", value: fin.customerOwed, text: m(fin.customerOwed), note: fin.customerOverdue > 0 ? `${m(fin.customerOverdue)} past the due date` : undefined, warn: true },
+                  { label: "Winga", value: fin.resellerOwed, text: m(fin.resellerOwed), note: fin.resellerOverdue > 0 ? `${m(fin.resellerOverdue)} past the settlement date` : undefined, warn: true },
+                  { label: "Suppliers (we owe)", value: supplierOwed, text: m(supplierOwed) },
+                ]}
+              />
             </section>
             <section className="card card-pad">
-              <h2 className="mb-3 text-base font-semibold text-slate-900">Expenses by category</h2>
-              <div className="h-52">
-                <TopProductsChart data={fin.expenses} money={money} empty="No approved expenses in this period" label="Spent" />
+              <h2 className="mb-0.5 text-base font-semibold text-slate-900">Expenses by category</h2>
+              <p className="mb-3 text-xs text-slate-500">{m(fin.expenseTotal)} spent in this period</p>
+              <BarList rows={fin.expenses.map((e) => ({ label: e.name, value: e.value, text: m(e.value), note: fin.expenseTotal > 0 ? `${((e.value / fin.expenseTotal) * 100).toFixed(0)}% of expenses` : undefined }))} empty="No approved expenses in this period" />
+            </section>
+            <section className="card card-pad">
+              <h2 className="mb-0.5 text-base font-semibold text-slate-900">Where the money came in</h2>
+              <p className="mb-3 text-xs text-slate-500">{m(fin.flowIn)} in, {m(fin.flowOut)} out</p>
+              <div className="h-80">
+                <DonutChart
+                  data={(["CASH", "MOBILE_MONEY", "BANK"] as const).map((meth) => ({ name: ACCOUNT_NAME[meth], value: fin.flow.filter((f) => f.method === meth && f.value > 0).reduce((t, f) => t + f.value, 0) })).filter((x) => x.value > 0)}
+                  money={money}
+                  centre={m(fin.flowIn)}
+                />
               </div>
             </section>
           </div>
 
-          <section className="card overflow-hidden">
-            <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
+          <section aria-label="Cash flow">
+            <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">Cash flow</h2>
-                <p className="text-xs text-slate-500">Money in {m(fin.flowIn)} · money out {m(fin.flowOut)}. Moves between your own accounts (bank deposits, closing differences) are included.</p>
+                <h2 className="text-base font-semibold text-slate-900">Cash flow by account</h2>
+                <p className="text-xs text-slate-500">Moves between your own accounts (bank deposits, closing differences) are included.</p>
               </div>
               <Link href={exportHref("expenses")} className="btn-secondary btn-sm">
                 <Download size={14} /> Expenses CSV
               </Link>
             </div>
             {fin.flow.length === 0 ? (
-              <EmptyState icon={<Banknote size={22} />} title="No money moved in this period" />
+              <div className="card">
+                <EmptyState icon={<Banknote size={22} />} title="No money moved in this period" />
+              </div>
             ) : (
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Account</th>
-                      <th>What</th>
-                      <th className="text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fin.flow.sort((a, b) => a.method.localeCompare(b.method) || b.value - a.value).map((f) => (
-                      <tr key={`${f.method}-${f.type}`}>
-                        <td>{ACCOUNT_NAME[f.method as PaymentMethod]}</td>
-                        <td>{TX_LABEL[f.type as CashTxType]}</td>
-                        <td className={cn("text-right tabular-nums", f.value >= 0 ? "text-emerald-700" : "text-brand-red-dark")}>{f.value >= 0 ? "+" : "−"} {m(Math.abs(f.value))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid gap-4 lg:grid-cols-3">
+                {(["CASH", "MOBILE_MONEY", "BANK"] as const).map((meth) => {
+                  const lines = fin.flow.filter((f) => f.method === meth).sort((a, b) => b.value - a.value);
+                  const inn = lines.filter((f) => f.value > 0).reduce((t, f) => t + f.value, 0);
+                  const out = lines.filter((f) => f.value < 0).reduce((t, f) => t - f.value, 0);
+                  return (
+                    <div key={meth} className="card overflow-hidden">
+                      <div className="border-b border-line px-4 py-3 sm:px-5">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <h3 className="text-base font-semibold text-slate-900">{ACCOUNT_NAME[meth]}</h3>
+                          <p className={cn("text-base font-bold tabular-nums", inn - out >= 0 ? "text-emerald-600" : "text-brand-red-dark")}>
+                            {inn - out >= 0 ? "+" : "−"} {m(Math.abs(inn - out))}
+                          </p>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {m(inn)} in · {m(out)} out
+                        </p>
+                      </div>
+                      {lines.length === 0 ? (
+                        <p className="px-5 py-6 text-center text-sm text-slate-500">Nothing moved.</p>
+                      ) : (
+                        <ul className="divide-y divide-line">
+                          {lines.map((f) => (
+                            <li key={f.type} className="flex items-center justify-between gap-3 px-4 py-2 text-sm sm:px-5">
+                              <span className="text-slate-700">{TX_LABEL[f.type as CashTxType]}</span>
+                              <span className={cn("shrink-0 font-medium tabular-nums", f.value >= 0 ? "text-emerald-600" : "text-brand-red-dark")}>
+                                {f.value >= 0 ? "+" : "−"} {m(Math.abs(f.value))}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>

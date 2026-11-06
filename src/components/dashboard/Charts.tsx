@@ -39,24 +39,43 @@ export function SalesTrendChart({ data, money }: { data: { label: string; sales:
   );
 }
 
-export function DonutChart({ data, money, centre, colors = CHART_COLORS, centreLabel = "Total", empty = "Nothing sold in this period yet" }: { data: { name: string; value: number }[]; money: Money; centre: string; colors?: string[]; centreLabel?: string; empty?: string }) {
+export function DonutChart({ data, money, centre, colors = CHART_COLORS, centreLabel = "Total", empty = "Nothing sold in this period yet", legend = true }: { data: { name: string; value: number }[]; money: Money; centre: string; colors?: string[]; centreLabel?: string; empty?: string; legend?: boolean }) {
   if (data.length === 0) return <Empty text={empty} />;
+  const total = data.reduce((t, d) => t + d.value, 0) || 1;
   return (
-    <div className="relative h-full w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="88%" paddingAngle={2} stroke="none">
-            {data.map((_, i) => (
-              <Cell key={i} fill={colors[i % colors.length]} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(v) => fmt(Number(v), money)} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-xs text-slate-500">{centreLabel}</span>
-        <span className="text-base font-semibold text-slate-900">{centre}</span>
+    <div className="flex h-full w-full flex-col">
+      <div className="relative min-h-0 flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="88%" paddingAngle={2} stroke="none">
+              {data.map((_, i) => (
+                <Cell key={i} fill={colors[i % colors.length]} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(v) => fmt(Number(v), money)} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className="text-xs text-slate-500">{centreLabel}</span>
+          <span className="text-base font-semibold text-slate-900">{centre}</span>
+        </div>
       </div>
+      {legend && (
+        <ul className="mt-3 space-y-1 text-xs">
+          {data.map((d, i) => (
+            <li key={d.name} className="flex items-center justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: colors[i % colors.length] }} />
+                <span className="truncate text-slate-700">{d.name}</span>
+              </span>
+              <span className="shrink-0 tabular-nums text-slate-500">
+                {money.symbol ? `${fmt(d.value, money)} · ` : ""}
+                {Math.round((d.value / total) * 100)}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
