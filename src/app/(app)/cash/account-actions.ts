@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
@@ -22,7 +23,13 @@ const refresh = () => {
 };
 
 /** Adds a mobile-money or bank account (CRDB, NMB, M-PESA, Lipa...), or changes the name, number or holder of one. The till is the only cash account. */
-export async function saveCashAccount(_prev: ActionState, fd: FormData): Promise<ActionState> {
+export async function saveCashAccount(prev: ActionState, fd: FormData): Promise<ActionState> {
+  const result = await saveAccount(prev, fd);
+  if (result.ok && result.message?.startsWith("new:")) redirect(`/cash/${result.message.slice(4)}`); // a new account opens on its own page
+  return result;
+}
+
+async function saveAccount(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const values = formValues(fd);
   return guarded("cash.adjust", async (user) => {
     const parsed = schema.safeParse({
@@ -39,11 +46,13 @@ export async function saveCashAccount(_prev: ActionState, fd: FormData): Promise
     const dupe = await db.cashAccount.findFirst({ where: { locationId, name: { equals: d.name, mode: "insensitive" }, ...(d.id ? { NOT: { id: d.id } } : {}) }, select: { id: true } });
     if (dupe) return fail("Please fix the highlighted fields.", { name: "An account with this name already exists." }, values);
 
+    let createdId: string | null = null;
     await db.$transaction(async (tx) => {
       if (!d.id) {
         const sameKind = await tx.cashAccount.count({ where: { locationId, method: d.method! } });
         const a = await tx.cashAccount.create({ data: { locationId, method: d.method!, name: d.name, accountNumber: d.accountNumber || null, holderName: d.holderName || null, isDefault: sameKind === 0 } });
         await writeAudit(tx, { user, action: "cash.account_create", entityType: "CashAccount", entityId: a.id, reference: a.name, after: { method: a.method, name: a.name, accountNumber: a.accountNumber, holderName: a.holderName } });
+        createdId = a.id;
         return;
       }
       const before = await tx.cashAccount.findFirst({ where: { id: d.id, locationId } });
@@ -55,7 +64,7 @@ export async function saveCashAccount(_prev: ActionState, fd: FormData): Promise
       throw e;
     });
     refresh();
-    return { ok: true, message: d.id ? "Saved." : "Account added." };
+    return { ok: true, message: createdId ? `new:${createdId}` : "Saved." };
   });
 }
 

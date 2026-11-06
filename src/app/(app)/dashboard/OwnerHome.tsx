@@ -140,7 +140,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   if (shipmentsOnTheWay > 0) items.push({ id: "ship-way", group: "stock", tone: "blue", icon: "shipment", title: `${plural(shipmentsOnTheWay, "shipment", "shipments")} on the way`, detail: "The shop marks them arrived and checks them.", href: "/shipments" });
 
   const pills = [
-    can(user, "cash.view") && { href: "/cash", label: "Cash & accounts", icon: Landmark, tone: "sky" as const },
+    can(user, "cash.view") && { href: "/cash", label: "Accounts", icon: Landmark, tone: "sky" as const },
     can(user, "reports.view") && { href: "/reports", label: "Reports", icon: ChartColumn, tone: "emerald" as const },
     (can(user, "returns.approve") || can(user, "expenses.approve") || can(user, "closing.approve")) && { href: "/approvals", label: "Approvals", icon: Inbox, tone: "navy" as const, badge: data.pendingApprovals + (pendingExpenses?._count ?? 0) + closingsToReview.length },
     can(user, "shipments.manage") && { href: "/shipments", label: "Purchase orders", icon: Truck, tone: "amber" as const },
