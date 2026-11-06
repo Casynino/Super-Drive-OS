@@ -8,6 +8,7 @@ import IssueRecords from "@/components/shipments/IssueRecords";
 import { loadIssueRecords } from "@/lib/shipments/issues";
 import { toIssueViews } from "@/lib/shipments/issue-view";
 import { getUnitMode } from "@/lib/unit-mode";
+import { fmtQty, inPacks } from "@/lib/qty";
 import MarkArrivedButton from "@/components/shipments/MarkArrivedButton";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -192,7 +193,11 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
           {list.map((r) => {
             const s = r.s;
             const mine = issueViews.filter((v) => v.shipmentId === s.id);
-            const open = mine.filter((v) => v.open > 0).length;
+            const openRows = mine.filter((v) => v.open > 0);
+            const open = openRows.length;
+            // everything still in question on this order, in the unit the person chose
+            const inQuestion = openRows.reduce((t, v) => t + (unitMode === "pcs" ? v.open : inPacks(v.open, v.pack)), 0);
+            const inQuestionText = unitMode === "pcs" ? `${fmtQty(inQuestion)} PCS` : `${fmtQty(Number(inQuestion.toFixed(1)))} CTN`;
             return (
               <section key={s.id} className="card overflow-hidden" aria-label={`Investigation ${s.shipmentNo}`}>
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
@@ -205,7 +210,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
                       {s.arrivedAt ? ` · arrived ${formatDateTime(s.arrivedAt)}` : ""}
                     </span>
                   </div>
-                  <span className="badge-red">{open > 0 ? `${open} product${open === 1 ? "" : "s"} to decide` : "Open"}</span>
+                  <span className="badge-red">{open > 0 ? `${open} product${open === 1 ? "" : "s"} to decide · ${inQuestionText} in question` : "Open"}</span>
                 </div>
                 {mine.length > 0 ? (
                   <IssueRecords mode={unitMode} currencySymbol={currency.symbol} records={mine} canAct={manage} action={decideIssueAction} />

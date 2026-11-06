@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
-import { ImageOff, PackageCheck, PackageX, Tag, Trash2, X } from "lucide-react";
+import { ChevronDown, ImageOff, PackageCheck, PackageX, Tag, Trash2, X } from "lucide-react";
 import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
@@ -166,106 +166,140 @@ function DecisionForm({ r, choice, action, onDone, mode, currencySymbol }: { r: 
   );
 }
 
+/** One shared set of column widths, so the header and every row line up: Product | Ordered | Arrived | Problem | Status | Actions */
+const COLS = "lg:grid-cols-[minmax(0,2.1fr)_5.5rem_5.5rem_7.5rem_8rem_19rem]";
+/** shorter names for the buttons on a table row */
+const ROW_LABEL: Partial<Record<Action, string>> = { DISCOUNT_SELL: "Discount", KEEP: "Keep" };
+
+/** The short name of the problem, for the table. */
+const SHORT: Record<string, { label: string; tone: string }> = {
+  "Missing product": { label: "Missing", tone: "text-brand-red-dark" },
+  "Listed but not shipped": { label: "Not shipped", tone: "text-brand-red-dark" },
+  "Damaged product": { label: "Damaged", tone: "text-brand-red-dark" },
+  "Quantity discrepancy": { label: "Extra", tone: "text-yellow-700" },
+  "Product not on the order": { label: "Not on order", tone: "text-yellow-700" },
+};
+
+function Cell({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 lg:hidden">{label}</p>
+      <div className="text-sm text-slate-800">{children}</div>
+    </div>
+  );
+}
+
 function RecordRow({ r, canAct, closed, action, mode, currencySymbol }: { r: IssueView; canAct: boolean; closed: boolean; action: Run; mode: UnitMode; currencySymbol: string }) {
   const [choice, setChoice] = useState<Action | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const done = r.open === 0;
-  const status = done ? { cls: "badge-green", label: "Resolved" } : closed ? { cls: "badge-gray", label: "Closed with a note" } : r.resolved > 0 ? { cls: "badge-yellow", label: "Partly resolved" } : { cls: "badge-red", label: "Under investigation" };
+  const status = done ? { cls: "badge-green", label: "Resolved" } : closed ? { cls: "badge-gray", label: "Closed" } : r.resolved > 0 ? { cls: "badge-yellow", label: "Partly resolved" } : { cls: "badge-red", label: "To decide" };
   const options = OPTIONS[r.kind];
   const dismissed = r.history.length > 0 && r.history.every((h) => h.action === "DISMISS");
+  const short = SHORT[r.typeLabel] ?? { label: r.typeLabel, tone: "text-slate-700" };
+  const canDecide = canAct && !done && !closed;
 
   return (
-    <li className={cn("px-4 py-4 sm:px-5", done && "bg-slate-50/40 opacity-75")}>
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1.3fr)_9.5rem] lg:gap-5">
-        <div className="flex min-w-0 gap-3">
-          <Link href={`/products/${r.productId}`} className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-white" aria-label={r.productName}>
+    <li className={cn("border-b border-line/70 last:border-b-0", done && "bg-slate-50/40")}>
+      <div className={cn("grid grid-cols-2 items-center gap-x-4 gap-y-3 px-4 py-3 sm:px-5", COLS, done && "opacity-70")}>
+        <div className="col-span-2 flex min-w-0 items-center gap-3 lg:col-span-1">
+          <Link href={`/products/${r.productId}`} className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-white" aria-label={r.productName}>
             {r.imageV ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={`/api/product-image/${r.productId}?size=thumb&v=${r.imageV}`} alt="" loading="lazy" className="h-full w-full object-contain" />
             ) : (
-              <ImageOff size={18} className="text-slate-300" />
+              <ImageOff size={16} className="text-slate-300" />
             )}
           </Link>
           <div className="min-w-0">
             <Link href={`/products/${r.productId}`} className="block truncate text-sm font-semibold text-slate-900 hover:text-navy-700 hover:underline">
               {r.productName}
             </Link>
-            <p className="truncate text-xs text-slate-500">
-              <span className="font-mono">{r.sku}</span> ·{" "}
-              <Link href={`/shipments/${r.shipmentId}`} className="text-navy-700 hover:underline">
-                {r.shipmentNo}
-              </Link>
-              {r.supplierName && <> · {r.supplierName}</>}
-            </p>
+            <p className="truncate font-mono text-xs text-slate-500">{r.sku}</p>
           </div>
         </div>
 
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className={status.cls}>{dismissed && done ? "Removed" : status.label}</span>
-            <span className="badge-gray">{r.typeLabel}</span>
-          </div>
-          <p className="mt-1.5 text-sm text-slate-700">{describe(r, mode)}</p>
-          {r.reported && <p className="text-xs text-slate-500">Reported {r.reported}</p>}
-        </div>
-
+        <Cell label="Ordered" className="lg:text-right">
+          <span className="tabular-nums">{qty(r, r.expected, mode)}</span>
+        </Cell>
+        <Cell label="Arrived" className="lg:text-right">
+          <span className="tabular-nums">{qty(r, r.arrived, mode)}</span>
+        </Cell>
         <div className="lg:text-right">
-          <p className="text-2xl font-bold leading-none tracking-tight text-slate-900">{qty(r, r.open, mode)}</p>
-          <p className="mt-1 text-xs text-slate-500">{done ? "all decided" : r.resolved > 0 ? `open, of ${qty(r, r.total, mode)}` : "under investigation"}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 lg:hidden">{short.label}</p>
+          <p className={cn("text-lg font-bold leading-tight tabular-nums", done ? "text-slate-500" : short.tone)}>{qty(r, r.open, mode)}</p>
+          <p className="hidden text-xs text-slate-500 lg:block">{done ? "decided" : short.label}</p>
+        </div>
+        <div className="flex items-center gap-1.5 lg:justify-start">
+          <span className={status.cls}>{dismissed && done ? "Removed" : status.label}</span>
+        </div>
+
+        <div className="col-span-2 flex flex-wrap items-center gap-1.5 lg:col-span-1 lg:justify-end">
+          {canDecide &&
+            options.map((o) => {
+              const Icon = CHOICES[o].icon;
+              return (
+                <button key={o} type="button" className={cn(BTN[CHOICES[o].tone], "btn-sm", choice === o && "ring-2 ring-navy-500/40")} onClick={() => setChoice(choice === o ? null : o)}>
+                  <Icon size={14} /> {ROW_LABEL[o] ?? CHOICES[o].label}
+                </button>
+              );
+            })}
+          {canDecide && (
+            <button type="button" title="Remove from list" aria-label="Remove from list" className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-brand-red-soft hover:text-brand-red-dark", choice === "DISMISS" && "bg-brand-red-soft text-brand-red-dark")} onClick={() => setChoice(choice === "DISMISS" ? null : "DISMISS")}>
+              <X size={16} />
+            </button>
+          )}
+          <button type="button" title="Show the history" aria-label="Show the history" aria-expanded={showHistory} className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800", showHistory && "bg-slate-100 text-slate-800")} onClick={() => setShowHistory((v) => !v)}>
+            <ChevronDown size={16} className={cn("transition", showHistory && "rotate-180")} />
+          </button>
         </div>
       </div>
 
-      {canAct && !done && !closed && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line/70 pt-3">
-          <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Decide</span>
-          {options.map((o) => {
-            const Icon = CHOICES[o].icon;
-            return (
-              <button key={o} type="button" className={cn(BTN[CHOICES[o].tone], "btn-sm", choice === o && "ring-2 ring-navy-500/40")} onClick={() => setChoice(choice === o ? null : o)}>
-                <Icon size={14} /> {CHOICES[o].label}
-              </button>
-            );
-          })}
-          <button type="button" className={cn("ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-brand-red-soft hover:text-brand-red-dark", choice === "DISMISS" && "bg-brand-red-soft text-brand-red-dark")} onClick={() => setChoice(choice === "DISMISS" ? null : "DISMISS")}>
-            <X size={14} /> Remove from list
-          </button>
+      {choice && (
+        <div className="px-4 pb-4 sm:px-5">
+          <DecisionForm key={choice} r={r} choice={choice} action={action} onDone={() => setChoice(null)} mode={mode} currencySymbol={currencySymbol} />
         </div>
       )}
-      {choice && <DecisionForm key={choice} r={r} choice={choice} action={action} onDone={() => setChoice(null)} mode={mode} currencySymbol={currencySymbol} />}
 
-      <details className="mt-3 text-sm">
-        <summary className="cursor-pointer select-none text-xs font-medium text-slate-500 hover:text-slate-800">History ({r.history.length + 1})</summary>
-        <ol className="mt-2 space-y-1.5 border-l border-line pl-4">
-          <li className="text-slate-600">
-            <span className="font-medium text-slate-800">Reported</span>
-            {r.reported ? ` · ${r.reported}` : ""}: {describe(r, mode)}
-          </li>
-          {r.history.map((h, i) => (
-            <li key={i} className="text-slate-600">
-              <span className="font-medium text-slate-800">{historyText(h, r, mode)}</span> · {h.by}, {h.at}
-              {h.note && <span className="block text-xs text-slate-500">“{h.note}”</span>}
+      {showHistory && (
+        <div className="border-t border-line/70 bg-slate-50/60 px-4 py-3 text-sm sm:px-5">
+          <ol className="space-y-2 border-l border-line pl-4">
+            <li className="text-slate-600">
+              <span className="font-medium text-slate-800">Reported</span>
+              {r.reported ? ` · ${r.reported}` : ""}
+              <span className="block text-xs text-slate-500">{describe(r, mode)}</span>
             </li>
-          ))}
-        </ol>
-      </details>
+            {r.history.map((h, i) => (
+              <li key={i} className="text-slate-600">
+                <span className="font-medium text-slate-800">{historyText(h, r, mode)}</span> · {h.by}, {h.at}
+                {h.note && <span className="block text-xs text-slate-500">“{h.note}”</span>}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
     </li>
   );
 }
 
 /**
- * The problem products of an order as a clean list: product, what happened, how much, and a clear row of choices for each one.
- * People who cannot decide (the shop) see the same list without the buttons.
+ * The problem products of an order as a compact table: one line per product (what was ordered, what arrived, what is in question),
+ * its status, and its choices right on the same line. People who cannot decide (the shop) see the same table without the buttons.
  */
 export default function IssueRecords({ records, canAct, closed = false, action, mode = "ctn", currencySymbol = "TSh" }: { records: IssueView[]; canAct: boolean; /** the investigation was closed with a note instead of deciding each product */ closed?: boolean; action: Run; /** the CTN | PCS switch */ mode?: UnitMode; currencySymbol?: string }) {
   // what still needs a decision first, decided ones last
   const sorted = [...records].sort((a, b) => Number(a.open === 0) - Number(b.open === 0));
   return (
     <div>
-      <div className="hidden border-b border-line bg-slate-50/60 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1.3fr)_9.5rem] lg:gap-5" aria-hidden>
+      <div className={cn("hidden border-b border-line bg-slate-50/60 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:items-center lg:gap-x-4", COLS)} aria-hidden>
         <span>Product</span>
-        <span>What happened</span>
-        <span className="text-right">Quantity</span>
+        <span className="text-right">Ordered</span>
+        <span className="text-right">Arrived</span>
+        <span className="text-right">In question</span>
+        <span>Status</span>
+        <span className="text-right">What to do</span>
       </div>
-      <ul className="divide-y divide-slate-100">
+      <ul>
         {sorted.map((r) => (
           <RecordRow key={r.key} r={r} canAct={canAct} closed={closed} action={action} mode={mode} currencySymbol={currencySymbol} />
         ))}
