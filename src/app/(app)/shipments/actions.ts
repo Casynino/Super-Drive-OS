@@ -7,7 +7,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
-import { fail, formString, guarded, type ActionState } from "@/lib/action";
+import { fail, formString, guarded, isUniqueViolation, type ActionState } from "@/lib/action";
 import { notifyPermission } from "@/lib/notifications";
 import { generateSku, nextBarcode, uniqueSku } from "@/lib/product-codes";
 import { ImageError, processProductImage } from "@/lib/product-images";
@@ -30,6 +30,8 @@ const BAD = "The form could not be read. Reload the page and try again.";
 
 const createSchema = z.object({
   supplierId: z.string().min(1).nullable(),
+  /** a supplier typed on the form that is not in the list yet; created together with the order */
+  newSupplierName: z.string().trim().max(120).nullable().optional(),
   reference: z.string().trim().max(80).nullable(),
   cargoName: z.string().trim().max(80).nullable().optional(),
   expectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
@@ -41,9 +43,21 @@ const createSchema = z.object({
 
 export async function announceShipment(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const result = await guarded("shipments.manage", async (user) => {
-    const p = parse(createSchema, fd);
-    if (!p) return fail(BAD);
+    const parsed = parse(createSchema, fd);
+    if (!parsed) return fail(BAD);
+    const { newSupplierName, ...p } = parsed;
     const currency = await getCurrency();
+    // Adding a supplier needs the same right as the Suppliers screen.
+    let newSupplier: string | null = null;
+    if (newSupplierName) {
+      if (newSupplierName.length < 2) return fail("Please fix the highlighted fields.", { supplierName: "Enter the supplier name." });
+      if (!can(user, "suppliers.manage")) return fail("Please fix the highlighted fields.", { supplierName: "You cannot add new suppliers. Choose one from the list." });
+      // a name that is already there is used, never duplicated
+      const same = await db.supplier.findFirst({ where: { name: { equals: newSupplierName, mode: "insensitive" } } });
+      if (same && same.status !== "ACTIVE") return fail("Please fix the highlighted fields.", { supplierName: "This supplier is switched off. Turn it on under Supplier Accounts first." });
+      if (same) p.supplierId = same.id;
+      else newSupplier = newSupplierName;
+    }
     // New selling prices need the same permission as changing a price anywhere else.
     if (!can(user, "products.price") && p.lines.some((l) => l.sellingPrice?.trim() || l.wholesalePrice?.trim())) return fail("You are not allowed to set selling prices. Remove them and announce the shipment again.");
     const location = await db.location.findFirst({ where: { id: p.locationId, status: "ACTIVE" } });
@@ -53,7 +67,13 @@ export async function announceShipment(_prev: ActionState, fd: FormData): Promis
     try {
       const s = await db.$transaction(
         async (tx) => {
-          const created = await createShipment(tx, { user, ...p, currencyDecimals: currency.decimals });
+          let supplierId = p.supplierId;
+          if (newSupplier) {
+            const sup = await tx.supplier.create({ data: { name: newSupplier } });
+            await writeAudit(tx, { user, action: "supplier.create", entityType: "Supplier", entityId: sup.id, reference: sup.name, after: { name: sup.name, from: "purchase order form" } });
+            supplierId = sup.id;
+          }
+          const created = await createShipment(tx, { user, ...p, supplierId, currencyDecimals: currency.decimals });
           const total = created.items.reduce((sum, i) => sum.plus(i.lineCost ?? 0), new Prisma.Decimal(0));
           await writeAudit(tx, { user, action: "shipment.create", entityType: "Shipment", entityId: created.id, reference: created.shipmentNo, after: { items: created.items.length, totalCost: total, cargo: p.cargoName, reference: p.reference, expectedDate: p.expectedDate } });
           await notifyPermission(tx, "shipments.receive", { type: "shipment.announced", title: `New purchase order on its way: ${created.shipmentNo}`, body: `${created.items.length} product${created.items.length === 1 ? "" : "s"} expected${p.expectedDate ? ` around ${p.expectedDate}` : ""}${p.cargoName ? ` · ${p.cargoName}` : p.reference ? ` · ${p.reference}` : ""}`, link: `/shipments/${created.id}` });
@@ -62,11 +82,13 @@ export async function announceShipment(_prev: ActionState, fd: FormData): Promis
         { timeout: 30000, maxWait: 15000 },
       );
       revalidatePath("/shipments");
+      if (newSupplier) revalidatePath("/suppliers");
       return { ok: true, message: s.id };
     } catch (e) {
       if (e instanceof ShipmentError) return fail(e.message, e.fieldErrors);
       const existing = await db.shipment.findUnique({ where: { submissionKey: p.submissionKey }, select: { id: true } });
       if (existing) return { ok: true, message: existing.id };
+      if (newSupplier && isUniqueViolation(e)) return fail("Please fix the highlighted fields.", { supplierName: "A supplier with this name already exists. Pick it from the list." });
       throw e;
     }
   });

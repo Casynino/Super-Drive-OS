@@ -19,6 +19,8 @@ type Props = {
   products: PickerProduct[];
   locations: LocationOption[];
   suppliers: Option[];
+  /** may type a supplier that is not on the list yet (needs the right to add suppliers) */
+  canAddSupplier: boolean;
   categories: Option[];
   brands: Option[];
   /** cargo companies used before, offered as suggestions */
@@ -67,13 +69,13 @@ function Stepper({ step, onGo, reached }: { step: number; onGo: (n: 1 | 2 | 3) =
   );
 }
 
-export default function ShipmentForm({ action, createProduct, products: initialProducts, locations, suppliers, categories, brands, cargoNames, canPrice, currencySymbol, submissionKey: key }: Props) {
+export default function ShipmentForm({ action, createProduct, products: initialProducts, locations, suppliers, canAddSupplier, categories, brands, cargoNames, canPrice, currencySymbol, submissionKey: key }: Props) {
   const [state, formAction] = useActionState(action, initial);
   const fe = state.fieldErrors ?? {};
   const [submissionKey] = useState(key);
   const [products, setProducts] = useState(initialProducts);
   const [lines, setLines] = useState<ShipmentLine[]>([]);
-  const [supplierId, setSupplierId] = useState("");
+  const [supplierText, setSupplierText] = useState("");
   const [cargoName, setCargoName] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
   const [locationId, setLocationId] = useState(locations.find((l) => l.isDefault)?.id ?? locations[0]?.id ?? "");
@@ -86,7 +88,7 @@ export default function ShipmentForm({ action, createProduct, products: initialP
   // the server found a problem: go back to the step where it can be fixed
   useEffect(() => {
     if (Object.keys(fe).some((k) => k.startsWith("line.") || k === "lines")) setStep(2);
-    else if (fe.supplierId || fe.locationId) setStep(1);
+    else if (fe.supplierId || fe.supplierName || fe.locationId) setStep(1);
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = (n: 1 | 2 | 3) => {
@@ -108,8 +110,14 @@ export default function ShipmentForm({ action, createProduct, products: initialP
     return null;
   }, [lines, byId]);
 
+  // a name typed here is either one already on the list or a new supplier that is added when the order is sealed
+  const typedSupplier = supplierText.trim();
+  const matchedSupplier = typedSupplier ? suppliers.find((s) => s.name.toLowerCase() === typedSupplier.toLowerCase()) : undefined;
+  const newSupplierName = typedSupplier && !matchedSupplier ? typedSupplier : null;
+
   const payload = JSON.stringify({
-    supplierId: supplierId || null,
+    supplierId: matchedSupplier?.id ?? null,
+    newSupplierName: newSupplierName,
     reference: null,
     cargoName: cargoName.trim() || null,
     expectedDate: expectedDate || null,
@@ -126,7 +134,7 @@ export default function ShipmentForm({ action, createProduct, products: initialP
   });
 
   const oneLocation = locations.length === 1;
-  const supplierName = suppliers.find((s) => s.id === supplierId)?.name;
+  const supplierName = matchedSupplier?.name ?? (newSupplierName ? `${newSupplierName} (new supplier)` : undefined);
   const locationName = locations.find((l) => l.id === locationId)?.name;
 
   const next = () => {
@@ -153,16 +161,27 @@ export default function ShipmentForm({ action, createProduct, products: initialP
           <h2 className="text-base font-semibold text-slate-900">Where is it coming from?</h2>
           <p className="text-sm text-slate-500">Only a few things. You can leave the optional ones empty.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <Field label="Supplier" name="supplierId" error={fe.supplierId} hint="Optional. Add suppliers under Supplier Accounts.">
-              <select id="supplierId" className={inputClass(fe.supplierId)} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-                <option value="">No supplier</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            {canAddSupplier ? (
+              <Field label="Supplier" name="supplierName" error={fe.supplierName ?? fe.supplierId} hint={newSupplierName ? "New supplier: it is added to Supplier Accounts when you seal the order." : "Optional. Pick one from the list or type a new name."}>
+                <input id="supplierName" className={inputClass(fe.supplierName ?? fe.supplierId)} list="supplier-names" value={supplierText} onChange={(e) => setSupplierText(e.target.value)} placeholder="e.g. the supplier's name" autoComplete="off" maxLength={120} />
+                <datalist id="supplier-names">
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.name} />
+                  ))}
+                </datalist>
+              </Field>
+            ) : (
+              <Field label="Supplier" name="supplierId" error={fe.supplierId} hint="Optional. Only the owner can add new suppliers.">
+                <select id="supplierId" className={inputClass(fe.supplierId)} value={matchedSupplier?.name ?? ""} onChange={(e) => setSupplierText(e.target.value)}>
+                  <option value="">No supplier</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <Field label="Cargo company" name="cargoName" hint="Which cargo is bringing it to Tanzania?">
               <input id="cargoName" className="input" list="cargo-names" value={cargoName} onChange={(e) => setCargoName(e.target.value)} placeholder="e.g. the cargo company's name" autoComplete="off" />
               <datalist id="cargo-names">

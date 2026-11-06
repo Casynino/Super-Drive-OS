@@ -45,6 +45,7 @@ export default async function NewShipmentPage() {
           products={products}
           locations={locations}
           suppliers={suppliers}
+          canAddSupplier={can(user, "suppliers.manage")}
           categories={categories}
           brands={brands}
           cargoNames={cargoRows.map((c) => c.cargoName!).filter(Boolean)}
