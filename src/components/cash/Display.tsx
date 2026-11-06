@@ -82,7 +82,7 @@ export function ClosingSummaryView({ s, currency, showAccounts = true }: { s: Cl
       </div>
 
       <Block title="Cash in the till">
-        <Row label="Cash at the start" value={m(s.cash.opening)} />
+        <Row label="Cash at the start (yesterday's closing balance)" value={m(s.cash.opening)} />
         <Row sign="+" label="Cash from sales" value={m(s.cash.salesIn)} />
         <Row sign="+" label="Cash from debts collected" value={m(s.cash.collectionsIn)} />
         {nonZero(s.cash.refundsOut) && <Row sign="-" label="Refunds paid to customers" value={m(s.cash.refundsOut)} />}

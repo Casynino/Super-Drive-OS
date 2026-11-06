@@ -114,6 +114,10 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
     db.dailyClosing.findFirst({ where: { locationId, businessDate: new Date(`${businessDay()}T00:00:00.000Z`) }, select: { id: true } }),
   ]);
   const pendingReturn = data.pendingApprovals > 0 && can(user, "returns.approve") ? await db.saleReversal.findFirst({ where: { status: "PENDING" }, select: { saleId: true }, orderBy: { id: "asc" } }) : null;
+  // a heads-up (nothing to sign off) when a closing in the last three days did not match
+  const recentDifferences = can(user, "closing.approve")
+    ? await db.dailyClosing.findMany({ where: { difference: { not: 0 }, businessDate: { gte: new Date(Date.parse(`${businessDay()}T00:00:00Z`) - 2 * 86_400_000) } }, orderBy: { businessDate: "desc" }, select: { id: true, businessDate: true, difference: true, closingNo: true } })
+    : [];
   const money = { symbol: currency.symbol, decimals: currency.decimals };
   const m = (v: number) => formatMoney(v, currency);
   const compact = (v: number) => `${currency.symbol} ${Math.abs(v) >= 1_000_000 ? `${(v / 1_000_000).toFixed(v >= 100_000_000 ? 0 : 1)}M` : Math.abs(v) >= 10_000 ? `${Math.round(v / 1000)}k` : new Intl.NumberFormat("en-US").format(Math.round(v))}`;
@@ -131,6 +135,18 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   if (data.pendingApprovals > 0 && can(user, "returns.approve")) items.push({ id: "returns", group: "decisions", tone: "amber", icon: "returns", title: `${plural(data.pendingApprovals, "return or cancellation", "returns and cancellations")} waiting`, detail: "Stock and money wait for your yes.", href: pendingReturn ? `/sales/${pendingReturn.saleId}` : "/sales" });
   if (pendingExpenses && pendingExpenses._count > 0) items.push({ id: "expenses", group: "decisions", tone: "amber", icon: "expense", title: `${plural(pendingExpenses._count, "expense", "expenses")} waiting for approval`, detail: "Nothing is paid out until you approve.", main: m(Number(pendingExpenses._sum.amount ?? 0)), href: "/expenses?status=PENDING" });
   if (shipmentIssues > 0) items.push({ id: "ship-issues", group: "decisions", tone: "amber", icon: "shipment", title: `${plural(shipmentIssues, "shipment", "shipments")} with damaged or missing goods`, detail: "Find out what went wrong and close the investigation.", href: "/shipments" });
+  if (recentDifferences.length > 0) {
+    const first = recentDifferences[0]!;
+    const one = recentDifferences.length === 1;
+    const short = recentDifferences.some((d) => d.difference.lt(0));
+    items.push({
+      id: "cash-difference", group: "money", tone: short ? "red" : "amber", icon: "closing",
+      title: one ? `Cash was ${first.difference.lt(0) ? "short" : "extra"} on ${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(first.businessDate)}` : `Cash did not match on ${recentDifferences.length} days`,
+      detail: "Open the day to see what was counted.",
+      main: m(recentDifferences.reduce((t, d) => t + Math.abs(d.difference.toNumber()), 0)), sub: "difference",
+      href: one ? `/closing/${first.id}` : "/closing?show=short",
+    });
+  }
   if (k.debt.overdue > 0) items.push({ id: "overdue", group: "money", tone: "red", icon: "debt", title: "Customers owe money past the due date", detail: o.oldestOwed > 0 ? `The oldest unpaid bill is ${o.oldestOwed} days old.` : "Follow these up before they get older.", main: m(k.debt.overdue), sub: `of ${m(k.debt.value)} owed in all`, href: "/credit" });
   if (resellerOverdue > 0) items.push({ id: "reseller-overdue", group: "money", tone: "red", icon: "reseller", title: "Winga have not paid on time", detail: "Money is past the settlement date.", main: m(resellerOverdue), href: "/resellers" });
   if (!closedToday && hourNow >= 19 && can(user, "closing.approve")) items.push({ id: "not-closed", group: "money", tone: "amber", icon: "clock", title: "The shop has not closed today yet", detail: "The WhatsApp report goes out once the day is closed.", href: "/closing" });

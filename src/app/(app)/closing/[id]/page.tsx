@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { randomUUID } from "node:crypto";
 import { notFound, redirect } from "next/navigation";
 import { Banknote, CheckCircle2, Landmark, Lock, Receipt, ReceiptText, Scale } from "lucide-react";
 import PrintButton from "@/components/PrintButton";
+import CorrectClosingForm from "@/components/cash/CorrectClosingForm";
 import { ClosingStatusBadge, ClosingSummaryView } from "@/components/cash/Display";
 import KpiCard from "@/components/dashboard/KpiCard";
 import Spread from "@/components/reports/Spread";
@@ -14,6 +16,7 @@ import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import { correctClosingAction } from "../actions";
 
 export const metadata = { title: "End of day report" };
 
@@ -39,6 +42,8 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
          AND (s."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Dar_es_Salaam')::date = ${day}::date
        GROUP BY p."name" ORDER BY v DESC LIMIT 6`,
   ]);
+  const corrections = await db.cashTransaction.findMany({ where: { type: "ADJUSTMENT", referenceType: "Manual", referenceNo: c.closingNo, account: { locationId: c.locationId, method: "CASH" } }, orderBy: { createdAt: "asc" }, include: { user: { select: { name: true } } } });
+  const correctedBy = corrections.reduce((t, x) => t.plus(x.amount), new D(0));
   const into = deposits.length ? await db.cashTransaction.findMany({ where: { type: "DEPOSIT_IN", referenceType: "BankDeposit", referenceId: { in: deposits.map((d) => d.id) } }, select: { referenceId: true, account: { select: { name: true, accountNumber: true } } } }) : [];
   const summary = c.summary as unknown as ClosingSummary;
   const money = (v: Prisma.Decimal | string | number) => formatMoney(v, currency);
@@ -52,7 +57,8 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
   const methodBalance = (m: "MOBILE_MONEY" | "BANK") => dec(summary.accounts.find((a) => a.method === m)?.balance);
   const mobileLeft = methodBalance("MOBILE_MONEY");
   const bankLeft = methodBalance("BANK").plus(banked);
-  const everything = c.cashCarried.plus(mobileLeft).plus(bankLeft);
+  const tillLeft = c.cashCarried.plus(correctedBy);
+  const everything = tillLeft.plus(mobileLeft).plus(bankLeft);
 
   return (
     <>
@@ -88,7 +94,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
         </div>
         <dl className="mt-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
           {[
-            ["In the till (cash)", c.cashCarried, banked.gt(0) ? `after ${money(banked)} went to the bank` : "nothing was banked"],
+            ["In the till (cash)", tillLeft, banked.gt(0) ? `after ${money(banked)} went to the bank` : "nothing was banked"],
             ["Mobile money", mobileLeft, "in the mobile money accounts"],
             ["In the bank", bankLeft, banked.gt(0) ? `includes ${money(banked)} banked today` : "in the bank accounts"],
           ].map(([label, value, note]) => (
@@ -151,6 +157,41 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Note from the shop</p>
           <p className="mt-1 text-sm text-slate-800">“{c.notes}”</p>
         </div>
+      )}
+
+      {(corrections.length > 0 || can(user, "cash.adjust")) && (
+        <section className="card mb-5 px-4 py-4 sm:px-5" aria-label="Corrections">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">Corrections after closing</h2>
+            {corrections.length > 0 && <span className="text-sm text-slate-500">Cash counted now {money(c.countedCash.plus(correctedBy))}</span>}
+          </div>
+          {corrections.length > 0 && (
+            <ul className="mt-3 divide-y divide-line/70 text-sm">
+              {corrections.map((x) => (
+                <li key={x.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2">
+                  <span className="min-w-0 text-slate-700">
+                    {(x.description ?? "").replace(/^Correction \((added|removed)\): /, "")}
+                    <span className="block text-xs text-slate-500">
+                      {x.user.name} · {formatDateTime(x.createdAt)}
+                    </span>
+                  </span>
+                  <span className={x.amount.lt(0) ? "font-semibold tabular-nums text-brand-red-dark" : "font-semibold tabular-nums text-emerald-700"}>
+                    {x.amount.gt(0) ? "+ " : "− "}
+                    {money(x.amount.abs())}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {can(user, "cash.adjust") && (
+            <details className="group mt-3" open={!c.difference.isZero() && corrections.length === 0}>
+              <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-navy-700 hover:underline">Correct this day&apos;s cash</summary>
+              <div className="mt-3">
+                <CorrectClosingForm action={correctClosingAction} closingId={c.id} current={c.countedCash.plus(correctedBy).toString()} symbol={currency.symbol} submissionKey={randomUUID()} />
+              </div>
+            </details>
+          )}
+        </section>
       )}
 
       <h2 className="mb-3 text-base font-semibold text-slate-900">The day in figures</h2>

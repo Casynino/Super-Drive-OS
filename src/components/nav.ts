@@ -61,10 +61,10 @@ export const NAV: NavGroup[] = [
     icon: ShoppingCart,
     items: [
       { label: "POS", href: "/pos", icon: ShoppingCart, permissions: ["sales.pos"], ready: true },
-      { label: "Customers", href: "/customers", icon: Users, permissions: ["customers.view"], ready: true },
       { label: "Sales", href: "/sales", icon: Receipt, permissions: ["sales.view_own", "sales.view_all"], ready: true },
       { label: "Credit", href: "/credit", icon: HandCoins, permissions: ["credit.view"], ready: true },
       { label: "Winga", href: "/resellers", icon: Handshake, permissions: ["resellers.view"], ready: true },
+      { label: "Customers", href: "/customers", icon: Users, permissions: ["customers.view"], ready: true },
     ],
   },
   {
@@ -73,13 +73,13 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Overview", href: "/inventory", icon: Boxes, permissions: ["inventory.view"], ready: true },
       { label: "Orders", href: "/shipments", icon: Truck, permissions: ["shipments.manage", "shipments.receive"], ready: true, badge: "incoming", also: ["/inventory/receiving"] },
-      { label: "Suppliers", href: "/suppliers", icon: Building2, permissions: ["suppliers.view", "suppliers.manage", "suppliers.pay"], ready: true },
       { label: "Scan", href: "/scan", icon: ScanBarcode, permissions: ["inventory.view", "sales.pos"], ready: LABELS_ENABLED },
       { label: "Deliveries", href: "/inventory/receiving", icon: PackageCheck, permissions: ["inventory.receive", "inventory.movements", "purchasing.view"], ready: true, hideIfAny: ["shipments.manage", "shipments.receive"] },
       { label: "Products", href: "/products", icon: Package, permissions: ["products.view"], ready: true, also: ["/items"] },
+      { label: "Suppliers", href: "/suppliers", icon: Building2, permissions: ["suppliers.view", "suppliers.manage", "suppliers.pay"], ready: true },
       { label: "Transfers", href: "/inventory/transfers", icon: ArrowLeftRight, permissions: ["inventory.transfer", "inventory.movements"], ready: true },
-      { label: "Adjustments", href: "/inventory/adjustments", icon: ClipboardCheck, permissions: ["inventory.adjust", "inventory.count", "inventory.report_damage", "inventory.movements"], ready: true },
       { label: "Movements", href: "/inventory/movements", icon: ArrowDownUp, permissions: ["inventory.movements"], ready: true },
+      { label: "Adjustments", href: "/inventory/adjustments", icon: ClipboardCheck, permissions: ["inventory.adjust", "inventory.count", "inventory.report_damage", "inventory.movements"], ready: true },
     ],
   },
   {

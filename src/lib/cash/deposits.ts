@@ -75,6 +75,8 @@ export type ManualCashInput = {
   reason: string;
   submissionKey: string;
   currencyDecimals: number;
+  /** the document this entry belongs to (for example the closing it corrects) */
+  referenceNo?: string;
 };
 
 /** Opening balance (once per account), withdrawals by the owner, and authorised corrections. Always with a reason, never silent. */
@@ -106,6 +108,7 @@ export async function postManualCash(tx: Tx, input: ManualCashInput) {
     amount: outgoing ? amount.neg() : amount,
     referenceType: "Manual",
     referenceId: input.submissionKey,
+    referenceNo: input.referenceNo,
     description,
     userId: input.user.id,
   });

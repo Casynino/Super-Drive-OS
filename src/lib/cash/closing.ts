@@ -13,7 +13,7 @@
 import { Prisma, type CashTxType, type PaymentMethod } from "@/generated/prisma/client";
 import { nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
 import { parseMoney } from "@/lib/money";
-import { postDeposit } from "./deposits";
+import { postDeposit, postManualCash } from "./deposits";
 import { CashError, METHODS, businessDay, dateToDay, dayToDate, getAccount, lockAccount, postCash } from "./ledger";
 
 const D = Prisma.Decimal;
@@ -248,4 +248,33 @@ export async function submitClosing(tx: Tx, input: SubmitClosingInput) {
     depositNo = dep.depositNo;
   }
   return { closing, difference, status, depositNo, summary };
+}
+
+// ───────────── Correcting a closed day (the owner) ─────────────
+
+/**
+ * The shop recounted, or the missing cash turned up: the owner types the cash that was really in the till and the
+ * difference to what is on record is posted as an authorised correction (with the reason), tied to that closing by its
+ * number. The locked closing is never edited; the correction lands in the cash ledger and appears in the next closing.
+ */
+export async function correctClosingCount(tx: Tx, input: { closingId: string; user: { id: string }; newCount: string; reason: string; submissionKey: string; currencyDecimals: number }) {
+  const fe: Record<string, string> = {};
+  const newCount = parseMoney(input.newCount, input.currencyDecimals);
+  if (!newCount || newCount.lt(0)) fe.newCount = "Enter the cash that was really in the till (0 if it was empty).";
+  const reason = input.reason.trim();
+  if (reason.length < 5) fe.reason = "Say why (at least a few words).";
+  if (Object.keys(fe).length || !newCount) throw new CashError("Please fix the highlighted fields.", fe);
+
+  await tx.$queryRaw`SELECT "id" FROM "DailyClosing" WHERE "id" = ${input.closingId} FOR UPDATE`;
+  const c = await tx.dailyClosing.findUnique({ where: { id: input.closingId } });
+  if (!c) throw new CashError("This closing no longer exists.");
+  const prior = await tx.cashTransaction.aggregate({ where: { type: "ADJUSTMENT", referenceType: "Manual", referenceNo: c.closingNo, account: { locationId: c.locationId, method: "CASH" } }, _sum: { amount: true } });
+  const current = c.countedCash.plus(prior._sum.amount ?? 0);
+  const delta = newCount.minus(current);
+  if (delta.isZero()) throw new CashError("That is already the counted cash on record.", { newCount: "Same as the figure on record." });
+  const entry = await postManualCash(tx, {
+    user: input.user, locationId: c.locationId, method: "CASH", kind: delta.gt(0) ? "CORRECTION_IN" : "CORRECTION_OUT", amount: delta.abs().toString(),
+    reason: `Closing ${c.closingNo}: ${reason}`, referenceNo: c.closingNo, submissionKey: input.submissionKey, currencyDecimals: input.currencyDecimals,
+  });
+  return { closing: c, entry, delta, newCount };
 }

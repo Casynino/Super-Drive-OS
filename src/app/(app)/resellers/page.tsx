@@ -12,7 +12,7 @@ import { emptyStanding, getStandings } from "@/lib/resellers/performance";
 import { getCurrency } from "@/lib/settings";
 import { cn, formatDate } from "@/lib/utils";
 
-export const metadata = { title: "Winga" };
+export const metadata = { title: "Winga (Sales Rep)" };
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -69,7 +69,7 @@ export default async function ResellersPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader
-        title="Winga"
+        title="Winga (Sales Rep)"
         description="People who sell our stock. Press one to see their stock and money."
         actions={
           canManage && (

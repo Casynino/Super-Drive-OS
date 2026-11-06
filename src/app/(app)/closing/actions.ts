@@ -7,7 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
 import { fail, formString, formValues, guarded, isUniqueViolation, type ActionState } from "@/lib/action";
 import { ImageError, processDocumentImage, saveAttachment } from "@/lib/cash/attachments";
-import { submitClosing } from "@/lib/cash/closing";
+import { correctClosingCount, submitClosing } from "@/lib/cash/closing";
 import { postDeposit } from "@/lib/cash/deposits";
 import { CashError, defaultLocationId } from "@/lib/cash/ledger";
 import { formatMoney } from "@/lib/money";
@@ -59,9 +59,9 @@ export async function submitClosingAction(_prev: ActionState, fd: FormData): Pro
           });
           const diff = r.difference.isZero() ? "no difference" : `${r.difference.gt(0) ? "surplus" : "shortage"} of ${formatMoney(r.difference.abs(), currency)}`;
           await notifyPermission(tx, "closing.approve", {
-            type: "closing.submitted",
-            title: `Day closed: ${r.closing.closingNo}`,
-            body: `${user.name} counted ${formatMoney(r.closing.countedCash, currency)} - ${diff}.`,
+            type: r.difference.isZero() ? "closing.submitted" : "closing.difference",
+            title: r.difference.isZero() ? `Day closed: ${r.closing.closingNo}` : `Cash ${r.difference.lt(0) ? "short" : "extra"} ${formatMoney(r.difference.abs(), currency)} at ${r.closing.closingNo}`,
+            body: `${user.name} counted ${formatMoney(r.closing.countedCash, currency)}, the system expected ${formatMoney(r.closing.expectedCash, currency)} (${diff}).`,
             link: `/closing/${r.closing.id}`,
           }, user.id);
           return r.closing.id;
@@ -119,4 +119,34 @@ export async function recordDepositAction(_prev: ActionState, fd: FormData): Pro
   });
   if (result.ok && result.message) redirect(`/closing?banked=${encodeURIComponent(result.message)}`);
   return result;
+}
+
+// ───────────── The owner corrects a closed day's count ─────────────
+
+export async function correctClosingAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const values = formValues(fd);
+  return guarded("cash.adjust", async (user) => {
+    const currency = await getCurrency();
+    const submissionKey = formString(fd, "submissionKey");
+    if (submissionKey.length < 16) return fail("The form could not be read. Reload the page and try again.", undefined, values);
+    const closingId = formString(fd, "closingId");
+    try {
+      await db.$transaction(
+        async (tx) => {
+          const r = await correctClosingCount(tx, { closingId, user, newCount: formString(fd, "newCount"), reason: formString(fd, "reason"), submissionKey, currencyDecimals: currency.decimals });
+          await writeAudit(tx, {
+            user, action: "closing.corrected", entityType: "DailyClosing", entityId: closingId, reference: r.closing.closingNo, reason: formString(fd, "reason"),
+            after: { newCount: r.newCount.toString(), change: r.delta.toString() },
+          });
+        },
+        { timeout: 30000 },
+      );
+      refresh();
+      return { ok: true, message: "Corrected." };
+    } catch (e) {
+      if (e instanceof CashError) return fail(e.message, e.fieldErrors, values);
+      if (isUniqueViolation(e)) return { ok: true, message: "This correction was already saved." };
+      throw e;
+    }
+  });
 }

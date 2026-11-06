@@ -128,8 +128,29 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                 ))}
               </div>
 
-              <div className="card px-4 py-5 sm:px-6">
-                <ClosingForm action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={canDeposit} submissionKey={randomUUID()} bankAccounts={bankAccounts} />
+              <div className="grid items-start gap-5 lg:grid-cols-[1fr_340px]">
+                <div className="card px-4 py-5 sm:px-6">
+                  <ClosingForm action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={canDeposit} submissionKey={randomUUID()} bankAccounts={bankAccounts} />
+                </div>
+                <aside className="card px-4 py-4 sm:px-5 lg:sticky lg:top-20" aria-label="Cash in the till">
+                  <h2 className="text-sm font-semibold text-slate-900">Cash in the till today</h2>
+                  <dl className="mt-3 space-y-1.5 text-sm">
+                    <StatementRow label="Cash from yesterday (closing balance)" value={money(preview.summary.cash.opening)} />
+                    <StatementRow sign="+" label="Cash sales" value={money(preview.summary.cash.salesIn)} />
+                    <StatementRow sign="+" label="Debts collected in cash" value={money(preview.summary.cash.collectionsIn)} />
+                    {Number(preview.summary.cash.refundsOut) !== 0 && <StatementRow sign="−" label="Refunds paid" value={money(preview.summary.cash.refundsOut)} />}
+                    <StatementRow sign="−" label="Cash expenses" value={money(preview.summary.cash.expensesOut)} />
+                    {Number(preview.summary.cash.withdrawals) !== 0 && <StatementRow sign="−" label="Taken out by the owner" value={money(preview.summary.cash.withdrawals)} />}
+                    {Number(preview.summary.cash.supplierPayments ?? 0) !== 0 && <StatementRow sign="−" label="Paid to suppliers" value={money(preview.summary.cash.supplierPayments ?? "0")} />}
+                    {Number(preview.summary.cash.depositsOut) !== 0 && <StatementRow sign="−" label="Banked earlier today" value={money(preview.summary.cash.depositsOut)} />}
+                    {Number(preview.summary.cash.corrections) !== 0 && <StatementRow sign={Number(preview.summary.cash.corrections) < 0 ? "−" : "+"} label="Corrections by the owner" value={money(Math.abs(Number(preview.summary.cash.corrections)))} />}
+                  </dl>
+                  <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
+                    <span className="text-sm font-semibold text-slate-900">Should be in the till</span>
+                    <span className="text-lg font-bold tabular-nums text-slate-900">{money(preview.expectedCash)}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">What you count becomes tomorrow&apos;s starting cash.</p>
+                </aside>
               </div>
 
               <details className="group mt-4">
@@ -268,5 +289,17 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
         </section>
       )}
     </>
+  );
+}
+
+function StatementRow({ label, value, sign }: { label: string; value: string; sign?: "+" | "−" }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-slate-600">
+        {sign && <span className="mr-1.5 inline-block w-3 text-center font-semibold text-slate-400">{sign}</span>}
+        {label}
+      </dt>
+      <dd className="tabular-nums text-slate-900">{value}</dd>
+    </div>
   );
 }

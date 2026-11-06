@@ -10,7 +10,7 @@ import { completeReversal, createReversalRequest } from "@/lib/sales/reversals";
 import { postDeposit, postManualCash, type ManualKind } from "./deposits";
 import { decideExpense, recordExpense, reverseExpense } from "./expenses";
 import { CashError, accountBalance, businessDay, getAccount, getBalances, postCash } from "./ledger";
-import { getClosingPreview, submitClosing, unclosedDays } from "./closing";
+import { correctClosingCount, getClosingPreview, submitClosing, unclosedDays } from "./closing";
 
 const D = (v: string | number) => new Prisma.Decimal(v);
 let userId: string;
@@ -297,6 +297,24 @@ describe("daily closing", () => {
     expect(r.status).toBe("SUBMITTED");
     expect(r.difference.toString()).toBe("-500");
     expect(await balance(s, "CASH")).toBe("49500");
+  });
+
+  it("the owner can correct a closed day: the new count replaces the old one, with a reason, and the ledger follows", async () => {
+    const s = await shop();
+    await manual(s, "CASH", "OPENING", "50000");
+    const r = await close(s, "47000"); // short 3,000
+    expect(await balance(s, "CASH")).toBe("47000");
+    const fix = (newCount: string, reason = "Recounted with the attendant: the rest was found") => db.$transaction((tx) => correctClosingCount(tx, { closingId: r.closing.id, user: { id: managerId }, newCount, reason, submissionKey: randomUUID(), currencyDecimals: 0 }));
+
+    expect((await fix("50000")).delta.toString()).toBe("3000");
+    expect(await balance(s, "CASH")).toBe("50000");
+    expect((await fix("49000")).delta.toString()).toBe("-1000"); // measured against the first correction
+    expect(await balance(s, "CASH")).toBe("49000");
+    await expect(fix("49000")).rejects.toThrow(/already/); // the same figure again
+    await expect(fix("48000", "no")).rejects.toMatchObject({ fieldErrors: { reason: expect.any(String) } });
+    // the locked closing itself is never edited
+    expect((await db.dailyClosing.findUniqueOrThrow({ where: { id: r.closing.id } })).countedCash.toString()).toBe("47000");
+    expect(await db.cashTransaction.count({ where: { referenceNo: r.closing.closingNo, type: "ADJUSTMENT" } })).toBe(2);
   });
 
   it("the same day cannot be closed twice, even at the same moment", async () => {
