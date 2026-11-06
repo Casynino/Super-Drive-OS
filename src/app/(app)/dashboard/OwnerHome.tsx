@@ -107,7 +107,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
     getOwnerOverview(db, { financials }),
     getStockAlerts(db),
     can(user, "shipments.manage") ? db.shipment.count({ where: { issue: "OPEN" } }) : 0,
-    can(user, "shipments.manage") ? db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] } } }) : 0,
+    can(user, "shipments.manage") ? db.shipment.count({ where: { status: "EXPECTED", arrivedAt: null } }) : 0,
     can(user, "cash.view") ? getBalances(db, locationId) : Promise.resolve([]),
     can(user, "expenses.approve") ? db.expense.aggregate({ where: { status: "PENDING" }, _count: true, _sum: { amount: true } }) : null,
     can(user, "closing.approve") ? db.dailyClosing.findMany({ where: { status: "NEEDS_REVIEW" }, select: { difference: true } }) : [],
@@ -139,7 +139,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   if (!closedToday && hourNow >= 19 && can(user, "closing.approve")) items.push({ id: "not-closed", group: "money", tone: "amber", icon: "clock", title: "The shop has not closed today yet", detail: "The WhatsApp report goes out once the day is closed.", href: "/closing" });
   if (alerts.out.length > 0) items.push({ id: "out", group: "stock", tone: "red", icon: "stock", title: `${plural(alerts.out.length, "product", "products")} out of stock`, detail: names(alerts.out), href: "/inventory?status=out" });
   if (alerts.low.length > 0) items.push({ id: "low", group: "stock", tone: "amber", icon: "stock", title: `${plural(alerts.low.length, "product", "products")} running low`, detail: names(alerts.low), href: "/inventory?status=low" });
-  if (shipmentsOnTheWay > 0) items.push({ id: "ship-way", group: "stock", tone: "blue", icon: "shipment", title: `${plural(shipmentsOnTheWay, "shipment", "shipments")} on the way`, detail: "The shop will count them when they arrive.", href: "/shipments" });
+  if (shipmentsOnTheWay > 0) items.push({ id: "ship-way", group: "stock", tone: "blue", icon: "shipment", title: `${plural(shipmentsOnTheWay, "shipment", "shipments")} on the way`, detail: "The shop marks them arrived and checks them.", href: "/shipments" });
 
   const pills = [
     can(user, "cash.view") && { href: "/cash", label: "Cash & accounts", icon: Landmark, tone: "sky" as const },

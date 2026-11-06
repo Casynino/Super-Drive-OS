@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ImageOff, Plus, Trash2 } from "lucide-react";
+import { CheckCheck, ImageOff, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui";
 import ProductPicker from "@/components/inventory/ProductPicker";
 import type { ActionState } from "@/lib/action";
@@ -50,7 +50,7 @@ function Buttons() {
   return (
     <div className="flex flex-wrap gap-3">
       <button type="submit" name="intent" value="confirm" className="btn-primary min-h-11 px-6 text-base" disabled={pending}>
-        {pending ? "Working…" : "Confirm receipt"}
+        {pending ? "Working…" : "Confirm and add to stock"}
       </button>
       <button type="submit" name="intent" value="save" className="btn-secondary min-h-11" disabled={pending}>
         Save draft
@@ -70,6 +70,16 @@ export default function ReceivingForm({ action, shipmentId, shipmentNo, rows: in
   const factorOf = (r: CountRow) => Number(r.units.find((u) => u.id === r.unitId)?.factor ?? 1);
   const num = (s: string) => (s.trim() === "" ? 0 : Number(s));
   const patch = (key: string, p: Partial<CountRow>) => setRows((all) => all.map((r) => (r.key === key ? { ...r, ...p } : r)));
+
+  /** "All of it arrived fine": fills what is still to come as good, in the counting unit when it divides evenly, otherwise in pieces. */
+  const fillFor = (r: CountRow): Partial<CountRow> => {
+    const rem = Math.max(r.expected - r.counted, 0);
+    if (rem <= 0) return {};
+    const inUnit = rem / factorOf(r);
+    if (Math.abs(inUnit - Math.round(inUnit)) < 1e-9) return { good: trim(inUnit), damaged: "" };
+    return { unitId: r.baseUnitId, good: trim(rem), damaged: "" };
+  };
+  const fillAll = () => setRows((all) => all.map((r) => (r.shipmentItemId ? { ...r, ...fillFor(r) } : r)));
 
   const totals = useMemo(() => {
     let good = 0;
@@ -107,6 +117,13 @@ export default function ReceivingForm({ action, shipmentId, shipmentNo, rows: in
       <input type="hidden" name="payloadJson" value={payload} />
       {state.error && <Alert>{state.error}</Alert>}
       {state.ok && state.message && state.message !== "confirmed" && <Alert kind="success">{state.message}</Alert>}
+
+      <div className="card card-pad flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-600">Everything there and in good shape? One tap fills in the full amount for every product.</p>
+        <button type="button" className="btn-secondary" onClick={fillAll}>
+          <CheckCheck size={16} /> Everything arrived fine
+        </button>
+      </div>
 
       <section className="space-y-3">
         {rows.map((r) => {
@@ -156,9 +173,16 @@ export default function ReceivingForm({ action, shipmentId, shipmentNo, rows: in
                   </select>
                 </div>
                 <div>
-                  <label className="label" htmlFor={`g-${r.key}`}>
-                    Good
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="label" htmlFor={`g-${r.key}`}>
+                      Good
+                    </label>
+                    {r.expected - r.counted > 0 && (
+                      <button type="button" className="mb-1.5 text-xs font-medium text-navy-700 hover:underline" onClick={() => patch(r.key, fillFor(r))}>
+                        All
+                      </button>
+                    )}
+                  </div>
                   <input id={`g-${r.key}`} className="input text-lg font-semibold" inputMode="decimal" placeholder="0" value={r.good} onChange={(e) => patch(r.key, { good: e.target.value })} />
                 </div>
                 <div>

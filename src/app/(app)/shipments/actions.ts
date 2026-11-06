@@ -10,7 +10,7 @@ import { can } from "@/lib/auth/can";
 import { fail, formString, guarded, type ActionState } from "@/lib/action";
 import { notifyPermission } from "@/lib/notifications";
 import { ImageError, processProductImage } from "@/lib/product-images";
-import { ShipmentError, cancelShipment, confirmSession, createShipment, resolveIssue, saveDraft } from "@/lib/shipments/engine";
+import { ShipmentError, cancelShipment, confirmSession, createShipment, markArrived, resolveIssue, saveDraft } from "@/lib/shipments/engine";
 import { getCurrency } from "@/lib/settings";
 import { parseMoney } from "@/lib/money";
 import type { PickerProduct } from "@/lib/inventory/types";
@@ -33,7 +33,7 @@ const createSchema = z.object({
   expectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   locationId: z.string().min(1, "Choose where it will be delivered."),
   notes: z.string().trim().max(500).nullable(),
-  lines: z.array(z.object({ productId: z.string().min(1), unitId: z.string().min(1), quantity: z.string().max(24), totalCost: z.string().max(24) })).min(1, "Add at least one product.").max(100),
+  lines: z.array(z.object({ productId: z.string().min(1), unitId: z.string().min(1), quantity: z.string().max(24), totalCost: z.string().max(24), sellingPrice: z.string().max(24).optional(), wholesalePrice: z.string().max(24).optional() })).min(1, "Add at least one product.").max(100),
   submissionKey: z.string().min(16).max(64),
 });
 
@@ -42,6 +42,8 @@ export async function announceShipment(_prev: ActionState, fd: FormData): Promis
     const p = parse(createSchema, fd);
     if (!p) return fail(BAD);
     const currency = await getCurrency();
+    // New selling prices need the same permission as changing a price anywhere else.
+    if (!can(user, "products.price") && p.lines.some((l) => l.sellingPrice?.trim() || l.wholesalePrice?.trim())) return fail("You are not allowed to set selling prices. Remove them and announce the shipment again.");
     const location = await db.location.findFirst({ where: { id: p.locationId, status: "ACTIVE" } });
     if (!location) return fail("Please fix the highlighted fields.", { locationId: "Choose an active location." });
     if (p.supplierId && !(await db.supplier.findFirst({ where: { id: p.supplierId, status: "ACTIVE" } }))) return fail("Please fix the highlighted fields.", { supplierId: "Choose an active supplier." });
@@ -106,6 +108,28 @@ export async function resolveIssueAction(_prev: ActionState, fd: FormData): Prom
     revalidatePath("/shipments");
     revalidatePath(`/shipments/${shipmentId}`);
     return { ok: true, message: "Investigation closed." };
+  });
+}
+
+// ───────────── Shop: the delivery is here ─────────────
+
+export async function markArrivedAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return guarded("shipments.receive", async (user) => {
+    const shipmentId = formString(fd, "shipmentId");
+    try {
+      await db.$transaction(async (tx) => {
+        const { shipment, already } = await markArrived(tx, { shipmentId, user });
+        if (already) return;
+        await writeAudit(tx, { user, action: "shipment.arrived", entityType: "Shipment", entityId: shipment.id, reference: shipment.shipmentNo });
+        await notifyPermission(tx, "shipments.manage", { type: "shipment.arrived", title: `${shipment.shipmentNo} has arrived at the shop`, body: `${user.name} marked it as arrived. It is being checked now.`, link: `/shipments/${shipment.id}` });
+      });
+    } catch (e) {
+      if (e instanceof ShipmentError) return fail(e.message, e.fieldErrors);
+      throw e;
+    }
+    revalidatePath("/shipments");
+    revalidatePath(`/shipments/${shipmentId}`);
+    return { ok: true, message: "Marked as arrived. You can check it now." };
   });
 }
 
@@ -241,6 +265,9 @@ export async function createProductForShipment(fd: FormData): Promise<{ ok: true
       name: created.name,
       sku: created.sku,
       barcode: null,
+      sellingPrice: price.toString(),
+      wholesalePrice: null,
+      imageV: image ? Date.now() : null,
       baseUnitId: piece.id,
       units: [
         { id: piece.id, name: piece.name, symbol: piece.symbol, factor: "1", allowsDecimal: piece.allowsDecimal },

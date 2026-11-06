@@ -35,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     can(user, "returns.approve") ? db.saleReversal.count({ where: { status: "PENDING" } }) : 0,
     can(user, "expenses.approve") ? db.expense.count({ where: { status: "PENDING" } }) : 0,
     can(user, "closing.approve") ? db.dailyClosing.count({ where: { status: "NEEDS_REVIEW" } }) : 0,
-    can(user, "shipments.receive") ? db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] } } }) : 0,
+    can(user, "shipments.receive") ? db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] }, arrivedAt: { not: null } } }) : 0,
     can(user, "shipments.manage") ? db.shipment.count({ where: { issue: "OPEN" } }) : 0,
   ]);
   const badges = { approvals: returnsWaiting + expensesWaiting + closingsToReview, incoming: can(user, "shipments.receive") ? shipmentsToCount : shipmentIssues };

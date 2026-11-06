@@ -40,7 +40,7 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
   const to = new Date(`${today}T23:59:59.999+03:00`);
   const sells = can(user, "sales.pos") || can(user, "sales.view_own") || can(user, "sales.view_all");
 
-  const incoming = can(user, "shipments.receive") ? await db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] } } }) : 0;
+  const incoming = can(user, "shipments.receive") ? await db.shipment.count({ where: { status: { in: ["EXPECTED", "PARTIAL"] }, arrivedAt: { not: null } } }) : 0;
   const closedToday = can(user, "closing.submit") ? await db.dailyClosing.findFirst({ where: { businessDate: dayToDate(businessDay()) }, select: { id: true } }) : null;
   const pendingExpensesMine = can(user, "expenses.create") ? await db.expense.count({ where: { requestedById: user.id, status: "PENDING" } }) : 0;
   const hourNow = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Africa/Dar_es_Salaam" }).format(new Date()));
@@ -79,7 +79,7 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
   const actions = [
     can(user, "sales.pos") && { href: "/pos", icon: ShoppingCart, title: "New sale", text: "Sell to a customer", primary: true },
     can(user, "payments.record") && { href: "/customers", icon: Banknote, title: "Take a payment", text: "A customer pays a debt" },
-    can(user, "shipments.receive") && { href: "/shipments", icon: PackageCheck, title: "Incoming stock", text: incoming > 0 ? `${incoming} ${incoming === 1 ? "delivery" : "deliveries"} to count` : "Count a delivery" },
+    can(user, "shipments.receive") && { href: "/shipments", icon: PackageCheck, title: "Incoming stock", text: incoming > 0 ? `${incoming} ${incoming === 1 ? "delivery" : "deliveries"} to check` : "See what is on the way" },
     can(user, "resellers.operate") && { href: "/resellers", icon: Handshake, title: "Resellers", text: "Issue stock, record what they sold" },
     can(user, "returns.create") && { href: "/sales", icon: Undo2, title: "Return an item", text: "Open the sale first" },
     can(user, "expenses.create") && { href: "/expenses", icon: ReceiptText, title: "Record an expense", text: pendingExpensesMine > 0 ? `${pendingExpensesMine} waiting for the owner` : "Money spent for the shop" },

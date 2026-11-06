@@ -3,6 +3,7 @@ import { Alert, PageHeader } from "@/components/ui";
 import ReceivingForm, { type CountRow } from "@/components/shipments/ReceivingForm";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
+import { canCount } from "@/lib/shipments/phase";
 import { getPickerProducts } from "../../../inventory/data";
 import { saveCount } from "../../actions";
 
@@ -17,7 +18,7 @@ export default async function ReceivePage({ params }: { params: Promise<{ id: st
   const shipment = await db.shipment.findUnique({
     where: { id },
     select: {
-      id: true, shipmentNo: true, status: true, reference: true, notes: true, expectedDate: true,
+      id: true, shipmentNo: true, status: true, arrivedAt: true, reference: true, notes: true, expectedDate: true,
       supplier: { select: { name: true } },
       items: {
         orderBy: [{ unexpected: "asc" }, { id: "asc" }],
@@ -31,7 +32,8 @@ export default async function ReceivePage({ params }: { params: Promise<{ id: st
     },
   });
   if (!shipment) notFound();
-  if (shipment.status !== "EXPECTED" && shipment.status !== "PARTIAL") redirect(`/shipments/${id}`);
+  // Not arrived yet (or already finished / cancelled): the shipment page explains what to do next
+  if (!canCount(shipment)) redirect(`/shipments/${id}`);
 
   const confirmed = await db.shipmentReceivingItem.groupBy({ by: ["productId"], where: { receiving: { shipmentId: id, status: "CONFIRMED" } }, _sum: { goodQty: true, damagedQty: true } });
   const counted = new Map(confirmed.map((c) => [c.productId, Number(c._sum.goodQty ?? 0) + Number(c._sum.damagedQty ?? 0)]));
@@ -83,7 +85,7 @@ export default async function ReceivePage({ params }: { params: Promise<{ id: st
         back={{ href: `/shipments/${id}`, label: shipment.shipmentNo }}
       />
       <div className="mb-4 space-y-3">
-        <Alert kind="info">Count each product and enter how many are <strong>good</strong> and how many are <strong>damaged</strong>. Nothing goes into stock until you press <strong>Confirm receipt</strong>. You can save a draft and come back.</Alert>
+        <Alert kind="info">Count each product. If everything is as announced, press <strong>Everything arrived fine</strong>. If not, type how many are <strong>good</strong> and how many <strong>damaged</strong>; anything that did not come is reported as missing. Nothing goes into stock until you press <strong>Confirm</strong>, and you can save a draft and come back.</Alert>
         {shipment.notes && <Alert kind="info">Note from the owner: {shipment.notes}</Alert>}
       </div>
       <ReceivingForm action={saveCount} shipmentId={id} shipmentNo={shipment.shipmentNo} rows={rows} catalogue={catalogue} catalogueMeta={meta} draftNotes={draft?.notes ?? ""} draftFinish={draft?.finishShipment ?? false} cancelHref={`/shipments/${id}`} />

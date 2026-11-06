@@ -1,6 +1,7 @@
 // Incoming shipments. Call these inside db.$transaction.
 //
 //   createShipment   OWNER announces stock that is on its way. Inventory does NOT change.
+//   markArrived      SHOP says the delivery is at the shop. Counting is only possible after this.
 //   saveDraft        SHOP counts what really arrived on a draft receiving document (editable, no stock change).
 //   confirmSession   SHOP confirms the count. This is the ONLY moment stock increases.
 //   cancelShipment   OWNER withdraws a shipment nobody has started counting.
@@ -37,7 +38,8 @@ export type CreateShipmentInput = {
   expectedDate: string | null; // YYYY-MM-DD
   locationId: string;
   notes: string | null;
-  lines: { productId: string; unitId: string; quantity: string; totalCost: string }[];
+  /** sellingPrice / wholesalePrice: new price per piece (base unit); blank = keep the current price. They go live when the stock is counted in. */
+  lines: { productId: string; unitId: string; quantity: string; totalCost: string; sellingPrice?: string; wholesalePrice?: string }[];
   submissionKey: string;
   currencyDecimals: number;
 };
@@ -47,13 +49,33 @@ export async function createShipment(tx: Tx, input: CreateShipmentInput) {
   if (!resolved.ok) throw new ShipmentError(resolved.message, Object.fromEntries(Object.entries(resolved.errors).map(([i, m]) => [`line.${i}`, m])));
 
   const errors: Record<string, string> = {};
+  const price = (raw: string | undefined): Dec | null | "bad" => {
+    const v = (raw ?? "").trim();
+    if (!v) return null;
+    const m = parseMoney(v, input.currencyDecimals);
+    return m && m.gt(0) ? m : "bad";
+  };
   const lines = resolved.lines.flatMap((l) => {
-    const cost = parseMoney(input.lines[l.index]!.totalCost, input.currencyDecimals);
+    const raw = input.lines[l.index]!;
+    const cost = parseMoney(raw.totalCost, input.currencyDecimals);
     if (!cost || cost.lte(0)) {
-      errors[`line.${l.index}`] = "Enter the total cost of this line (what the goods cost you, landed).";
+      errors[`line.${l.index}`] = "Enter what this line cost you (buying price), landed.";
       return [];
     }
-    return [{ l, lineCost: cost, unitCost: cost.div(l.quantity).toDecimalPlaces(4) }];
+    const sell = price(raw.sellingPrice);
+    const whole = price(raw.wholesalePrice);
+    if (sell === "bad" || whole === "bad") {
+      errors[`line.${l.index}`] = "Enter the selling price as a valid amount, or leave it empty.";
+      return [];
+    }
+    // only a real change is stored; the same price as today means "no change"
+    return [{
+      l,
+      lineCost: cost,
+      unitCost: cost.div(l.quantity).toDecimalPlaces(4),
+      sellingPrice: sell && !sell.eq(l.basePrice) ? sell : null,
+      wholesalePrice: whole && !(l.baseWholesale && whole.eq(l.baseWholesale)) ? whole : null,
+    }];
   });
   if (Object.keys(errors).length) throw new ShipmentError("Please fix the highlighted lines.", errors);
 
@@ -69,7 +91,7 @@ export async function createShipment(tx: Tx, input: CreateShipmentInput) {
       createdById: input.user.id,
       submissionKey: input.submissionKey,
       items: {
-        create: lines.map(({ l, lineCost, unitCost }) => ({
+        create: lines.map(({ l, lineCost, unitCost, sellingPrice, wholesalePrice }) => ({
           productId: l.productId,
           expectedQty: l.quantity,
           enteredQty: l.enteredQty,
@@ -77,6 +99,8 @@ export async function createShipment(tx: Tx, input: CreateShipmentInput) {
           factor: l.factor,
           unitCost,
           lineCost,
+          sellingPrice,
+          wholesalePrice,
         })),
       },
     },
@@ -89,9 +113,25 @@ export async function cancelShipment(tx: Tx, input: { shipmentId: string; user: 
   await tx.$queryRaw`SELECT "id" FROM "Shipment" WHERE "id" = ${input.shipmentId} FOR UPDATE`;
   const s = await tx.shipment.findUnique({ where: { id: input.shipmentId }, include: { _count: { select: { receivings: true } } } });
   if (!s) throw new ShipmentError("This shipment no longer exists.");
-  if (s.status !== "EXPECTED" || s._count.receivings > 0) throw new ShipmentError("The shop has already started counting this shipment, so it can no longer be cancelled.");
+  if (s.status !== "EXPECTED" || s._count.receivings > 0 || s.arrivedAt) throw new ShipmentError("This shipment has already arrived at the shop, so it can no longer be cancelled. Check it and report anything wrong instead.");
   return tx.shipment.update({ where: { id: s.id }, data: { status: "CANCELLED", resolutionNote: input.reason.trim() } });
 }
+
+// ───────────── Shop: mark as arrived ─────────────
+
+/** The shop says the delivery is at the door. Counting can only start after this. Pressing it twice is harmless. */
+export async function markArrived(tx: Tx, input: { shipmentId: string; user: { id: string } }) {
+  await tx.$queryRaw`SELECT "id" FROM "Shipment" WHERE "id" = ${input.shipmentId} FOR UPDATE`;
+  const s = await tx.shipment.findUnique({ where: { id: input.shipmentId } });
+  if (!s) throw new ShipmentError("This shipment no longer exists.");
+  if (s.status === "CANCELLED") throw new ShipmentError("This shipment was cancelled.");
+  if (s.status === "RECEIVED") throw new ShipmentError("This shipment is already fully received.");
+  if (s.arrivedAt) return { shipment: s, already: true };
+  const shipment = await tx.shipment.update({ where: { id: s.id }, data: { arrivedAt: new Date(), arrivedById: input.user.id } });
+  return { shipment, already: false };
+}
+
+const NOT_ARRIVED = "Mark this shipment as arrived first, then count it.";
 
 // ───────────── Shop: count (draft) ─────────────
 
@@ -106,8 +146,9 @@ export async function saveDraft(tx: Tx, input: SaveDraftInput) {
   const shipment = await tx.shipment.findUnique({ where: { id: input.shipmentId }, include: { items: true } });
   if (!shipment) throw new ShipmentError("This shipment no longer exists.");
   if (shipment.status !== "EXPECTED" && shipment.status !== "PARTIAL") throw new ShipmentError(shipment.status === "CANCELLED" ? "This shipment was cancelled." : "This shipment is already fully received.");
+  if (!shipment.arrivedAt) throw new ShipmentError(NOT_ARRIVED);
 
-  let session = await tx.shipmentReceiving.findFirst({ where: { shipmentId: shipment.id, status: "DRAFT" } });
+  let session =await tx.shipmentReceiving.findFirst({ where: { shipmentId: shipment.id, status: "DRAFT" } });
   if (!session) {
     const last = await tx.shipmentReceiving.aggregate({ where: { shipmentId: shipment.id }, _max: { sessionNo: true } });
     session = await tx.shipmentReceiving.create({ data: { shipmentId: shipment.id, sessionNo: (last._max.sessionNo ?? 0) + 1, startedById: input.user.id } });
@@ -171,6 +212,7 @@ export async function confirmSession(tx: Tx, input: { shipmentId: string; sessio
   if (!session || session.shipmentId !== shipment.id) throw new ShipmentError("This counting sheet was not found.");
   if (session.status === "CONFIRMED") throw new ShipmentError("This count was already confirmed.", {}, "ALREADY_CONFIRMED");
   if (shipment.status !== "EXPECTED" && shipment.status !== "PARTIAL") throw new ShipmentError(shipment.status === "CANCELLED" ? "This shipment was cancelled." : "This shipment is already fully received.");
+  if (!shipment.arrivedAt) throw new ShipmentError(NOT_ARRIVED);
   if (session.items.length === 0 && !session.finishShipment) throw new ShipmentError("Nothing has been counted yet. Enter what arrived, or finish the shipment if nothing more is coming.");
 
   await lockProducts(tx, session.items.map((i) => i.productId));
@@ -229,6 +271,28 @@ export async function confirmSession(tx: Tx, input: { shipmentId: string; sessio
         userId: input.user.id,
       });
     }
+  }
+
+  // 1b. New selling prices the owner entered with the announcement go live now that this stock is on the shelf (once per line).
+  for (const a of arrived) {
+    const item = a.item;
+    if (a.total.lte(0) || item.priceAppliedAt || (!item.sellingPrice && !item.wholesalePrice)) continue;
+    const p = await tx.product.findUniqueOrThrow({ where: { id: a.ri.productId }, select: { sellingPrice: true, wholesalePrice: true } });
+    const data: { sellingPrice?: Dec; wholesalePrice?: Dec } = {};
+    const history: { field: string; oldValue: Dec | null; newValue: Dec }[] = [];
+    if (item.sellingPrice && !item.sellingPrice.eq(p.sellingPrice)) {
+      data.sellingPrice = item.sellingPrice;
+      history.push({ field: "sellingPrice", oldValue: p.sellingPrice, newValue: item.sellingPrice });
+    }
+    if (item.wholesalePrice && !(p.wholesalePrice && item.wholesalePrice.eq(p.wholesalePrice))) {
+      data.wholesalePrice = item.wholesalePrice;
+      history.push({ field: "wholesalePrice", oldValue: p.wholesalePrice, newValue: item.wholesalePrice });
+    }
+    if (history.length) {
+      await tx.product.update({ where: { id: a.ri.productId }, data });
+      await tx.productPriceHistory.createMany({ data: history.map((h) => ({ productId: a.ri.productId, ...h, changedById: shipment.createdById })) });
+    }
+    await tx.shipmentItem.update({ where: { id: item.id }, data: { priceAppliedAt: new Date() } });
   }
 
   // 2. Close the count

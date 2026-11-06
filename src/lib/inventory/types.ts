@@ -10,6 +10,10 @@ export type PickerProduct = {
   baseUnitId: string;
   /** base unit first (factor "1"), then packaging units */
   units: PickerUnit[];
+  /** only filled where a form needs them (the shipment form): current prices per piece and the picture version */
+  sellingPrice?: string;
+  wholesalePrice?: string | null;
+  imageV?: number | null;
 };
 
 export type EditorLine = { productId: string; unitId: string; quantity: string; totalCost: string };

@@ -2,7 +2,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { cancelShipment, confirmSession, createShipment, resolveIssue, saveDraft, ShipmentError, type CountLine } from "./engine";
+import { cancelShipment, confirmSession, createShipment, markArrived, resolveIssue, saveDraft, ShipmentError, type CountLine } from "./engine";
+import { canCount, canMarkArrived, shipmentPhase } from "./phase";
 
 const D = (v: string | number) => new Prisma.Decimal(v);
 let ownerId: string;
@@ -28,9 +29,9 @@ async function world() {
 }
 type W = Awaited<ReturnType<typeof world>>;
 
-/** Announce 2 cartons of A (24 bottles, total cost 240000) and optionally 1 carton of B (12 bottles, 60000). */
-function announce(w: W, withB = false) {
-  return db.$transaction((tx) =>
+/** Announce 2 cartons of A (24 bottles, total cost 240000) and optionally 1 carton of B (12 bottles, 60000). The shop marks it arrived unless told not to. */
+async function announce(w: W, withB = false, arrived = true) {
+  const s = await db.$transaction((tx) =>
     createShipment(tx, {
       user: { id: ownerId },
       supplierId: null,
@@ -43,6 +44,8 @@ function announce(w: W, withB = false) {
       currencyDecimals: 0,
     }),
   );
+  if (arrived) await db.$transaction((tx) => markArrived(tx, { shipmentId: s.id, user: { id: shopId } }));
+  return s;
 }
 
 const line = (productId: string, good: string, damaged = "0", unitId = bottle, shipmentItemId: string | null = null): CountLine => ({ shipmentItemId, productId, unitId, good, damaged, note: null });
@@ -101,6 +104,108 @@ describe("announcing and counting", () => {
     expect((await reload(s.id)).status).toBe("RECEIVED");
     expect(await stock(w, w.a.id)).toBe("24");
     expect(await db.shipmentReceiving.count({ where: { shipmentId: s.id } })).toBe(2);
+  });
+});
+
+describe("arrival", () => {
+  it("nothing can be counted until the shop marks the shipment as arrived", async () => {
+    const w = await world();
+    const s = await announce(w, false, false);
+    expect(shipmentPhase(await reload(s.id))).toBe("ON_THE_WAY");
+    await expect(count(s.id, [line(w.a.id, "24")])).rejects.toThrow(/Mark this shipment as arrived/);
+    expect(await stock(w, w.a.id)).toBe("0");
+    expect(await db.shipmentReceiving.count({ where: { shipmentId: s.id } })).toBe(0);
+
+    await db.$transaction((tx) => markArrived(tx, { shipmentId: s.id, user: { id: shopId } }));
+    const arrived = await reload(s.id);
+    expect(shipmentPhase(arrived)).toBe("ARRIVED");
+    expect([canMarkArrived(arrived), canCount(arrived)]).toEqual([false, true]);
+    await count(s.id, [line(w.a.id, "24")]);
+    expect(await stock(w, w.a.id)).toBe("24");
+    expect(shipmentPhase(await reload(s.id))).toBe("DONE");
+  });
+
+  it("marking arrived records who and when, twice is harmless, and finished or cancelled shipments refuse it", async () => {
+    const w = await world();
+    const s = await announce(w, false, false);
+    const first = await db.$transaction((tx) => markArrived(tx, { shipmentId: s.id, user: { id: shopId } }));
+    expect(first.already).toBe(false);
+    const at = (await reload(s.id)).arrivedAt!.getTime();
+    const second = await db.$transaction((tx) => markArrived(tx, { shipmentId: s.id, user: { id: ownerId } }));
+    expect(second.already).toBe(true);
+    const after = await reload(s.id);
+    expect([after.arrivedAt!.getTime(), after.arrivedById]).toEqual([at, shopId]); // the first press wins
+
+    await count(s.id, [line(w.a.id, "24")]);
+    await expect(db.$transaction((tx) => markArrived(tx, { shipmentId: s.id, user: { id: shopId } }))).rejects.toBeInstanceOf(ShipmentError);
+
+    const c = await announce(w, false, false);
+    await db.$transaction((tx) => cancelShipment(tx, { shipmentId: c.id, user: { id: ownerId }, reason: "Order cancelled" }));
+    await expect(db.$transaction((tx) => markArrived(tx, { shipmentId: c.id, user: { id: shopId } }))).rejects.toBeInstanceOf(ShipmentError);
+    expect(shipmentPhase(await reload(c.id))).toBe("CANCELLED");
+  });
+
+  it("phases follow the real flow: on the way, arrived, part checked, investigation, in stock", async () => {
+    const w = await world();
+    const s = await announce(w, false, false);
+    const phases = [shipmentPhase(await reload(s.id))];
+    await db.$transaction((tx) => markArrived(tx, { shipmentId: s.id, user: { id: shopId } }));
+    phases.push(shipmentPhase(await reload(s.id)));
+    await count(s.id, [line(w.a.id, "12")]); // half of it
+    phases.push(shipmentPhase(await reload(s.id)));
+    await count(s.id, [line(w.a.id, "8", "4")]); // the rest, 4 damaged
+    phases.push(shipmentPhase(await reload(s.id)));
+    await db.$transaction((tx) => resolveIssue(tx, { shipmentId: s.id, user: { id: ownerId }, note: "Supplier will refund 4 bottles" }));
+    phases.push(shipmentPhase(await reload(s.id)));
+    expect(phases).toEqual(["ON_THE_WAY", "ARRIVED", "CHECKING", "INVESTIGATION", "DONE"]);
+  });
+});
+
+describe("selling prices entered with the shipment", () => {
+  const withPrices = (w: W, prices: { sellingPrice?: string; wholesalePrice?: string }) =>
+    db.$transaction((tx) =>
+      createShipment(tx, {
+        user: { id: ownerId },
+        supplierId: null,
+        reference: null,
+        expectedDate: null,
+        locationId: w.location.id,
+        notes: null,
+        lines: [{ productId: w.a.id, unitId: carton, quantity: "2", totalCost: "240000", ...prices }],
+        submissionKey: randomUUID(),
+        currencyDecimals: 0,
+      }),
+    );
+  const product = (id: string) => db.product.findUniqueOrThrow({ where: { id } });
+
+  it("the new prices only go live when the stock is counted in, and only once", async () => {
+    const w = await world(); // product A sells at 25000
+    const s = await withPrices(w, { sellingPrice: "30000", wholesalePrice: "27000" });
+    await db.$transaction((tx) => markArrived(tx, { shipmentId: s.id, user: { id: shopId } }));
+    expect((await product(w.a.id)).sellingPrice.toString()).toBe("25000"); // announcing and arriving change nothing
+
+    await count(s.id, [line(w.a.id, "12")]); // first truck
+    const live = await product(w.a.id);
+    expect([live.sellingPrice.toString(), live.wholesalePrice?.toString()]).toEqual(["30000", "27000"]);
+    const history = await db.productPriceHistory.findMany({ where: { productId: w.a.id }, orderBy: { field: "asc" } });
+    expect(history.map((h) => [h.field, h.oldValue?.toString() ?? null, h.newValue?.toString(), h.changedById])).toEqual([
+      ["sellingPrice", "25000", "30000", ownerId],
+      ["wholesalePrice", null, "27000", ownerId],
+    ]);
+
+    // the owner changes the price by hand later; the second truck must not put the old plan back
+    await db.product.update({ where: { id: w.a.id }, data: { sellingPrice: 32000 } });
+    await count(s.id, [line(w.a.id, "12")]);
+    expect((await product(w.a.id)).sellingPrice.toString()).toBe("32000");
+    expect(await db.productPriceHistory.count({ where: { productId: w.a.id } })).toBe(2);
+  });
+
+  it("the same price as today means no change, and bad or zero prices are refused", async () => {
+    const w = await world();
+    const same = await withPrices(w, { sellingPrice: "25000" });
+    expect((await db.shipmentItem.findFirstOrThrow({ where: { shipmentId: same.id } })).sellingPrice).toBeNull();
+    await expect(withPrices(w, { sellingPrice: "abc" })).rejects.toBeInstanceOf(ShipmentError);
+    await expect(withPrices(w, { wholesalePrice: "0" })).rejects.toBeInstanceOf(ShipmentError);
   });
 });
 
@@ -172,7 +277,7 @@ describe("safety", () => {
 
   it("a cancelled shipment cannot be counted, and one already being counted cannot be cancelled", async () => {
     const w = await world();
-    const s1 = await announce(w);
+    const s1 = await announce(w, false, false); // still on the way: the owner may cancel
     await db.$transaction((tx) => cancelShipment(tx, { shipmentId: s1.id, user: { id: ownerId }, reason: "Supplier cancelled the order" }));
     await expect(count(s1.id, [line(w.a.id, "24")])).rejects.toBeInstanceOf(ShipmentError);
     expect(await stock(w, w.a.id)).toBe("0");

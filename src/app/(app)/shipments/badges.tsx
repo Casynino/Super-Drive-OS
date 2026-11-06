@@ -1,12 +1,15 @@
-export function ShipmentStatusBadge({ status }: { status: "EXPECTED" | "PARTIAL" | "RECEIVED" | "CANCELLED" }) {
-  if (status === "EXPECTED") return <span className="badge-blue">On the way</span>;
-  if (status === "PARTIAL") return <span className="badge-yellow">Part received</span>;
-  if (status === "RECEIVED") return <span className="badge-green">Received</span>;
-  return <span className="badge-gray">Cancelled</span>;
-}
+import { PHASE_LABEL, type ShipmentPhase } from "@/lib/shipments/phase";
 
-export function IssueBadge({ issue }: { issue: "NONE" | "OPEN" | "RESOLVED" }) {
-  if (issue === "OPEN") return <span className="badge-red">Needs investigation</span>;
-  if (issue === "RESOLVED") return <span className="badge-gray">Investigated</span>;
-  return null;
+const CLASS: Record<ShipmentPhase, string> = {
+  ON_THE_WAY: "badge-blue",
+  ARRIVED: "badge-yellow",
+  CHECKING: "badge-yellow",
+  INVESTIGATION: "badge-red",
+  DONE: "badge-green",
+  CANCELLED: "badge-gray",
+};
+
+/** One badge for where a shipment stands (On the way, Arrived, Part checked, Investigation, In stock, Cancelled). */
+export function PhaseBadge({ phase }: { phase: ShipmentPhase }) {
+  return <span className={CLASS[phase]}>{PHASE_LABEL[phase]}</span>;
 }

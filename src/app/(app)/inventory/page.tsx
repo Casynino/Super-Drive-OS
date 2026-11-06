@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { ArrowLeftRight, Boxes, CircleCheck, ClipboardCheck, LayoutGrid, List, PackageCheck, PackageX, Search, TriangleAlert, Wallet } from "lucide-react";
+import { ArrowLeftRight, Banknote, Boxes, CircleCheck, ClipboardCheck, Coins, LayoutGrid, List, PackageCheck, PackageX, Search, TrendingUp, TriangleAlert } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
-import StatTile from "@/components/dashboard/StatTile";
+import KpiCard from "@/components/dashboard/KpiCard";
 import StockCard from "@/components/inventory/StockCard";
 import { Prisma } from "@/generated/prisma/client";
 import { can, canAny } from "@/lib/auth/can";
@@ -78,6 +78,27 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const outRows = rows.filter((r) => r.status === "out");
   const totalValue = rows.reduce((s, r) => s.plus(r.value), new D(0));
   const noCost = rows.filter((r) => r.qty.gt(0) && r.p.avgCost.lte(0)).length;
+  // What the stock should sell for, and the profit on the products that have both a cost and a selling price (stock held by resellers counts: it is still ours)
+  let salesValue = new D(0);
+  let profitBase = new D(0);
+  let profitCost = new D(0);
+  let noPrice = 0;
+  for (const r of rows) {
+    const have = r.qty.plus(r.away);
+    if (have.lte(0)) continue;
+    if (r.p.sellingPrice.lte(0)) {
+      noPrice++;
+      continue;
+    }
+    const sv = have.mul(r.p.sellingPrice);
+    salesValue = salesValue.plus(sv);
+    if (r.p.avgCost.gt(0)) {
+      profitBase = profitBase.plus(sv);
+      profitCost = profitCost.plus(have.mul(r.p.avgCost));
+    }
+  }
+  const expectedProfit = profitBase.minus(profitCost);
+  const margin = profitBase.gt(0) ? Math.round(Number(expectedProfit.div(profitBase).mul(100).toString())) : null;
   const noMinimum = rows.filter((r) => r.p.minStock.lte(0)).length;
   const attention = [...outRows, ...lowRows];
 
@@ -180,15 +201,24 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       <PageHeader title="Stock overview" description="What you have, where it is, and what needs reordering." actions={actions} />
 
       {/* Headline numbers */}
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatTile icon={Boxes} tone="navy" label="Active products" value={total} hint={`${inStock} in stock`} href={canOpenProduct ? "/products" : undefined} />
-        <StatTile icon={TriangleAlert} tone="yellow" label="Low stock" value={lowRows.length} hint="At or below the minimum" href={href({ status: "low", page: undefined })} />
-        <StatTile icon={PackageX} tone="red" label="Out of stock" value={outRows.length} hint={outRows.length ? "Needs reordering" : "Nothing missing"} href={href({ status: "out", page: undefined })} />
-        {canValue ? (
-          <StatTile icon={Wallet} tone="green" label="Inventory value" value={formatMoney(totalValue, currency)} hint={noCost ? `${noCost} product${noCost > 1 ? "s" : ""} in stock with no cost yet` : "At average cost"} />
-        ) : (
-          <StatTile icon={Wallet} tone="slate" label="Locations" value={locations.length} />
-        )}
+      {canValue && (
+        <div className="mb-3 grid gap-3 sm:gap-4 md:grid-cols-3">
+          <KpiCard icon={Banknote} tone="navy" label="Stock value" value={formatMoney(totalValue, currency)} hint={noCost ? `${noCost} product${noCost > 1 ? "s" : ""} in stock with no buying price yet` : "What the stock cost you"} />
+          <KpiCard icon={Coins} tone="blue" label="Selling value" value={formatMoney(salesValue, currency)} hint={noPrice ? `${noPrice} product${noPrice > 1 ? "s" : ""} in stock with no selling price` : "If it all sells at today's prices"} />
+          <KpiCard
+            icon={TrendingUp}
+            tone={expectedProfit.lt(0) ? "red" : "green"}
+            label="Expected profit"
+            value={profitBase.gt(0) ? formatMoney(expectedProfit, currency) : "—"}
+            badge={margin !== null ? `${margin}% margin` : undefined}
+            hint={profitBase.gt(0) ? "Selling value minus cost" : "Add buying and selling prices to see it"}
+          />
+        </div>
+      )}
+      <div className="mb-5 grid grid-cols-3 gap-3 sm:gap-4">
+        <KpiCard icon={Boxes} tone="navy" label="Products" value={total} hint={`${inStock} in stock`} href={canOpenProduct ? "/products" : undefined} />
+        <KpiCard icon={TriangleAlert} tone="yellow" label="Low stock" value={lowRows.length} hint="At or below minimum" href={href({ status: "low", page: undefined })} active={sp.status === "low"} />
+        <KpiCard icon={PackageX} tone="red" label="Out of stock" value={outRows.length} hint={outRows.length ? "Needs reordering" : "Nothing missing"} href={href({ status: "out", page: undefined })} active={sp.status === "out"} />
       </div>
 
       {/* Health + what to reorder */}
