@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/guard";
 import { logout } from "@/lib/auth/actions";
 import { db } from "@/lib/db";
 import { getBusinessName } from "@/lib/settings";
+import { getUnitMode } from "@/lib/unit-mode";
 import ChangePasswordForm from "./account/ChangePasswordForm";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -48,6 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       logoutAction={logout}
       unread={unread}
       badges={badges}
+      unitMode={await getUnitMode()}
     >
       {children}
     </AppShell>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ImageOff } from "lucide-react";
 import { StatusBadge } from "@/components/ui";
 import type { RecordStatus } from "@/generated/prisma/client";
-import { qtyText, type Pack } from "@/lib/qty";
+import { qtyText, type Pack, type UnitMode } from "@/lib/qty";
 
 export type HeroStock = { available: number; reseller: number; sold: number; returned: number; damaged: number; missing: number };
 
@@ -23,6 +23,7 @@ export default function ProductHero({
   stock,
   pack = null,
   baseSymbol = "",
+  mode = "ctn",
 }: {
   id: string;
   name: string;
@@ -37,8 +38,9 @@ export default function ProductHero({
   /** cartons first: the biggest pack and the base unit's label */
   pack?: Pack | null;
   baseSymbol?: string;
+  mode?: UnitMode;
 }) {
-  const fmt = (n: number) => qtyText(n, pack, baseSymbol);
+  const fmt = (n: number) => qtyText(n, pack, baseSymbol, mode);
   const total = stock ? stock.available + stock.reseller + stock.sold + stock.damaged : 0;
   const out = stock ? stock.available === 0 : false;
   const low = stock ? !out && minStock > 0 && stock.available <= minStock : false;

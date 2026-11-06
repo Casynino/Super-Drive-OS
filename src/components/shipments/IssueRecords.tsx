@@ -7,7 +7,7 @@ import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
 import type { IssueView } from "@/lib/shipments/issue-view";
-import { qtyText } from "@/lib/qty";
+import { qtyText, type UnitMode } from "@/lib/qty";
 import { cn } from "@/lib/utils";
 
 type Action = "FOUND" | "NOT_DELIVERED" | "WRITE_OFF" | "KEEP";
@@ -21,9 +21,9 @@ const CHOICES: Record<Action, { label: string; title: string; help: string; conf
 };
 const OPTIONS: Record<IssueView["kind"], Action[]> = { MISSING: ["FOUND", "NOT_DELIVERED"], DAMAGED: ["WRITE_OFF"], EXTRA: ["KEEP"] };
 
-const show = (r: IssueView, n: number) => qtyText(n, r.pack, r.unit);
+const show = (r: IssueView, n: number, mode: UnitMode) => qtyText(n, r.pack, r.unit, mode);
 
-function DecisionForm({ r, choice, action, onDone }: { r: IssueView; choice: Action; action: (prev: ActionState, fd: FormData) => Promise<ActionState>; onDone: () => void }) {
+function DecisionForm({ r, choice, action, onDone, mode }: { r: IssueView; choice: Action; action: (prev: ActionState, fd: FormData) => Promise<ActionState>; onDone: () => void; mode: UnitMode }) {
   const [state, formAction] = useActionState(action, {});
   const [submissionKey] = useState(() => crypto.randomUUID());
   const fe = state.fieldErrors ?? {};
@@ -60,7 +60,7 @@ function DecisionForm({ r, choice, action, onDone }: { r: IssueView; choice: Act
               </select>
             )}
           </div>
-          {fe.quantity ? <p className="field-error">{fe.quantity}</p> : <p className="hint">{show(r, r.open).main} open. Fewer is fine: the rest stays under investigation.</p>}
+          {fe.quantity ? <p className="field-error">{fe.quantity}</p> : <p className="hint">{show(r, r.open, mode).main} open. Fewer is fine: the rest stays under investigation.</p>}
         </div>
         <div>
           <label className="label" htmlFor={`n-${r.key}`}>{c.reasonRequired ? "Reason" : "Note (optional)"}</label>
@@ -88,7 +88,7 @@ function DecisionForm({ r, choice, action, onDone }: { r: IssueView; choice: Act
   );
 }
 
-function RecordCard({ r, canAct, closed, action }: { r: IssueView; canAct: boolean; closed: boolean; action: (prev: ActionState, fd: FormData) => Promise<ActionState> }) {
+function RecordCard({ r, canAct, closed, action, mode }: { r: IssueView; canAct: boolean; closed: boolean; action: (prev: ActionState, fd: FormData) => Promise<ActionState>; mode: UnitMode }) {
   const [choice, setChoice] = useState<Action | null>(null);
   const done = r.open === 0;
   const status = done ? { cls: "badge-green", label: "Resolved" } : closed ? { cls: "badge-gray", label: "Closed with a note" } : r.resolved > 0 ? { cls: "badge-yellow", label: "Partly resolved" } : { cls: "badge-red", label: "Under investigation" };
@@ -124,11 +124,11 @@ function RecordCard({ r, canAct, closed, action }: { r: IssueView; canAct: boole
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold leading-none tracking-tight text-slate-900">
-            {show(r, r.open).main}
+            {show(r, r.open, mode).main}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            {done ? "all decided" : r.resolved > 0 ? `still open of ${show(r, r.total).main}` : "under investigation"}
-            {show(r, r.open).pieces && !done && <span className="block">{show(r, r.open).pieces}</span>}
+            {done ? "all decided" : r.resolved > 0 ? `still open of ${show(r, r.total, mode).main}` : "under investigation"}
+            {show(r, r.open, mode).pieces && !done && <span className="block">{show(r, r.open, mode).pieces}</span>}
           </p>
         </div>
       </div>
@@ -142,7 +142,7 @@ function RecordCard({ r, canAct, closed, action }: { r: IssueView; canAct: boole
           ))}
         </div>
       )}
-      {choice && <DecisionForm key={choice} r={r} choice={choice} action={action} onDone={() => setChoice(null)} />}
+      {choice && <DecisionForm key={choice} r={r} choice={choice} action={action} onDone={() => setChoice(null)} mode={mode} />}
 
       <details className="mt-3 text-sm">
         <summary className="cursor-pointer select-none text-xs font-medium text-slate-500 hover:text-slate-800">History ({r.history.length + 1})</summary>
@@ -167,13 +167,13 @@ function RecordCard({ r, canAct, closed, action }: { r: IssueView; canAct: boole
  * The problem products of an order, one card each, with the choices the owner has for that kind of problem.
  * People who cannot decide (the shop) see the same cards without the buttons.
  */
-export default function IssueRecords({ records, canAct, closed = false, action }: { records: IssueView[]; canAct: boolean; /** the investigation was closed with a note instead of deciding each product */ closed?: boolean; action: (prev: ActionState, fd: FormData) => Promise<ActionState> }) {
+export default function IssueRecords({ records, canAct, closed = false, action, mode = "ctn" }: { records: IssueView[]; canAct: boolean; /** the CTN | PCS switch */ mode?: UnitMode; /** the investigation was closed with a note instead of deciding each product */ closed?: boolean; action: (prev: ActionState, fd: FormData) => Promise<ActionState> }) {
   // what still needs a decision first, decided ones last
   const sorted = [...records].sort((a, b) => Number(a.open === 0) - Number(b.open === 0));
   return (
     <ul className="divide-y divide-slate-100">
       {sorted.map((r) => (
-        <RecordCard key={r.key} r={r} canAct={canAct} closed={closed} action={action} />
+        <RecordCard key={r.key} r={r} canAct={canAct} closed={closed} action={action} mode={mode} />
       ))}
     </ul>
   );

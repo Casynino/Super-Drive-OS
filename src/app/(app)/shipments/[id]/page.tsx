@@ -9,6 +9,7 @@ import IssueRecords from "@/components/shipments/IssueRecords";
 import { LABELS_ENABLED } from "@/lib/features";
 import { loadIssueRecords } from "@/lib/shipments/issues";
 import { toIssueViews } from "@/lib/shipments/issue-view";
+import { getUnitMode } from "@/lib/unit-mode";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { Prisma } from "@/generated/prisma/client";
 import { can, canAny } from "@/lib/auth/can";
@@ -162,7 +163,7 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
               </p>
             </div>
           </div>
-          <IssueRecords records={issueViews} canAct={manage} closed={shipment.issue === "RESOLVED" && issueViews.some((r) => r.open > 0)} action={decideIssueAction} />
+          <IssueRecords mode={await getUnitMode()} records={issueViews} canAct={manage} closed={shipment.issue === "RESOLVED" && issueViews.some((r) => r.open > 0)} action={decideIssueAction} />
           {manage && shipment.issue === "OPEN" && (
             <details className="border-t border-line px-5 py-3">
               <summary className="cursor-pointer select-none text-sm font-medium text-slate-600 hover:text-slate-900">Close the whole investigation with one note instead</summary>

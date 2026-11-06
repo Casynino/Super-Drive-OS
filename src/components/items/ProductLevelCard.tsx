@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ImageOff } from "lucide-react";
-import { qtyText, type Pack } from "@/lib/qty";
+import { qtyText, type Pack, type UnitMode } from "@/lib/qty";
 import { cn } from "@/lib/utils";
 
 export type ProductLevel = {
@@ -28,11 +28,11 @@ export type ProductLevel = {
  * One product's level at a glance: the big number is what is in the shop now, the bar shows where every piece of it went
  * (in the shop, with resellers, damaged, sold). Pressing the card shows only that product's pieces.
  */
-export default function ProductLevelCard({ p, href, active, showStock = true }: { p: ProductLevel; href: string; active?: boolean; /** false for people who may not see stock: only the product and its price */ showStock?: boolean }) {
+export default function ProductLevelCard({ p, href, active, showStock = true, mode = "ctn" }: { p: ProductLevel; href: string; active?: boolean; /** false for people who may not see stock: only the product and its price */ showStock?: boolean; /** the CTN | PCS switch */ mode?: UnitMode }) {
   const out = p.available === 0;
   const low = !out && p.minStock > 0 && p.available <= p.minStock;
   const pct = (n: number) => (p.total > 0 ? (n / p.total) * 100 : 0);
-  const fmt = (n: number) => qtyText(n, p.pack ?? null, p.baseSymbol ?? "").main;
+  const fmt = (n: number) => qtyText(n, p.pack ?? null, p.baseSymbol ?? "", mode).main;
   const segments = [
     { n: p.available, cls: out ? "bg-brand-red" : low ? "bg-oil-400" : "bg-emerald-500", label: "in the shop" },
     { n: p.reseller, cls: "bg-blue-500", label: "with resellers" },

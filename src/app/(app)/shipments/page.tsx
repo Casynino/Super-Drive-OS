@@ -7,6 +7,7 @@ import ReceiptsTable from "@/components/inventory/ReceiptsTable";
 import IssueRecords from "@/components/shipments/IssueRecords";
 import { loadIssueRecords } from "@/lib/shipments/issues";
 import { toIssueViews } from "@/lib/shipments/issue-view";
+import { getUnitMode } from "@/lib/unit-mode";
 import MarkArrivedButton from "@/components/shipments/MarkArrivedButton";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -31,6 +32,7 @@ const TAB_PHASES: Record<PhaseTab, ShipmentPhase[]> = {
 };
 
 export default async function ShipmentsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const unitMode = await getUnitMode();
   const user = await requireUser();
   if (!canAny(user, ["shipments.manage", "shipments.receive"])) redirect("/forbidden");
   const sp = await searchParams;
@@ -206,7 +208,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
                   <span className="badge-red">{open > 0 ? `${open} product${open === 1 ? "" : "s"} to decide` : "Open"}</span>
                 </div>
                 {mine.length > 0 ? (
-                  <IssueRecords records={mine} canAct={manage} action={decideIssueAction} />
+                  <IssueRecords mode={unitMode} records={mine} canAct={manage} action={decideIssueAction} />
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-slate-600">
                     <span>This order has a problem on record. Open it to see the details.</span>

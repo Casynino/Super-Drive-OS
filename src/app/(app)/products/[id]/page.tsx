@@ -10,7 +10,8 @@ import { db } from "@/lib/db";
 import { Prisma, type ItemStatus } from "@/generated/prisma/client";
 import { ITEM_STATUSES, ITEM_STATUS_LABEL } from "@/lib/inventory/item-labels";
 import { formatMoney } from "@/lib/money";
-import { largestPack } from "@/lib/qty";
+import { largestPack, packNote } from "@/lib/qty";
+import { getUnitMode } from "@/lib/unit-mode";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { LABELS_ENABLED, PIECE_LIST_ENABLED } from "@/lib/features";
 import { getProductFormOptions } from "../options";
@@ -141,7 +142,7 @@ export default async function EditProductPage({ params, searchParams }: { params
         id={product.id}
         name={product.name}
         sku={product.sku}
-        subtitle={[product.category.name, product.brand?.name].filter(Boolean).join(" · ")}
+        subtitle={[product.category.name, product.brand?.name, packNote(largestPack(product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor }))), product.baseUnit.symbol)].filter(Boolean).join(" · ")}
         status={product.status}
         imageV={image ? image.updatedAt.getTime() : null}
         price={formatMoney(product.sellingPrice, currency)}
@@ -150,6 +151,7 @@ export default async function EditProductPage({ params, searchParams }: { params
         stock={stock}
         pack={largestPack(product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })))}
         baseSymbol={product.baseUnit.symbol}
+        mode={await getUnitMode()}
       />
       {sp.created && (
         <div className="mb-4">

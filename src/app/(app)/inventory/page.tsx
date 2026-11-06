@@ -10,7 +10,8 @@ import { db } from "@/lib/db";
 import { ADJUSTMENT_KIND_LABELS } from "@/lib/inventory/labels";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
-import { largestPack, qtyText } from "@/lib/qty";
+import { largestPack, packNote, qtyText } from "@/lib/qty";
+import { getUnitMode } from "@/lib/unit-mode";
 import { cn, formatDateTime } from "@/lib/utils";
 
 export const metadata = { title: "Stock overview" };
@@ -31,6 +32,7 @@ type SortKey = keyof typeof SORTS;
 const RANK: Record<Status, number> = { out: 0, low: 1, ok: 2 };
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<Search> }) {
+  const mode = await getUnitMode();
   const user = await requirePagePermission("inventory.view");
   const sp = await searchParams;
   const currency = await getCurrency();
@@ -179,7 +181,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     const hasMin = p.minStock.gt(0);
     // cartons first, pieces as the small second line
     const pk = largestPack(p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
-    const shown = qtyText(Number(qty.toString()), pk, unit);
+    const shown = qtyText(Number(qty.toString()), pk, unit, mode);
     return {
       id: p.id,
       name: p.name,
@@ -189,11 +191,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       imageV: p.image ? p.image.updatedAt.getTime() : null,
       qty: shown.main,
       unit: "",
-      pack: shown.pieces,
-      min: hasMin ? qtyText(Number(p.minStock.toString()), pk, unit).main : null,
+      pack: packNote(pk, unit),
+      min: hasMin ? qtyText(Number(p.minStock.toString()), pk, unit, mode).main : null,
       levelPct: hasMin ? Math.min(100, (Number(qty.toString()) / (Number(p.minStock.toString()) * 3)) * 100) : null,
       status,
-      away: away.gt(0) ? qtyText(Number(away.toString()), pk, unit).main : null,
+      away: away.gt(0) ? qtyText(Number(away.toString()), pk, unit, mode).main : null,
       value: canValue ? formatMoney(value, currency) : null,
       href: canOpenProduct ? `/products/${p.id}` : null,
     };
@@ -285,7 +287,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                           <span className="shrink-0 text-xs text-slate-500">
                             {(() => {
                               const pk = largestPack(r.p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
-                              return `${qtyText(Number(r.qty.toString()), pk, r.p.baseUnit.symbol).main} / ${qtyText(Number(r.p.minStock.toString()), pk, r.p.baseUnit.symbol).main}`;
+                              return `${qtyText(Number(r.qty.toString()), pk, r.p.baseUnit.symbol, mode).main} / ${qtyText(Number(r.p.minStock.toString()), pk, r.p.baseUnit.symbol, mode).main}`;
                             })()}
                           </span>
                         )}
@@ -421,8 +423,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               <tbody>
                 {pageRows.map(({ p, qty, away, status, value }) => {
                   const pk = largestPack(p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
-                  const shown = qtyText(Number(qty.toString()), pk, p.baseUnit.symbol);
-                  const pack = shown.pieces;
+                  const shown = qtyText(Number(qty.toString()), pk, p.baseUnit.symbol, mode);
+                  const pack = packNote(pk, p.baseUnit.symbol);
                   return (
                     <tr key={p.id}>
                       <td>
@@ -446,8 +448,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                         <span className="font-semibold">{shown.main}</span>
                         {pack && <span className="block text-xs text-slate-500">{pack}</span>}
                       </td>
-                      {!locationId && <td className="hidden text-right text-slate-600 md:table-cell">{away.gt(0) ? qtyText(Number(away.toString()), pk, p.baseUnit.symbol).main : "—"}</td>}
-                      <td className="hidden text-right text-slate-600 md:table-cell">{p.minStock.gt(0) ? qtyText(Number(p.minStock.toString()), pk, p.baseUnit.symbol).main : "—"}</td>
+                      {!locationId && <td className="hidden text-right text-slate-600 md:table-cell">{away.gt(0) ? qtyText(Number(away.toString()), pk, p.baseUnit.symbol, mode).main : "—"}</td>}
+                      <td className="hidden text-right text-slate-600 md:table-cell">{p.minStock.gt(0) ? qtyText(Number(p.minStock.toString()), pk, p.baseUnit.symbol, mode).main : "—"}</td>
                       <td>{status === "out" ? <span className="badge-red">Out of stock</span> : status === "low" ? <span className="badge-yellow">Low</span> : <span className="badge-green">In stock</span>}</td>
                       {canValue && <td className="hidden text-right lg:table-cell">{formatMoney(value, currency)}</td>}
                     </tr>

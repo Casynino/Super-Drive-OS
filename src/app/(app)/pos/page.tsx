@@ -2,6 +2,7 @@ import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { EmptyState, PageHeader } from "@/components/ui";
 import PosTerminal from "@/components/pos/PosTerminal";
+import { getUnitMode } from "@/lib/unit-mode";
 import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { Prisma } from "@/generated/prisma/client";
@@ -92,6 +93,7 @@ export default async function PosPage() {
           stockByLocation={stockByLocation}
           customers={posCustomers}
           submissionKey={randomUUID()}
+          unitMode={await getUnitMode()}
           currency={currency}
           perms={{ credit: canCredit, discount: can(user, "sales.discount"), addCustomer: can(user, "customers.create"), creditException: can(user, "credit.approve_exception") }}
         />

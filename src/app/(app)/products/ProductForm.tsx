@@ -235,7 +235,7 @@ export default function ProductForm({ product, categories, brands, units, curren
               <p className="label">Single pieces</p>
               <label className="flex items-start gap-2 text-sm text-slate-700">
                 <input type="checkbox" name="allowPieceSales" defaultChecked={product ? product.allowPieceSales : true} disabled={disabled} className="mt-0.5 h-4 w-4 rounded border-slate-400" />
-                <span>Allow selling single pieces. Untick it to sell this product by the carton only.</span>
+                <span>Allow switching to PCS when selling. The carton stays the default. Untick it to sell this product by the carton only.</span>
               </label>
             </div>
           </div>

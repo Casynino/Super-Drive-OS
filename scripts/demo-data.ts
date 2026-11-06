@@ -217,7 +217,7 @@ async function setup(d: number) {
 async function createPO(d: number, user: Who, supplierId: string, cargo: string, perProduct: number, expectedOffset: number, only?: string[]) {
   const chosen = prods.filter((p) => !only || only.some((n) => p.name.includes(n)));
   const lines = chosen.map((p) => {
-    const pieces = Math.max(p.factor, Math.round((perProduct * ORDER_SIZE[POPULARITY[prods.indexOf(p) % POPULARITY.length]!]! * (0.8 + rnd() * 0.4)) / p.factor) * p.factor);
+    const pieces = Math.max(p.factor, Math.round((perProduct * 1.7 * ORDER_SIZE[POPULARITY[prods.indexOf(p) % POPULARITY.length]!]! * (0.8 + rnd() * 0.4)) / p.factor) * p.factor);
     const unitId = p.cartonUnitId ?? p.baseUnitId;
     const qty = p.cartonUnitId ? pieces / p.factor : pieces;
     return { productId: p.id, unitId, quantity: String(qty), totalCost: String(Math.round(p.cost * 0.97 * pieces)), sellingPrice: "", wholesalePrice: "" };
@@ -230,18 +230,20 @@ async function arrive(id: string, user: Who) {
 }
 /** The shop counts. `fraction` of each line arrived good, `damaged` pieces of one product broke, `finish` = nothing more is coming. */
 async function count(id: string, user: Who, opts: { fraction?: number; before?: Map<string, number>; damaged?: Record<string, number>; finish?: boolean }) {
+  // everything is counted in cartons (the unit it was ordered in); `before` and `damaged` are carton counts too
   const items = await db.shipmentItem.findMany({ where: { shipmentId: id, unexpected: false } });
   const lines: CountLine[] = [];
   const counted = opts.before ?? new Map<string, number>();
   const now = new Map<string, number>();
   for (const it of items) {
-    const expected = Number(it.expectedQty);
+    const p = prods.find((x) => x.id === it.productId)!;
+    const expected = Number(it.expectedQty) / p.factor;
     const target = opts.fraction === undefined ? expected : Math.floor(expected * opts.fraction);
     const already = counted.get(it.productId) ?? 0;
     const bad = opts.damaged?.[it.productId] ?? 0;
     const good = Math.max(target - already - bad, 0);
     now.set(it.productId, already + good + bad);
-    if (good + bad > 0) lines.push({ shipmentItemId: null, productId: it.productId, unitId: pieceUnit, good: String(good), damaged: String(bad), note: bad ? "Boxes crushed in transit" : null });
+    if (good + bad > 0) lines.push({ shipmentItemId: null, productId: it.productId, unitId: p.cartonUnitId ?? p.baseUnitId, good: String(good), damaged: String(bad), note: bad ? "Cartons crushed in transit" : null });
   }
   const saved = await tx((t) => saveDraft(t, { shipmentId: id, user, notes: null, finish: Boolean(opts.finish), lines }));
   await tx((t) => confirmSession(t, { shipmentId: id, sessionId: saved.sessionId, user }), 180000);
@@ -267,7 +269,7 @@ function pickPopular(list: Prod[]): Prod {
 const methodMix = (): PaymentMethod => (chance(0.62) ? "CASH" : chance(0.78) ? "MOBILE_MONEY" : "BANK");
 
 async function oneSale(cashier: Who) {
-  const inStock = prods.filter((p) => (stock.get(p.id) ?? 0) >= 1);
+  const inStock = prods.filter((p) => (stock.get(p.id) ?? 0) >= p.factor); // sold by the carton only
   if (inStock.length === 0) return;
   const business = chance(0.3) ? pick(customers) : null;
   const regular = !business && chance(0.35) ? pick(walkIns) : null;
@@ -279,17 +281,14 @@ async function oneSale(cashier: Who) {
     if (picked.has(p.id)) continue;
     picked.add(p.id);
     const have = stock.get(p.id) ?? 0;
-    const bulk = business && chance(0.12) && p.cartonUnitId && have >= p.factor * 2;
-    const qty = bulk ? 1 : Math.min(business ? int(2, 6) : int(1, 2), have);
+    // the business sells by the carton: whole cartons only, never single pieces
+    const cartonsHave = Math.floor(have / p.factor);
+    const qty = Math.min(business ? int(1, 3) : 1, cartonsHave);
     if (qty < 1) continue;
-    const unitId = bulk ? p.cartonUnitId! : p.baseUnitId;
-    const pieces = bulk ? qty * p.factor : qty;
-    let itemCodes: string[] | undefined;
-    if (!bulk && chance(0.4)) {
-      // scanned: those exact pieces
-      const found = await db.inventoryItem.findMany({ where: { productId: p.id, locationId: locId, status: "AVAILABLE" }, orderBy: { itemNo: "asc" }, take: qty, select: { token: true } });
-      if (found.length === qty) itemCodes = found.map((f) => f.token);
-    }
+    const unitId = p.cartonUnitId ?? p.baseUnitId;
+    const pieces = qty * p.factor;
+    const bulk = Boolean(p.cartonUnitId);
+    const itemCodes: string[] | undefined = undefined;
     const discount = chance(0.07);
     const list = business && ["WHOLESALE", "DISTRIBUTOR"].includes(business.type) ? p.wholesale : p.retail;
     lines.push({ productId: p.id, unitId, quantity: String(qty), unitPrice: discount ? String(round500(list * 0.95) * (bulk ? p.factor : 1)) : "", itemCodes });
@@ -365,10 +364,10 @@ async function collect(customerId: string, who: Who, fractionOfDebt: number) {
 
 async function returnOne(d: number, leavePending: boolean) {
   const sale = await db.sale.findFirst({ where: { status: "COMPLETED", paymentStatus: "PAID", channel: "SHOP", createdAt: { gte: new Date(Date.now() - 5 * 86400000) } }, orderBy: { createdAt: "desc" }, include: { items: true } });
-  const line = sale?.items.find((i) => i.factor.eq(1));
+  const line = sale?.items[0];
   if (!sale || !line) return;
   const damaged = chance(0.4);
-  const req = await tx((t) => createReversalRequest(t, { user: amina, saleId: sale.id, kind: "RETURN", reason: damaged ? "Bottle was leaking when opened" : "Customer bought the wrong grade", refundMethod: "CASH", refundReference: null, lines: [{ saleItemId: line.id, quantity: "1", condition: damaged ? "DAMAGED" : "RESELLABLE" }], submissionKey: key() }));
+  const req = await tx((t) => createReversalRequest(t, { user: amina, saleId: sale.id, kind: "RETURN", reason: damaged ? "Carton was leaking when opened" : "Customer bought the wrong grade", refundMethod: "CASH", refundReference: null, lines: [{ saleItemId: line.id, quantity: "1", condition: damaged ? "DAMAGED" : "RESELLABLE" }], submissionKey: key() }));
   if (!leavePending) await tx((t) => completeReversal(t, { reversalId: req.id, approver: manager, note: null, dp: 0 }));
   void d;
 }
@@ -394,7 +393,7 @@ async function main() {
   let firstCount = new Map<string, number>();
   at(-50, async () => void (po.p2 = await createPO(-50, owner, suppliers[0]!.id, "Dar Express Cargo", 120, -46)));
   at(-46, async () => { await arrive(po.p2!.id, salim); firstCount = await count(po.p2!.id, salim, { fraction: 0.6 }); });
-  at(-44, async () => { const bad = prods.find((p) => p.name.includes("5W-30 5L"))!; await count(po.p2!.id, salim, { before: firstCount, damaged: { [bad.id]: 6 }, finish: true }); });
+  at(-44, async () => { const bad = prods.find((p) => p.name.includes("5W-30 5L"))!; await count(po.p2!.id, salim, { before: firstCount, damaged: { [bad.id]: 1 }, finish: true }); });
   at(-40, async () => void (await tx((t) => resolveIssue(t, { shipmentId: po.p2!.id, user: owner, note: "Cargo company accepted the damage claim: 6 jugs will be credited on the next order." }))));
   at(-36, async () => void (await tx((t) => paySupplier(t, { user: owner, supplierId: suppliers[0]!.id, shipmentId: po.p2!.id, amount: "4500000", method: "BANK", reference: "TT-GZ-21877", notes: null, submissionKey: key(), currencyDecimals: 0 }))));
   at(-32, async () => void (po.p3 = await createPO(-32, owner, suppliers[1]!.id, "Safari Air Freight", 100, -29)));
@@ -420,13 +419,13 @@ async function main() {
     await loadStock();
     const lines = prods
       .filter((p) => names.some((n) => p.name.includes(n)))
-      .map((p) => ({ productId: p.id, unitId: p.baseUnitId, quantity: String(Math.min(perLine, Math.floor((stock.get(p.id) ?? 0) * 0.5))) }))
+      .map((p) => ({ productId: p.id, unitId: p.cartonUnitId ?? p.baseUnitId, quantity: String(Math.min(Math.ceil(perLine / 3), Math.floor(((stock.get(p.id) ?? 0) * 0.5) / p.factor))) }))
       .filter((l) => Number(l.quantity) > 0);
     if (lines.length) await tx((t) => issueStock(t, { user: amina, resellerId: resellers[r]!.id, fromLocationId: locId, lines, notes: "Weekly stock", submissionKey: key(), currencyDecimals: 0 }));
   };
   const sold = async (r: number, share: number) => {
     const bal = await db.stockBalance.findMany({ where: { locationId: resellers[r]!.locationId, quantity: { gt: 0 } } });
-    const lines = bal.map((b) => ({ productId: b.productId, unitId: prods.find((p) => p.id === b.productId)!.baseUnitId, quantity: String(Math.floor(Number(b.quantity) * share)) })).filter((l) => Number(l.quantity) > 0);
+    const lines = bal.map((b) => { const p = prods.find((x) => x.id === b.productId)!; return { productId: b.productId, unitId: p.cartonUnitId ?? p.baseUnitId, quantity: String(Math.floor((Number(b.quantity) / p.factor) * share)) }; }).filter((l) => Number(l.quantity) > 0);
     if (lines.length) await tx((t) => reportSold(t, { user: amina, canDiscount: false, resellerId: resellers[r]!.id, lines, discountReason: null, notes: null, submissionKey: key(), currencyDecimals: 0 }));
   };
   at(-57, async () => { await issue(0, 12, ["15W-40 5L", "20W-50 5L", "1L"]); await issue(1, 8, ["5W-30 5L", "20W-50 1L", "NS-2"]); });
@@ -435,7 +434,7 @@ async function main() {
   at(-30, async () => {
     const r = resellers[1]!;
     const bal = await db.stockBalance.findMany({ where: { locationId: r.locationId, quantity: { gt: 0 } }, take: 2 });
-    const lines = bal.map((b, i) => ({ productId: b.productId, unitId: prods.find((p) => p.id === b.productId)!.baseUnitId, quantity: "2", condition: (i === 0 ? "RESELLABLE" : "DAMAGED") as "RESELLABLE" | "DAMAGED" }));
+    const lines = bal.map((b, i) => ({ productId: b.productId, unitId: prods.find((p) => p.id === b.productId)!.cartonUnitId ?? prods.find((p) => p.id === b.productId)!.baseUnitId, quantity: "1", condition: (i === 0 ? "RESELLABLE" : "DAMAGED") as "RESELLABLE" | "DAMAGED" }));
     if (lines.length) await tx((t) => returnStock(t, { user: amina, resellerId: r.id, toLocationId: locId, lines, notes: "Unsold and one broken", submissionKey: key() }));
   });
   at(-20, async () => { await issue(0, 10, ["15W-40 5L", "5W-30 5L", "Quartz", "1L"]); await issue(1, 10, ["20W-50 5L", "15W-40 1L", "20W-50 1L"]); });
@@ -459,7 +458,7 @@ async function main() {
     const factor = [0.55, 1, 0.9, 0.95, 1, 1.25, 1.5][dow]! * (0.75 + 0.5 * ((d - START) / -START));
     const trading = d > -67; // the first delivery is counted on day -67
     if (trading && firstSalesDay === 1) firstSalesDay = d;
-    const nSales = trading ? Math.max(0, Math.round(6 * factor + int(-1, 1))) : 0;
+    const nSales = trading ? Math.max(0, Math.round(1.7 * factor + int(-1, 1))) : 0; // cartons are big sales: a few a day
     const closed = d < 0 && d >= firstSalesDay;
     const morning = Math.ceil(nSales * 0.45);
 
@@ -506,8 +505,14 @@ async function main() {
       if (closed && dow === 5) {
         // Friday: part of the till goes to the bank
         const cash = await db.$queryRaw<{ s: Prisma.Decimal | null }[]>`SELECT SUM(t."amount") AS s FROM "CashTransaction" t JOIN "CashAccount" a ON a."id" = t."accountId" WHERE a."method" = 'CASH'`;
-        const amount = Math.floor((Number(cash[0]?.s ?? 0) * 0.7) / 10000) * 10000;
-        if (amount >= 100000) await tx((t) => postDeposit(t, { user: amina, locationId: locId, amount: String(amount), bankReference: `DEP-${isoDay(d).replaceAll("-", "")}`, notes: "Weekly deposit", slipId: null, submissionKey: key(), currencyDecimals: 0 }));
+        const amount = Math.floor((Number(cash[0]?.s ?? 0) * 0.5) / 10000) * 10000;
+        if (amount >= 100000) {
+          try {
+            await tx((t) => postDeposit(t, { user: amina, locationId: locId, amount: String(amount), bankReference: `DEP-${isoDay(d).replaceAll("-", "")}`, notes: "Weekly deposit", slipId: null, submissionKey: key(), currencyDecimals: 0 }));
+          } catch {
+            // not enough counted cash that Friday: the deposit simply waits for next week
+          }
+        }
       }
     });
 

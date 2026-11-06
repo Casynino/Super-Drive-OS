@@ -10,7 +10,8 @@ import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { LABELS_ENABLED, PIECE_LIST_ENABLED } from "@/lib/features";
 import { untrackedStock } from "@/lib/inventory/items";
-import { fmtQty, inPacks, largestPack, qtyText } from "@/lib/qty";
+import { fmtQty, inPacks, largestPack, packNote, qtyText } from "@/lib/qty";
+import { getUnitMode } from "@/lib/unit-mode";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ type Search = { q?: string; category?: string; status?: string; page?: string; v
 const num = (d: { toString(): string } | null | undefined) => Number(d?.toString() ?? 0);
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<Search> }) {
+  const mode = await getUnitMode();
   const user = await requirePagePermission("products.view");
   const sp = await searchParams;
   const currency = await getCurrency();
@@ -94,7 +96,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       sold,
       damaged,
       total: available + reseller + sold + damaged,
-      subtitle: [p.category.name, p.brand?.name].filter(Boolean).join(" · "),
+      subtitle: [p.category.name, p.brand?.name, packNote(largestPack(p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor }))), p.baseUnit.symbol)].filter(Boolean).join(" · "),
       price: formatMoney(p.sellingPrice, currency),
       inactive: p.status === "INACTIVE",
       pack: largestPack(p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor }))),
@@ -114,21 +116,27 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     const packOf = new Map(catalogue.map((c) => [c.id, largestPack(c.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })))]));
     const onShelf = new Map<string, number>();
     let shelfCtn = 0;
-    let shelfPcs = 0;
     let heldCtn = 0;
+    let shelfPcs = 0;
+    let heldPcs = 0;
     for (const b of allBalances) {
       const n = num(b._sum.quantity);
       const pk = packOf.get(b.productId) ?? null;
-      if (isReseller.has(b.locationId)) heldCtn += inPacks(n, pk);
-      else {
+      if (isReseller.has(b.locationId)) {
+        heldCtn += inPacks(n, pk);
+        heldPcs += n;
+      } else {
         shelfCtn += inPacks(n, pk);
         shelfPcs += n;
         onShelf.set(b.productId, (onShelf.get(b.productId) ?? 0) + n);
       }
     }
     const soldCtn = soldByProduct.reduce((t, r) => t + inPacks(r._count, packOf.get(r.productId) ?? null), 0);
+    const soldPcs = soldByProduct.reduce((t, r) => t + r._count, 0);
     const round = (x: number) => fmtQty(Number(x.toFixed(1)));
-    top = { products: catalogue.length, inShop: `${round(shelfCtn)} CTN`, inShopPcs: shelfPcs > 0 ? `${fmtQty(shelfPcs)} PCS` : null, withResellers: `${round(heldCtn)} CTN`, sold: `${round(soldCtn)} CTN`, restock: catalogue.filter((c) => (onShelf.get(c.id) ?? 0) <= num(c.minStock)).length };
+    // the same figures in cartons (default) or pieces, following the CTN | PCS switch
+    const pcs = mode === "pcs";
+    top = { products: catalogue.length, inShop: pcs ? `${fmtQty(shelfPcs)} PCS` : `${round(shelfCtn)} CTN`, inShopPcs: null as string | null, withResellers: pcs ? `${fmtQty(heldPcs)} PCS` : `${round(heldCtn)} CTN`, sold: pcs ? `${fmtQty(soldPcs)} PCS` : `${round(soldCtn)} CTN`, restock: catalogue.filter((c) => (onShelf.get(c.id) ?? 0) <= num(c.minStock)).length };
   }
   const missing = untracked.reduce((sum, r) => sum + r.missing, 0);
 
@@ -237,7 +245,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       ) : view === "cards" ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {levels.map((l) => (
-            <ProductLevelCard key={l.id} p={l} href={`/products/${l.id}`} showStock={canStock} />
+            <ProductLevelCard key={l.id} p={l} href={`/products/${l.id}`} showStock={canStock} mode={mode} />
           ))}
         </div>
       ) : (
@@ -269,7 +277,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                     </td>
                     <td className="hidden sm:table-cell">{p.category.name}</td>
                     <td className="hidden md:table-cell">{p.baseUnit.symbol}</td>
-                    {canStock && <td className="text-right font-medium">{qtyText(levels[i]!.available, levels[i]!.pack ?? null, levels[i]!.baseSymbol ?? "").main}</td>}
+                    {canStock && <td className="text-right font-medium">{qtyText(levels[i]!.available, levels[i]!.pack ?? null, levels[i]!.baseSymbol ?? "", mode).main}</td>}
                     <td className="text-right font-medium">{formatMoney(p.sellingPrice, currency)}</td>
                     {canCost && <td className="hidden text-right md:table-cell">{formatMoney(p.purchasePrice, currency)}</td>}
                     <td>

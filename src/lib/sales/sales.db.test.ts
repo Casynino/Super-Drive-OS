@@ -35,6 +35,7 @@ async function fixture(stock = 100, cost = 10000) {
       purchasePrice: cost,
       sellingPrice: 25000,
       wholesalePrice: 22000,
+      allowPieceSales: true,
       units: { create: [{ unitId: unitCarton, factor: 12 }] },
     },
   });

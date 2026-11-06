@@ -10,7 +10,7 @@ import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
 import { defaultUnitId, type LocationOption } from "@/lib/inventory/types";
-import { largestPack, qtyText } from "@/lib/qty";
+import { largestPack, qtyText, type UnitMode } from "@/lib/qty";
 import { PAYMENT_METHODS, type CartLine, type PosCustomer, type PosProduct } from "@/lib/sales/types";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +24,8 @@ type Props = {
   submissionKey: string;
   currency: { code: string; symbol: string; decimals: number };
   perms: { credit: boolean; discount: boolean; addCustomer: boolean; creditException: boolean };
+  /** the CTN | PCS switch: cartons are the default, PCS makes new lines start in pieces */
+  unitMode: UnitMode;
 };
 
 const initial: ActionState = {};
@@ -52,7 +54,7 @@ function Thumb({ p, className }: { p: PosProduct; className?: string }) {
   );
 }
 
-export default function PosTerminal({ action, quickAddCustomer, products, locations, stockByLocation, customers: initialCustomers, submissionKey: key, currency, perms }: Props) {
+export default function PosTerminal({ action, quickAddCustomer, products, locations, stockByLocation, customers: initialCustomers, submissionKey: key, currency, perms, unitMode }: Props) {
   const [state, formAction] = useActionState(action, initial);
   const fe = state.fieldErrors ?? {};
   const [submissionKey] = useState(key); // one key per page visit: a double click cannot create two sales
@@ -141,13 +143,27 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
   const addProduct = (p: PosProduct) =>
     setCart((c) => {
       // cartons first: a product starts in its default selling unit (the carton when it has one)
-      const unitId = defaultUnitId(p, "sales");
+      const unitId = unitMode === "pcs" && p.allowPieceSales !== false ? p.baseUnitId : defaultUnitId(p, "sales");
       const i = c.findIndex((l) => l.productId === p.id && l.unitId === unitId);
       if (i >= 0) return c.map((l, idx) => (idx === i ? { ...l, quantity: String(Number(l.quantity || 0) + 1) } : l));
       return [...c, { productId: p.id, unitId, quantity: "1", price: "" }];
     });
   // a line can never hold more scanned pieces than its quantity: lowering the quantity drops the last scanned ones
   const fit = (l: CartLine): CartLine => (l.scanned && l.scanned.length > Math.max(Math.floor(Number(l.quantity || 0)), 0) ? { ...l, scanned: l.scanned.slice(0, Math.max(Math.floor(Number(l.quantity || 0)), 0)) } : l);
+  // Changing CTN to PCS (or back) keeps the same real amount when it comes out whole: 1 CTN of 12 becomes 12 PCS, and 12 PCS becomes 1 CTN.
+  const switchUnit = (i: number, unitId: string) =>
+    setCart((c) =>
+      c.map((l, idx) => {
+        if (idx !== i) return l;
+        const p = products.find((x) => x.id === l.productId);
+        const from = Number(p?.units.find((u) => u.id === l.unitId)?.factor ?? 1);
+        const to = Number(p?.units.find((u) => u.id === unitId)?.factor ?? 1);
+        const q = Number(l.quantity);
+        const next = q > 0 && to > 0 ? (q * from) / to : q;
+        const whole = Number.isFinite(next) && Math.abs(next - Math.round(next)) < 1e-9;
+        return fit({ ...l, unitId, price: "", quantity: whole ? String(Math.round(next)) : l.quantity });
+      }),
+    );
   const patch = (i: number, p: Partial<CartLine>) => setCart((c) => c.map((l, idx) => (idx === i ? fit({ ...l, ...p }) : l)));
   const step = (i: number, delta: number) => setCart((c) => c.map((l, idx) => (idx === i ? fit({ ...l, quantity: String(Math.max(Number(l.quantity || 0) + delta, 0)) }) : l)));
   const dropScanned = (i: number, token: string) => setCart((c) => c.map((l, idx) => (idx === i ? { ...l, scanned: (l.scanned ?? []).filter((x) => x.token !== token), quantity: String(Math.max(Number(l.quantity || 0) - 1, 0)) } : l)));
@@ -325,7 +341,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                         <Thumb p={p} className="aspect-square w-full rounded-xl [&_img]:p-1.5 [&_img]:transition [&_img]:duration-200 group-hover:[&_img]:scale-105" />
                         {inCart > 0 && <span className="absolute right-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-navy-700 px-1.5 text-xs font-semibold text-white shadow">{trim(inCart)}</span>}
                         <span className={cn("absolute bottom-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-semibold backdrop-blur", left <= 0 ? "bg-brand-red text-white" : left <= 5 ? "bg-oil-400 text-navy-950" : "bg-white/90 text-slate-700 ring-1 ring-slate-200")}>
-                          {left <= 0 ? "Out of stock" : `${qtyText(left, largestPack(p.units), p.units[0]?.symbol ?? "").main} left`}
+                          {left <= 0 ? "Out of stock" : `${qtyText(left, largestPack(p.units), p.units[0]?.symbol ?? "", unitMode).main} left`}
                         </span>
                       </div>
                       <p className="mt-2.5 line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-slate-900">{p.name}</p>
@@ -393,7 +409,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                                 <Plus size={14} />
                               </button>
                             </div>
-                            <select className="input h-8 w-auto py-0 pr-8 text-sm" value={r.l.unitId} onChange={(e) => patch(i, { unitId: e.target.value, price: "" })} disabled={r.p.units.length === 1 || Boolean(r.l.scanned?.length)} aria-label="Unit">
+                            <select className="input h-8 w-auto py-0 pr-8 text-sm" value={r.l.unitId} onChange={(e) => switchUnit(i, e.target.value)} disabled={r.p.units.length === 1 || Boolean(r.l.scanned?.length)} aria-label="Unit">
                               {r.p.units.filter((u) => (u.id === r.l.unitId || !takenUnits.has(u.id)) && (u.id !== r.p.baseUnitId || r.p.allowPieceSales !== false || r.p.units.length === 1 || u.id === r.l.unitId)).map((u) => (
                                 <option key={u.id} value={u.id}>
                                   {u.name}
