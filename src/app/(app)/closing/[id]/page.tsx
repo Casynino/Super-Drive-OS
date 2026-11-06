@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { notFound, redirect } from "next/navigation";
-import { ArrowDownRight, ArrowUpRight, Banknote, Boxes, CheckCircle2, Landmark, Lock, Receipt, ReceiptText, Scale, TrendingUp } from "lucide-react";
-import PrintButton from "@/components/PrintButton";
+import { ArrowDownRight, ArrowUpRight, Banknote, Boxes, CheckCircle2, Download, Landmark, Lock, Printer, Receipt, ReceiptText, Scale, TrendingUp } from "lucide-react";
 import CorrectClosingForm from "@/components/cash/CorrectClosingForm";
 import { ClosingStatusBadge, ClosingSummaryView } from "@/components/cash/Display";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -88,7 +87,12 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
 
   return (
     <>
-      <PageHeader title={`End of day · ${formatDate(c.businessDate)}`} back={{ href: "/closing", label: "End of day" }} description={`${c.location.name} · ${c.closingNo} · submitted by ${c.submittedBy.name}, ${formatDateTime(c.submittedAt)}`} actions={<><ClosingStatusBadge status={c.status} difference={c.difference.toString()} /><PrintButton label="Print / Save as PDF" /></>} />
+      <PageHeader title={`End of day · ${formatDate(c.businessDate)}`} back={{ href: "/closing", label: "End of day" }} description={`${c.location.name} · ${c.closingNo} · submitted by ${c.submittedBy.name}, ${formatDateTime(c.submittedAt)}`} actions={<><ClosingStatusBadge status={c.status} difference={c.difference.toString()} /><Link href={`/print/closing/${c.id}?print=1`} target="_blank" className="btn-secondary !px-3" title="Print" aria-label="Print">
+              <Printer size={16} />
+            </Link>
+            <Link href={`/print/closing/${c.id}?print=1&save=1`} target="_blank" className="btn-primary !px-3" title="Download as PDF" aria-label="Download as PDF">
+              <Download size={16} />
+            </Link></>} />
 
       {sp.done && (
         <div className="mb-4">
@@ -105,14 +109,39 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
         <KpiCard icon={Banknote} tone="green" label="Money received" value={money(today.money.income)} hint={`${today.money.payments} payment${today.money.payments === 1 ? "" : "s"} · at the sale and on debts`} />
         <KpiCard icon={ReceiptText} tone="red" label="Spent on expenses" value={money(today.money.expenses)} hint={`${today.expensesByCategory.length} categor${today.expensesByCategory.length === 1 ? "y" : "ies"}`} />
         {profit && <KpiCard icon={TrendingUp} tone={profit.net.lt(0) ? "red" : "green"} label={profit.net.lt(0) ? "Loss" : "Profit"} value={money(profit.net.abs())} badge={`${profit.marginPct.toFixed(1)}% of sales`} hint={`Sales profit ${money(profit.gross)} − expenses ${money(today.money.expenses)}`} />}
-        <KpiCard
-          icon={Scale}
-          tone={c.difference.isZero() ? "green" : c.difference.lt(0) ? "red" : "yellow"}
-          label="Cash count"
-          value={c.difference.isZero() ? "No difference" : `${c.difference.lt(0) ? "Short" : "Extra"} ${money(c.difference.abs())}`}
-          hint={`Counted ${money(c.countedCash)} · expected ${money(c.expectedCash)}`}
-        />
+        {(() => {
+          const net = c.countedCash.plus(correctedBy).minus(c.expectedCash);
+          const fixed = !correctedBy.isZero();
+          return (
+            <KpiCard
+              icon={Scale}
+              tone={net.isZero() ? "green" : net.lt(0) ? "red" : "yellow"}
+              label="Cash count"
+              value={net.isZero() ? (fixed ? "Corrected" : "Correct") : `${net.lt(0) ? "Short" : "Extra"} ${money(net.abs())}`}
+              hint={fixed ? `Was ${c.difference.lt(0) ? "short" : "extra"} ${money(c.difference.abs())} at closing` : `Counted ${money(c.countedCash)} · expected ${money(c.expectedCash)}`}
+            />
+          );
+        })()}
       </div>
+
+      {can(user, "cash.adjust") && !c.countedCash.plus(correctedBy).minus(c.expectedCash).isZero() && (() => {
+        const off = c.countedCash.plus(correctedBy).minus(c.expectedCash);
+        return (
+          <section className={`card mb-5 overflow-hidden border-l-4 ${off.lt(0) ? "border-l-brand-red" : "border-l-oil-400"}`} aria-label="The cash did not match">
+            <div className="px-4 py-4 sm:px-5">
+              <h2 className="text-base font-semibold text-slate-900">
+                The cash did not match: {off.lt(0) ? "short" : "extra"} {money(off.abs())}
+              </h2>
+              <p className="mt-0.5 text-sm text-slate-600">
+                Counted {money(c.countedCash.plus(correctedBy))} · the system expected {money(c.expectedCash)}. If the shop recounted or the cash turned up, correct it here: it is saved with your reason and shown in the report.
+              </p>
+              <div className="mt-4">
+                <CorrectClosingForm action={correctClosingAction} closingId={c.id} current={c.countedCash.plus(correctedBy).toString()} expected={c.expectedCash.toString()} symbol={currency.symbol} submissionKey={randomUUID()} />
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       <section className="card mb-5 px-4 py-4 sm:px-5" aria-label="Where the money is">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -280,10 +309,10 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
             </ul>
           )}
           {can(user, "cash.adjust") && (
-            <details className="group mt-3" open={!c.difference.isZero() && corrections.length === 0}>
+            <details className="group mt-3">
               <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-navy-700 hover:underline">Correct this day&apos;s cash</summary>
               <div className="mt-3">
-                <CorrectClosingForm action={correctClosingAction} closingId={c.id} current={c.countedCash.plus(correctedBy).toString()} symbol={currency.symbol} submissionKey={randomUUID()} />
+                <CorrectClosingForm action={correctClosingAction} closingId={c.id} current={c.countedCash.plus(correctedBy).toString()} expected={c.expectedCash.toString()} symbol={currency.symbol} submissionKey={randomUUID()} />
               </div>
             </details>
           )}

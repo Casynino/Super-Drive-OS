@@ -43,6 +43,17 @@ export async function getSalesPerDay(db: Db, locationId: string, from: string, t
   return rows.map((r) => ({ day: r.day, total: new D(r.v ?? 0), count: Number(r.n) }));
 }
 
+/** What each product sold on the days between two dates (after returns): quantity in its base unit, revenue and cost. */
+export async function getProductsSold(db: Db, locationId: string, from: string, to: string): Promise<{ id: string; name: string; qty: Dec; revenue: Dec; cost: Dec }[]> {
+  const rows = await db.$queryRaw<{ id: string; name: string; qty: Dec | null; revenue: Dec | null; cost: Dec | null }[]>`
+    SELECT p."id", p."name", SUM(si."quantity" - COALESCE(x.q, 0)) AS qty, SUM(si."lineTotal" - COALESCE(x.v, 0)) AS revenue, SUM(si."costTotal" - COALESCE(x.c, 0)) AS cost
+      FROM "SaleItem" si JOIN "Sale" s ON s."id" = si."saleId" JOIN "Product" p ON p."id" = si."productId"
+      LEFT JOIN (SELECT ri."saleItemId", SUM(ri."quantity") AS q, SUM(ri."returnValue") AS v, SUM(ri."costValue") AS c FROM "ReversalItem" ri JOIN "SaleReversal" rv ON rv."id" = ri."reversalId" WHERE rv."status" = 'COMPLETED' GROUP BY 1) x ON x."saleItemId" = si."id"
+     WHERE s."status" = 'COMPLETED' AND s."locationId" = ${locationId} AND (s."createdAt" ${Prisma.raw(TZ)})::date BETWEEN ${from}::date AND ${to}::date
+     GROUP BY p."id", p."name" ORDER BY revenue DESC`;
+  return rows.map((r) => ({ id: r.id, name: r.name, qty: new D(r.qty ?? 0), revenue: new D(r.revenue ?? 0), cost: new D(r.cost ?? 0) }));
+}
+
 export type PeriodStats = {
   from: string;
   to: string;
