@@ -1,3 +1,6 @@
 {
-  "crons": [{ "path": "/api/cron/daily-report", "schedule": "0 17 * * *" }]
+  "crons": [
+    { "path": "/api/cron/daily-report", "schedule": "0 17 * * *" },
+    { "path": "/api/cron/payment-reminders", "schedule": "0 6 * * *" }
+  ]
 }

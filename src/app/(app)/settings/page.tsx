@@ -71,6 +71,9 @@ export default async function SettingsPage() {
             <Link href="/settings/whatsapp" className="btn-secondary">
               WhatsApp report
             </Link>
+            <Link href="/settings/reminders" className="btn-secondary">
+              Payment reminders
+            </Link>
             {can(user, "roles.manage") && (
               <Link href="/settings/roles" className="btn-secondary">
                 Roles &amp; permissions
@@ -92,6 +95,7 @@ export default async function SettingsPage() {
                 { name: "businessPhone", label: "Phone", value: profile.phone },
                 { name: "businessAddress", label: "Address", value: profile.address },
                 { name: "creditTermsDays", label: "Credit period (days)", value: String(profile.creditTermsDays), hint: "How long customers have to pay a credit sale before it is overdue." },
+                { name: "paymentAccounts", label: "Payment accounts (copied into payment reminders)", type: "textarea" as const, value: profile.paymentAccounts, span: 2 as const, hint: "Bank and mobile-money accounts customers should pay into. Each account on its own lines, with a blank line between accounts." },
               ]}
             />
             <p className="mt-3 text-sm text-slate-500">

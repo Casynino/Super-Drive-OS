@@ -62,7 +62,7 @@ export default async function ResellerPage({ params, searchParams }: { params: P
   const st = standings.get(id) ?? emptyStanding;
   const status = wingaStatus({ inactive: r.status === "INACTIVE", lateInvoices: st.lateInvoices, openInvoices: st.openInvoices, holdsStock: a.remainingQty.gt(0), reports: a.reports });
   const late = lateMap.get(r.customerId) ?? [];
-  const reminderText = late.length ? buildReminder({ businessName: profile.name, businessPhone: profile.phone, customerName: r.name, invoices: late, currency }) : null;
+  const reminderText = late.length ? buildReminder({ businessName: profile.name, businessPhone: profile.phone, paymentAccounts: profile.paymentAccounts, customerName: r.name, invoices: late, currency }) : null;
   const remindHref = reminderText ? reminderLink(r.phone, reminderText) : null;
   const chatNumber = waNumber(r.phone);
   const took = a.issuedQty.minus(a.returnedQty);

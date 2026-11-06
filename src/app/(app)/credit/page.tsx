@@ -191,7 +191,7 @@ export default async function CreditPage({ searchParams }: { searchParams: Promi
   const remind = (customerId: string, name: string, phone: string | null, only?: string) => {
     const late = (lateMap.get(customerId) ?? []).filter((i) => !only || i.id === only);
     if (late.length === 0) return null;
-    const text = buildReminder({ businessName: profile.name, businessPhone: profile.phone, customerName: name, invoices: late, currency });
+    const text = buildReminder({ businessName: profile.name, businessPhone: profile.phone, paymentAccounts: profile.paymentAccounts, customerName: name, invoices: late, currency });
     return { href: reminderLink(phone, text), saleIds: late.map((i) => i.id), lastText: remindedText(lastMap.get(customerId)) };
   };
 
@@ -230,7 +230,17 @@ export default async function CreditPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="Credit management" description="Every credit invoice: who owes it, when it is due, how late it is and what is left to pay." />
+      <PageHeader
+        title="Credit management"
+        description="Every credit invoice: who owes it, when it is due, how late it is and what is left to pay."
+        actions={
+          can(user, "settings.view") && (
+            <Link href="/settings/reminders" className="btn-secondary">
+              Automatic reminders
+            </Link>
+          )
+        }
+      />
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard icon={Wallet} tone="navy" label="Total owed" value={money(openOwed)} hint={`${counts.all} open invoice${counts.all === 1 ? "" : "s"} · ${n(s?.customers)} customer${n(s?.customers) === 1 ? "" : "s"}`} href={link({ view: undefined, age: undefined, page: undefined })} active={view === "all" && !age} />

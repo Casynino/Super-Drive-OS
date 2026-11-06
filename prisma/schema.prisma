@@ -557,6 +557,7 @@ model Customer {
   updatedAt          DateTime            @updatedAt
   sales              Sale[]
   payments           Payment[]
+  reminders          PaymentReminder[]
   reseller           Reseller?
   creditApplications CreditApplication[]
 
@@ -1298,6 +1299,31 @@ model WhatsAppReport {
 
   @@index([businessDate, kind])
   @@index([status, createdAt])
+}
+
+// An automatic WhatsApp payment reminder to a customer. At most one per customer per day: the row is created BEFORE
+// sending, so two jobs can never message the same person twice. Manual reminders (opened in WhatsApp by staff) are in the audit log.
+model PaymentReminder {
+  id            String        @id @default(cuid())
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  businessDate  DateTime      @db.Date
+  trigger       ReportTrigger
+  status        ReportStatus  @default(SENDING)
+  attempts      Int           @default(0)
+  error         String?
+  saleIds       Json // the invoices this message was about
+  totalOwed     Decimal       @db.Decimal(14, 2)
+  toPhone       String // masked for display
+  providerId    String? // WhatsApp's id for the message
+  requestedById String?
+  createdAt     DateTime      @default(now())
+  claimedAt     DateTime?
+  sentAt        DateTime?
+
+  @@unique([customerId, businessDate])
+  @@index([status, createdAt])
+  @@index([createdAt])
 }
 
 // Money paid to a supplier (from cash, mobile money or the bank). What we owe a supplier is always calculated:

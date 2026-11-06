@@ -16,13 +16,14 @@ export const getBusinessName = cache(async (): Promise<string> => {
   return typeof row?.value === "string" ? row.value : "Super Drive Oil";
 });
 
-export type BusinessProfile = { name: string; phone: string; address: string; creditTermsDays: number };
+/** `paymentAccounts` is free text (bank and mobile-money accounts) that is copied as it is into payment reminders. */
+export type BusinessProfile = { name: string; phone: string; address: string; creditTermsDays: number; paymentAccounts: string };
 
 const text = (v: unknown) => (typeof v === "string" ? v : "");
 
 /** Name, phone, address (printed on receipts) and the default credit period in days. */
 export const getBusinessProfile = cache(async (): Promise<BusinessProfile> => {
-  const rows = await db.setting.findMany({ where: { key: { in: ["businessName", "businessPhone", "businessAddress", "creditTermsDays"] } } });
+  const rows = await db.setting.findMany({ where: { key: { in: ["businessName", "businessPhone", "businessAddress", "creditTermsDays", "paymentAccounts"] } } });
   const m = new Map(rows.map((r) => [r.key, r.value]));
   const days = Number(m.get("creditTermsDays"));
   return {
@@ -30,5 +31,6 @@ export const getBusinessProfile = cache(async (): Promise<BusinessProfile> => {
     phone: text(m.get("businessPhone")),
     address: text(m.get("businessAddress")),
     creditTermsDays: Number.isInteger(days) && days >= 0 && days <= 365 ? days : 30,
+    paymentAccounts: text(m.get("paymentAccounts")),
   };
 });

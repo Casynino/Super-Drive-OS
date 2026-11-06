@@ -250,6 +250,7 @@ const profileSchema = z.object({
   businessName: z.string().trim().min(2, "Enter the business name.").max(80, "Too long."),
   businessPhone: z.string().trim().max(40, "Too long."),
   businessAddress: z.string().trim().max(200, "Too long."),
+  paymentAccounts: z.string().trim().max(600, "Too long (600 characters at most)."),
   creditTermsDays: z.coerce.number({ error: "Enter a number of days." }).int("Whole days only.").min(0, "0 or more.").max(365, "At most 365."),
 });
 
@@ -260,6 +261,7 @@ export async function saveBusinessProfile(_prev: ActionState, fd: FormData): Pro
       businessName: formString(fd, "businessName"),
       businessPhone: formString(fd, "businessPhone"),
       businessAddress: formString(fd, "businessAddress"),
+      paymentAccounts: formString(fd, "paymentAccounts").replace(/\r\n/g, "\n"),
       creditTermsDays: formString(fd, "creditTermsDays") || "30",
     });
     if (!parsed.success) return invalid(parsed.error, values);

@@ -56,34 +56,68 @@ export function remindedText(at: Date | undefined, now = new Date()): string | n
   return days <= 0 ? "Reminded today" : days === 1 ? "Reminded yesterday" : `Reminded ${days} days ago`;
 }
 
-const dateText = (d: Date) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Dar_es_Salaam" }).format(d);
+const MONTHS = ["Januari", "Februari", "Machi", "Aprili", "Mei", "Juni", "Julai", "Agosti", "Septemba", "Oktoba", "Novemba", "Desemba"];
+/** "2 Oktoba 2026" from a date-only value (the due date). */
+export function swahiliDate(d: Date): string {
+  const ymd = d.toISOString().slice(0, 10);
+  return `${Number(ymd.slice(8, 10))} ${MONTHS[Number(ymd.slice(5, 7)) - 1]} ${ymd.slice(0, 4)}`;
+}
 const MAX_LISTED = 6;
+/** formatMoney puts a non-breaking space after the symbol; messages use a plain one. */
+const plain = (t: string) => t.replace(/[\u00a0\u202f]/g, " ");
 
-/** The message: Swahili first, then English, polite, with every late invoice and the shop's number to call. */
-export function buildReminder(input: { businessName: string; businessPhone: string; customerName: string; invoices: LateInvoice[]; currency: CurrencyConfig }): string {
-  const { businessName, businessPhone, customerName, invoices, currency } = input;
-  const money = (v: Prisma.Decimal) => formatMoney(v, currency);
-  const total = invoices.reduce((s, i) => s.plus(i.owed), new Prisma.Decimal(0));
+type Frame = { business: string; phone: string; accounts: string; name: string; payment: string };
+
+/** The reminder wording (Nino's template, Swahili). `payment` is the block under "TAARIFA ZA MALIPO". */
+function frame(f: Frame): string {
+  const accounts = f.accounts.trim();
+  const call = f.phone.trim();
+  return [
+    `Habari ${f.name},`,
+    "Tunatumaini unaendelea vizuri.",
+    `Tunapenda kukukumbusha kuhusu malipo ya mzigo wako kutoka ${f.business} ambayo bado hayajakamilika.`,
+    `TAARIFA ZA MALIPO\n${f.payment}`,
+    ...(accounts ? [`TAARIFA ZA AKAUNTI ZA MALIPO\n\n${accounts}`] : []),
+    "Baada ya kufanya malipo, tafadhali tutumie uthibitisho wa muamala ili tuweze kusasisha kumbukumbu za akaunti yako.",
+    ...(call ? [`Kwa msaada au maelezo zaidi, tupigie simu au WhatsApp kupitia ${call}.`] : []),
+    `Asante kwa kuendelea kushirikiana na ${f.business}. Tunathamini sana biashara yako!`,
+  ].join("\n\n");
+}
+
+/** The message opened in WhatsApp for one customer: every late invoice with its amount, due date and days late, then the payment accounts. */
+export function buildReminder(input: { businessName: string; businessPhone: string; paymentAccounts: string; customerName: string; invoices: LateInvoice[]; currency: CurrencyConfig }): string {
+  const { invoices, currency } = input;
+  const money = (v: Prisma.Decimal) => plain(formatMoney(v, currency));
   const shown = invoices.slice(0, MAX_LISTED);
   const more = invoices.length - shown.length;
-  const sw = shown.map((i) => `• ${i.saleNo}: ${money(i.owed)} (ilitakiwa kulipwa ${dateText(i.dueDate)}, imechelewa siku ${i.days})`);
-  const en = shown.map((i) => `• ${i.saleNo}: ${money(i.owed)} (due ${dateText(i.dueDate)}, ${i.days} day${i.days === 1 ? "" : "s"} late)`);
-  if (more > 0) {
-    sw.push(`• na ankara ${more} nyingine`);
-    en.push(`• and ${more} more invoice${more === 1 ? "" : "s"}`);
-  }
-  const call = businessPhone.trim();
-  return [
-    `Habari ${customerName}, ni ${businessName}.`,
-    `Tunakukumbusha kuwa una deni la ${money(total)} ambalo muda wake wa kulipa umepita:`,
-    ...sw,
-    `Tafadhali lipa mapema iwezekanavyo.${call ? ` Kwa maswali piga au tuma WhatsApp ${call}.` : ""} Asante.`,
-    "",
-    `Hello ${customerName}, this is ${businessName}.`,
-    `A friendly reminder that ${money(total)} is overdue:`,
-    ...en,
-    `Please pay as soon as you can.${call ? ` Questions? Call or WhatsApp ${call}.` : ""} Thank you.`,
-  ].join("\n");
+  const blocks = shown.map((i) => [`• Ankara: ${i.saleNo}`, `• Kiasi kinachodaiwa: ${money(i.owed)}`, `• Tarehe ya mwisho ya malipo: ${swahiliDate(i.dueDate)}`, `• Muda uliopita: Siku ${i.days}`].join("\n"));
+  let payment = blocks.join("\n\n");
+  if (more > 0) payment += `\n\n• na ankara ${more} nyingine`;
+  if (invoices.length > 1) payment += `\n\nJumla inayodaiwa: ${money(invoices.reduce((s, i) => s.plus(i.owed), new Prisma.Decimal(0)))}`;
+  return frame({ business: input.businessName, phone: input.businessPhone, accounts: input.paymentAccounts, name: input.customerName, payment });
+}
+
+// ───────── The same wording as a WhatsApp Business template (for automatic sending) ─────────
+// WhatsApp only lets a system start a conversation with an APPROVED template whose variables are single-line text.
+// The template body is this text with {{1}}..{{5}}; the shop number, accounts and business name are written into it.
+
+export const TEMPLATE_PAYMENT = ["• Ankara: {{2}}", "• Kiasi kinachodaiwa: {{3}}", "• Tarehe ya mwisho ya malipo: {{4}}", "• Muda uliopita: Siku {{5}}"].join("\n");
+export const TEMPLATE_BODY_LIMIT = 1024;
+
+/** The text to paste into the WhatsApp Business template (body). */
+export function templateBody(p: { businessName: string; businessPhone: string; paymentAccounts: string }): string {
+  return frame({ business: p.businessName, phone: p.businessPhone, accounts: p.paymentAccounts, name: "{{1}}", payment: TEMPLATE_PAYMENT });
+}
+
+const oneLine = (t: string, max: number) => t.replace(/\s+/g, " ").trim().slice(0, max);
+
+/** The five template variables: name, invoice numbers, total owed, oldest due date, days late (oldest). Never contains a line break. */
+export function templateParams(input: { customerName: string; invoices: LateInvoice[]; currency: CurrencyConfig }): string[] {
+  const { invoices, currency } = input;
+  const nos = invoices.slice(0, 5).map((i) => i.saleNo).join(", ") + (invoices.length > 5 ? ` na nyingine ${invoices.length - 5}` : "");
+  const total = invoices.reduce((s, i) => s.plus(i.owed), new Prisma.Decimal(0));
+  const oldest = invoices.reduce((o, i) => (i.dueDate < o.dueDate ? i : o), invoices[0]!);
+  return [oneLine(input.customerName, 60), oneLine(nos, 140), plain(formatMoney(total, currency)), swahiliDate(oldest.dueDate), String(Math.max(...invoices.map((i) => i.days)))];
 }
 
 export function reminderLink(phone: string | null | undefined, text: string): string | null {

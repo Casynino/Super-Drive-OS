@@ -71,6 +71,7 @@ async function main() {
     data: [
       { key: "businessName", value: "Super Drive Oil" },
       { key: "businessPhone", value: "+255 750 496 756" }, // the shop's WhatsApp number (from its Instagram page); printed on receipts and used in payment reminders
+      { key: "paymentAccounts", value: `CRDB BANK\nJina: ABEL JACOB KIJYOMBO\nAkaunti: 0152841983800\n\nNMB BANK\nJina: ABEL JACOB KIJYOMBO\nAkaunti: 20410052450\n\nM-PESA\nJina: Abely Jacob\nNamba: 37453908` }, // where customers pay; copied into payment reminders (editable in Settings → Business)
       { key: "currency", value: { code: "TZS", symbol: "TSh", decimals: 0 } },
       { key: "creditTermsDays", value: 30 },
       { key: "expenseApprovalLimit", value: 0 }, // 0 = every expense needs the owner's approval until the owner sets a limit
