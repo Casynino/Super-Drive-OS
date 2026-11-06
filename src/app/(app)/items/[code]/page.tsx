@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ImageOff, Printer } from "lucide-react";
@@ -9,7 +10,7 @@ import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { findItemByCode } from "@/lib/inventory/items";
-import { LABELS_ENABLED } from "@/lib/features";
+import { LABELS_ENABLED, PIECE_LIST_ENABLED } from "@/lib/features";
 import { ITEM_EVENT_LABEL } from "@/lib/inventory/item-labels";
 import { itemQrText } from "@/lib/qr";
 import { getCurrency } from "@/lib/settings";
@@ -18,6 +19,7 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 export const metadata = { title: "Item" };
 
 export default async function ItemPage({ params }: { params: Promise<{ code: string }> }) {
+  if (!PIECE_LIST_ENABLED) redirect("/products");
   const user = await requirePagePermission("inventory.view");
   const { code } = await params;
   const found = await findItemByCode(db, decodeURIComponent(code));

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AlertTriangle, Handshake, PackageCheck, PackageX, QrCode, ScanBarcode, Search, ShoppingCart, Trash2, type LucideIcon } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
@@ -6,7 +7,7 @@ import ProductLevelCard, { type ProductLevel } from "@/components/items/ProductL
 import ItemsTable, { type ItemRow } from "@/components/products/ItemsTable";
 import { Prisma, type ItemStatus } from "@/generated/prisma/client";
 import LabelExistingStock from "@/components/products/LabelExistingStock";
-import { LABELS_ENABLED } from "@/lib/features";
+import { LABELS_ENABLED, PIECE_LIST_ENABLED } from "@/lib/features";
 import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
@@ -21,6 +22,7 @@ const PAGE = 50;
 type Search = { q?: string; status?: string; product?: string; shipment?: string; page?: string };
 
 export default async function ItemsPage({ searchParams }: { searchParams: Promise<Search> }) {
+  if (!PIECE_LIST_ENABLED) redirect("/products");
   const user = await requirePagePermission("inventory.view");
   const sp = await searchParams;
   const q = sp.q?.trim() ?? "";

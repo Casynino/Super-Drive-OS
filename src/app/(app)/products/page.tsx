@@ -8,7 +8,7 @@ import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
-import { LABELS_ENABLED } from "@/lib/features";
+import { LABELS_ENABLED, PIECE_LIST_ENABLED } from "@/lib/features";
 import { untrackedStock } from "@/lib/inventory/items";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
@@ -140,7 +140,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         description="Everything you sell. Open a product to see its pieces, prices and codes."
         actions={
           <>
-            {canStock && (
+            {canStock && PIECE_LIST_ENABLED && (
               <Link href="/items" className="btn-secondary">
                 <QrCode size={16} /> All pieces
               </Link>

@@ -11,7 +11,7 @@ import { Prisma, type ItemStatus } from "@/generated/prisma/client";
 import { ITEM_STATUSES, ITEM_STATUS_LABEL } from "@/lib/inventory/item-labels";
 import { formatMoney } from "@/lib/money";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
-import { LABELS_ENABLED } from "@/lib/features";
+import { LABELS_ENABLED, PIECE_LIST_ENABLED } from "@/lib/features";
 import { getProductFormOptions } from "../options";
 import ProductForm, { type ProductFormData } from "../ProductForm";
 import { setProductStatus } from "../actions";
@@ -36,7 +36,8 @@ export default async function EditProductPage({ params, searchParams }: { params
 
   // Pieces (each physical item) and where the stock is: only for people who can view stock
   const canItems = can(user, "inventory.view");
-  const tab: "pieces" | "details" = canItems && sp.tab !== "details" ? "pieces" : "details";
+  const showPieces = PIECE_LIST_ENABLED && canItems;
+  const tab: "pieces" | "details" = showPieces && sp.tab !== "details" ? "pieces" : "details";
   const pstatus = ITEM_STATUSES.includes(sp.pstatus as ItemStatus) ? (sp.pstatus as ItemStatus) : undefined;
   const pq = sp.pq?.trim() ?? "";
   const ppage = Math.max(1, Number.parseInt(sp.ppage ?? "1", 10) || 1);
@@ -150,7 +151,7 @@ export default async function EditProductPage({ params, searchParams }: { params
         </div>
       )}
 
-      <ProductTabs id={id} tab={tab} pieces={canItems ? (pq ? wholeCounts.reduce((sum, c) => sum + c._count, 0) : pieceTotal) : null} />
+      {showPieces && <ProductTabs id={id} tab={tab} pieces={pq ? wholeCounts.reduce((sum, c) => sum + c._count, 0) : pieceTotal} />}
 
       {tab === "pieces" && (
         <section className="card overflow-hidden" aria-label="Pieces">
