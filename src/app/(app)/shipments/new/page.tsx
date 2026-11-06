@@ -5,7 +5,7 @@ import ShipmentForm from "@/components/shipments/ShipmentForm";
 import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
-import { getCurrency } from "@/lib/settings";
+import { getBusinessProfile, getCurrency } from "@/lib/settings";
 import { getActiveLocations, getPickerProducts } from "../../inventory/data";
 import { announceShipment, createProductForShipment } from "../actions";
 
@@ -14,7 +14,7 @@ export const metadata = { title: "New purchase order" };
 export default async function NewShipmentPage() {
   const user = await requirePagePermission("shipments.manage");
   const canPrice = can(user, "products.price");
-  const [picker, extras, locations, suppliers, categories, brands, currency, cargoRows] = await Promise.all([
+  const [picker, extras, locations, suppliers, categories, brands, currency, cargoRows, biz] = await Promise.all([
     getPickerProducts(),
     // current prices and picture versions, so each line starts from today's selling price (prices are only read for people who may set them)
     db.product.findMany({ where: { status: "ACTIVE" }, select: { id: true, sellingPrice: true, wholesalePrice: true, image: { select: { updatedAt: true } } } }),
@@ -24,6 +24,7 @@ export default async function NewShipmentPage() {
     db.brand.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     getCurrency(),
     db.shipment.findMany({ where: { cargoName: { not: null } }, distinct: ["cargoName"], orderBy: { createdAt: "desc" }, take: 20, select: { cargoName: true } }),
+    getBusinessProfile(),
   ]);
   const extra = new Map(extras.map((e) => [e.id, e]));
   const products = picker.map((p) => {
@@ -51,6 +52,7 @@ export default async function NewShipmentPage() {
           cargoNames={cargoRows.map((c) => c.cargoName!).filter(Boolean)}
           canPrice={canPrice}
           currencySymbol={currency.symbol}
+          business={{ name: biz.name, address: biz.address, phone: biz.phone }}
           submissionKey={randomUUID()}
         />
       )}

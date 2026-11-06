@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, PackageCheck, Truck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FileText, List, PackageCheck, Printer, Truck } from "lucide-react";
 import { Alert } from "@/components/ui";
 import { Field, SubmitButton, inputClass } from "@/components/FormBits";
 import PackingList, { packingTotals } from "./PackingList";
+import PackingListSheet, { type SheetData } from "./PackingListSheet";
+import { printDocument } from "./printSheet";
 import ShipmentLinesEditor, { lineFigures, newLine, type ShipmentLine } from "./ShipmentLinesEditor";
 import NewProductPanel from "./NewProductPanel";
 import type { ActionState } from "@/lib/action";
@@ -27,6 +29,8 @@ type Props = {
   cargoNames: string[];
   canPrice: boolean;
   currencySymbol: string;
+  /** printed at the top of the packing list document */
+  business: { name: string; address: string; phone: string };
   submissionKey: string;
 };
 
@@ -69,7 +73,7 @@ function Stepper({ step, onGo, reached }: { step: number; onGo: (n: 1 | 2 | 3) =
   );
 }
 
-export default function ShipmentForm({ action, createProduct, products: initialProducts, locations, suppliers, canAddSupplier, categories, brands, cargoNames, canPrice, currencySymbol, submissionKey: key }: Props) {
+export default function ShipmentForm({ action, createProduct, products: initialProducts, locations, suppliers, canAddSupplier, categories, brands, cargoNames, canPrice, currencySymbol, business, submissionKey: key }: Props) {
   const [state, formAction] = useActionState(action, initial);
   const fe = state.fieldErrors ?? {};
   const [submissionKey] = useState(key);
@@ -84,6 +88,8 @@ export default function ShipmentForm({ action, createProduct, products: initialP
   const [reached, setReached] = useState(1);
   const [checked, setChecked] = useState(false);
   const [nudge, setNudge] = useState<string | null>(null);
+  const [view, setView] = useState<"list" | "document">("list");
+  const [withPrices, setWithPrices] = useState(false);
 
   // the server found a problem: go back to the step where it can be fixed
   useEffect(() => {
@@ -136,6 +142,42 @@ export default function ShipmentForm({ action, createProduct, products: initialP
   const oneLocation = locations.length === 1;
   const supplierName = matchedSupplier?.name ?? (newSupplierName ? `${newSupplierName} (new supplier)` : undefined);
   const locationName = locations.find((l) => l.id === locationId)?.name;
+
+  // the packing list as a paper document (relative picture addresses on screen, absolute ones for the print window)
+  const sheetData = (absolute: boolean): SheetData => {
+    const origin = absolute ? window.location.origin : "";
+    return {
+      number: "Draft",
+      draft: true,
+      dateText: formatDate(new Date()),
+      business,
+      supplier: matchedSupplier?.name ?? newSupplierName,
+      cargo: cargoName.trim() || null,
+      expected: expectedDate ? formatDate(new Date(`${expectedDate}T00:00:00Z`)) : null,
+      deliverTo: locationName ?? null,
+      notes: notes.trim() || null,
+      preparedBy: null,
+      currencySymbol,
+      showPrices: withPrices,
+      rows: lines.map((l) => {
+        const p = byId.get(l.productId);
+        const f = lineFigures(l, p);
+        return {
+          name: p?.name ?? "Unknown product",
+          code: p?.sku ?? null,
+          barcode: p?.barcode ?? null,
+          imageUrl: p?.imageV ? `${origin}/api/product-image/${l.productId}?size=thumb&v=${p.imageV}` : null,
+          packed: `${Number(Number(l.quantity).toFixed(3))} ${f.unit?.symbol ?? ""}`.trim(),
+          pieces: Number.isFinite(f.baseQty) ? f.baseQty : 0,
+          unitPrice: Number.isFinite(f.cpp) ? f.cpp : null,
+          lineTotal: Number.isFinite(f.total) ? f.total : null,
+        };
+      }),
+    };
+  };
+  const printDraft = () => {
+    if (!printDocument(<PackingListSheet data={sheetData(true)} />, "Packing list (draft)")) setNudge("The print window was blocked. Allow pop-ups for this site and try again.");
+  };
 
   const next = () => {
     if (step === 1) return go(2);
@@ -284,17 +326,38 @@ export default function ShipmentForm({ action, createProduct, products: initialP
             </dl>
           </section>
 
-          <PackingList
-            lines={lines}
-            products={products}
-            canPrice={canPrice}
-            currencySymbol={currencySymbol}
-            headerAction={
-              <button type="button" className="btn-secondary btn-sm" onClick={() => go(2)}>
-                Edit packing list
-              </button>
-            }
-          />
+          {(() => {
+            const tools = (
+              <>
+                <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                  <input type="checkbox" className="h-4 w-4 rounded border-slate-400" checked={withPrices} onChange={(e) => setWithPrices(e.target.checked)} />
+                  Show buying prices
+                </label>
+                <button type="button" className="btn-secondary btn-sm" onClick={() => setView(view === "list" ? "document" : "list")}>
+                  {view === "list" ? <FileText size={14} /> : <List size={14} />} {view === "list" ? "Document view" : "List view"}
+                </button>
+                <button type="button" className="btn-secondary btn-sm" onClick={printDraft}>
+                  <Printer size={14} /> Print / Save as PDF
+                </button>
+                <button type="button" className="btn-secondary btn-sm" onClick={() => go(2)}>
+                  Edit packing list
+                </button>
+              </>
+            );
+            return view === "list" ? (
+              <PackingList lines={lines} products={products} canPrice={canPrice} currencySymbol={currencySymbol} headerAction={tools} />
+            ) : (
+              <section className="card overflow-hidden" aria-label="Packing list document">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
+                  <h2 className="text-base font-semibold text-slate-900">Packing list document</h2>
+                  <div className="flex flex-wrap items-center gap-2">{tools}</div>
+                </div>
+                <div className="bg-slate-100 p-3 sm:p-6">
+                  <PackingListSheet data={sheetData(false)} />
+                </div>
+              </section>
+            );
+          })()}
 
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white px-4 py-3.5 text-sm text-slate-800">
             <input type="checkbox" className="mt-0.5 h-5 w-5 rounded border-slate-400" checked={checked} onChange={(e) => setChecked(e.target.checked)} />

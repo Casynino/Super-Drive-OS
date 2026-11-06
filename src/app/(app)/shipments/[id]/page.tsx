@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AlertTriangle, ClipboardCheck, ImageOff, Printer } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, FileText, ImageOff, Printer } from "lucide-react";
 import { Alert, PageHeader } from "@/components/ui";
 import { CancelShipmentForm, ResolveIssueForm } from "@/components/shipments/IssueForms";
 import MarkArrivedButton from "@/components/shipments/MarkArrivedButton";
@@ -111,6 +111,9 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
         actions={
           <>
             <PhaseBadge phase={phase} />
+            <Link href={`/shipments/${id}/packing-list`} className="btn-secondary">
+              <FileText size={16} /> Packing list
+            </Link>
             {itemCount > 0 && can(user, "inventory.view") && (
               <Link href={`/items/labels?shipment=${id}`} className="btn-secondary">
                 <Printer size={16} /> Print item labels ({itemCount})
