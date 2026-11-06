@@ -18,7 +18,7 @@ export default async function ReceivePage({ params }: { params: Promise<{ id: st
   const shipment = await db.shipment.findUnique({
     where: { id },
     select: {
-      id: true, shipmentNo: true, status: true, arrivedAt: true, reference: true, notes: true, expectedDate: true,
+      id: true, shipmentNo: true, status: true, arrivedAt: true, reference: true, cargoName: true, notes: true, expectedDate: true,
       supplier: { select: { name: true } },
       items: {
         orderBy: [{ unexpected: "asc" }, { id: "asc" }],
@@ -81,7 +81,7 @@ export default async function ReceivePage({ params }: { params: Promise<{ id: st
     <>
       <PageHeader
         title={`Count ${shipment.shipmentNo}`}
-        description={[shipment.supplier?.name, shipment.reference].filter(Boolean).join(" · ") || "Check what really arrived"}
+        description={[shipment.supplier?.name, shipment.cargoName ?? shipment.reference].filter(Boolean).join(" · ") || "Check what really arrived"}
         back={{ href: `/shipments/${id}`, label: shipment.shipmentNo }}
       />
       <div className="mb-4 space-y-3">

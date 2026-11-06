@@ -28,7 +28,7 @@ export default async function ItemPage({ params }: { params: Promise<{ code: str
       include: {
         product: { select: { id: true, name: true, sku: true, size: true, sellingPrice: true, brand: { select: { name: true } }, category: { select: { name: true } }, image: { select: { updatedAt: true } } } },
         location: { select: { name: true } },
-        shipment: { select: { id: true, shipmentNo: true, reference: true } },
+        shipment: { select: { id: true, shipmentNo: true, reference: true, cargoName: true } },
         receipt: { select: { id: true, receiptNo: true } },
       },
     }),

@@ -18,7 +18,7 @@ import { Banknote, Coins, TrendingUp, Truck } from "lucide-react";
 import { cancelShipmentAction, markArrivedAction, resolveIssueAction } from "../actions";
 import { PhaseBadge } from "../badges";
 
-export const metadata = { title: "Shipment" };
+export const metadata = { title: "Purchase order" };
 const D = Prisma.Decimal;
 const q = (n: Prisma.Decimal) => Number(n.toFixed(3)).toString();
 
@@ -106,8 +106,8 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
     <>
       <PageHeader
         title={shipment.shipmentNo}
-        description={[shipment.supplier?.name, shipment.reference].filter(Boolean).join(" · ") || "No supplier"}
-        back={{ href: "/shipments", label: "Incoming stock" }}
+        description={[shipment.supplier?.name, shipment.cargoName ?? shipment.reference].filter(Boolean).join(" · ") || "No supplier"}
+        back={{ href: "/shipments", label: "Purchase orders" }}
         actions={
           <>
             <PhaseBadge phase={phase} />

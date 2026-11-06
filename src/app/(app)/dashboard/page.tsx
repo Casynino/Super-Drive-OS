@@ -79,7 +79,7 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
   const actions = [
     can(user, "sales.pos") && { href: "/pos", icon: ShoppingCart, title: "New sale", text: "Sell to a customer", primary: true },
     can(user, "payments.record") && { href: "/customers", icon: Banknote, title: "Take a payment", text: "A customer pays a debt" },
-    can(user, "shipments.receive") && { href: "/shipments", icon: PackageCheck, title: "Incoming stock", text: incoming > 0 ? `${incoming} ${incoming === 1 ? "delivery" : "deliveries"} to check` : "See what is on the way" },
+    can(user, "shipments.receive") && { href: "/shipments", icon: PackageCheck, title: "Purchase orders", text: incoming > 0 ? `${incoming} ${incoming === 1 ? "delivery" : "deliveries"} to check` : "See what is on the way" },
     can(user, "resellers.operate") && { href: "/resellers", icon: Handshake, title: "Resellers", text: "Issue stock, record what they sold" },
     can(user, "returns.create") && { href: "/sales", icon: Undo2, title: "Return an item", text: "Open the sale first" },
     can(user, "expenses.create") && { href: "/expenses", icon: ReceiptText, title: "Record an expense", text: pendingExpensesMine > 0 ? `${pendingExpensesMine} waiting for the owner` : "Money spent for the shop" },

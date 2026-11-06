@@ -813,7 +813,8 @@ model Shipment {
   shipmentNo       String              @unique
   supplierId       String?
   supplier         Supplier?           @relation(fields: [supplierId], references: [id])
-  reference        String? // tracking number / container / supplier invoice
+  reference        String? // tracking number / container / supplier invoice (older shipments; the form now asks for the cargo company)
+  cargoName        String? // the cargo company that brings the goods
   expectedDate     DateTime?           @db.Date
   locationId       String
   location         Location            @relation(fields: [locationId], references: [id])

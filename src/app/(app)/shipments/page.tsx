@@ -15,7 +15,7 @@ import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { markArrivedAction } from "./actions";
 import { PhaseBadge } from "./badges";
 
-export const metadata = { title: "Incoming stock" };
+export const metadata = { title: "Purchase orders" };
 
 type Tab = "way" | "check" | "investigation" | "history";
 const TAB_PHASES: Record<Tab, ShipmentPhase[]> = {
@@ -71,10 +71,10 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
     { key: "history", label: "History" },
   ];
   const empty: Record<Tab, { title: string; text: string }> = {
-    way: { title: "Nothing is on the way", text: manage ? "Write down the stock you bought and it shows up here." : "When the owner sends new stock it shows up here." },
+    way: { title: "Nothing is on the way", text: manage ? "Make a purchase order and it shows up here." : "When the owner sends a purchase order it shows up here." },
     check: { title: "Nothing to check", text: "When a delivery is marked as arrived it waits here to be counted." },
     investigation: { title: "No problems", text: "Damaged, missing or extra goods are listed here until they are investigated." },
-    history: { title: "No finished shipments yet", text: "Shipments that are fully in stock appear here." },
+    history: { title: "No finished orders yet", text: "Orders that are fully in stock appear here." },
   };
 
   const action = (r: (typeof rows)[number]) => {
@@ -102,12 +102,12 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader
-        title="Incoming stock"
-        description={manage ? "Write down the stock you buy. The shop marks it arrived, checks it, and anything wrong comes back to you." : "Stock on its way to the shop. Mark it arrived, then check what you receive."}
+        title="Purchase orders"
+        description={manage ? "Write down what you order. It goes on the way, the shop marks it arrived and checks it, and anything wrong comes back to you." : "Orders on their way to the shop. Mark one arrived, then check what you receive."}
         actions={
           manage && (
             <Link href="/shipments/new" className="btn-primary">
-              <Plus size={16} /> New shipment
+              <Plus size={16} /> New purchase order
             </Link>
           )
         }
@@ -128,7 +128,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
         <KpiCard icon={PackageOpen} tone="green" label="In stock" value={doneRecently} hint="Fully received, last 30 days" href="/shipments?tab=history" active={tab === "history"} />
       </div>
 
-      <nav className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Shipment stages">
+      <nav className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Order stages">
         {tabs.map((t) => {
           const active = tab === t.key;
           return (
@@ -154,7 +154,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
             action={
               tab === "way" && manage ? (
                 <Link href="/shipments/new" className="btn-primary">
-                  <Plus size={16} /> New shipment
+                  <Plus size={16} /> New purchase order
                 </Link>
               ) : undefined
             }
@@ -164,7 +164,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
             <table className="table">
               <thead>
                 <tr>
-                  <th>Shipment</th>
+                  <th>Order</th>
                   <th className="hidden md:table-cell">Items</th>
                   <th className="hidden sm:table-cell">{tab === "way" ? "Expected" : "Arrived"}</th>
                   <th>Status</th>
@@ -181,7 +181,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
                         <Link href={`/shipments/${s.id}`} className="font-semibold text-navy-700 hover:underline">
                           {s.shipmentNo}
                         </Link>
-                        <span className="block text-xs text-slate-500">{[s.supplier?.name, s.reference].filter(Boolean).join(" · ") || `Announced ${formatDate(s.createdAt)}`}</span>
+                        <span className="block text-xs text-slate-500">{[s.supplier?.name, s.cargoName ?? s.reference].filter(Boolean).join(" · ") || `Announced ${formatDate(s.createdAt)}`}</span>
                       </td>
                       <td className="hidden md:table-cell">
                         {productCount(s)} product{productCount(s) === 1 ? "" : "s"}

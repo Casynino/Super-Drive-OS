@@ -36,6 +36,8 @@ export type CreateShipmentInput = {
   user: { id: string };
   supplierId: string | null;
   reference: string | null;
+  /** the cargo company that ships the goods */
+  cargoName?: string | null;
   expectedDate: string | null; // YYYY-MM-DD
   locationId: string;
   notes: string | null;
@@ -80,12 +82,13 @@ export async function createShipment(tx: Tx, input: CreateShipmentInput) {
   });
   if (Object.keys(errors).length) throw new ShipmentError("Please fix the highlighted lines.", errors);
 
-  const shipmentNo = await nextDocumentNo(tx, "SHP");
+  const shipmentNo = await nextDocumentNo(tx, "PO"); // purchase order number, e.g. PO-2026-000001
   return tx.shipment.create({
     data: {
       shipmentNo,
       supplierId: input.supplierId,
       reference: input.reference,
+      cargoName: input.cargoName?.trim() || null,
       expectedDate: input.expectedDate ? new Date(`${input.expectedDate}T00:00:00.000Z`) : null,
       locationId: input.locationId,
       notes: input.notes,

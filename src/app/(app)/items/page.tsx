@@ -36,6 +36,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
             { product: { sku: { contains: q, mode: "insensitive" } } },
             { shipment: { shipmentNo: { contains: q, mode: "insensitive" } } },
             { shipment: { reference: { contains: q, mode: "insensitive" } } },
+            { shipment: { cargoName: { contains: q, mode: "insensitive" } } },
             { receipt: { receiptNo: { contains: q, mode: "insensitive" } } },
           ],
         }

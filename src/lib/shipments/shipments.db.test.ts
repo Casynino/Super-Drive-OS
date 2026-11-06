@@ -36,6 +36,7 @@ async function announce(w: W, withB = false, arrived = true) {
       user: { id: ownerId },
       supplierId: null,
       reference: "CN-123",
+      cargoName: "Lakeside Cargo",
       expectedDate: "2026-12-01",
       locationId: w.location.id,
       notes: null,
@@ -63,7 +64,8 @@ describe("announcing and counting", () => {
   it("announcing a shipment changes no stock; a draft count changes no stock; only confirming does", async () => {
     const w = await world();
     const s = await announce(w);
-    expect(s.shipmentNo).toMatch(/^SHP-\d{4}-\d{6}$/);
+    expect(s.shipmentNo).toMatch(/^PO-\d{4}-\d{6}$/);
+    expect(s.cargoName).toBe("Lakeside Cargo"); // the cargo company that brings the goods
     expect(await stock(w, w.a.id)).toBe("0");
 
     await db.$transaction((tx) => saveDraft(tx, { shipmentId: s.id, user: { id: shopId }, notes: null, finish: false, lines: [line(w.a.id, "24")] }));

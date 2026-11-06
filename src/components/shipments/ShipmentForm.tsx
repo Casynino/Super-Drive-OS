@@ -21,6 +21,8 @@ type Props = {
   suppliers: Option[];
   categories: Option[];
   brands: Option[];
+  /** cargo companies used before, offered as suggestions */
+  cargoNames: string[];
   canPrice: boolean;
   currencySymbol: string;
   submissionKey: string;
@@ -65,14 +67,14 @@ function Stepper({ step, onGo, reached }: { step: number; onGo: (n: 1 | 2 | 3) =
   );
 }
 
-export default function ShipmentForm({ action, createProduct, products: initialProducts, locations, suppliers, categories, brands, canPrice, currencySymbol, submissionKey: key }: Props) {
+export default function ShipmentForm({ action, createProduct, products: initialProducts, locations, suppliers, categories, brands, cargoNames, canPrice, currencySymbol, submissionKey: key }: Props) {
   const [state, formAction] = useActionState(action, initial);
   const fe = state.fieldErrors ?? {};
   const [submissionKey] = useState(key);
   const [products, setProducts] = useState(initialProducts);
   const [lines, setLines] = useState<ShipmentLine[]>([]);
   const [supplierId, setSupplierId] = useState("");
-  const [reference, setReference] = useState("");
+  const [cargoName, setCargoName] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
   const [locationId, setLocationId] = useState(locations.find((l) => l.isDefault)?.id ?? locations[0]?.id ?? "");
   const [notes, setNotes] = useState("");
@@ -108,7 +110,8 @@ export default function ShipmentForm({ action, createProduct, products: initialP
 
   const payload = JSON.stringify({
     supplierId: supplierId || null,
-    reference: reference.trim() || null,
+    reference: null,
+    cargoName: cargoName.trim() || null,
     expectedDate: expectedDate || null,
     locationId,
     notes: notes.trim() || null,
@@ -160,8 +163,13 @@ export default function ShipmentForm({ action, createProduct, products: initialP
                 ))}
               </select>
             </Field>
-            <Field label="Container, tracking or invoice number" name="reference">
-              <input id="reference" className="input" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. container number" />
+            <Field label="Cargo company" name="cargoName" hint="Which cargo is bringing it to Tanzania?">
+              <input id="cargoName" className="input" list="cargo-names" value={cargoName} onChange={(e) => setCargoName(e.target.value)} placeholder="e.g. the cargo company's name" autoComplete="off" />
+              <datalist id="cargo-names">
+                {cargoNames.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
             </Field>
             <Field label="Expected arrival" name="expectedDate">
               <input id="expectedDate" type="date" className="input" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
@@ -239,7 +247,7 @@ export default function ShipmentForm({ action, createProduct, products: initialP
             <dl className="mt-4 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
               {[
                 { k: "Supplier", v: supplierName ?? "—" },
-                { k: "Container / tracking", v: reference.trim() || "—" },
+                { k: "Cargo company", v: cargoName.trim() || "—" },
                 { k: "Expected arrival", v: expectedDate ? formatDate(new Date(`${expectedDate}T00:00:00Z`)) : "—" },
                 { k: "Deliver to", v: locationName ?? "—" },
               ].map((r) => (

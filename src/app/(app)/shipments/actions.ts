@@ -31,6 +31,7 @@ const BAD = "The form could not be read. Reload the page and try again.";
 const createSchema = z.object({
   supplierId: z.string().min(1).nullable(),
   reference: z.string().trim().max(80).nullable(),
+  cargoName: z.string().trim().max(80).nullable().optional(),
   expectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   locationId: z.string().min(1, "Choose where it will be delivered."),
   notes: z.string().trim().max(500).nullable(),
@@ -54,8 +55,8 @@ export async function announceShipment(_prev: ActionState, fd: FormData): Promis
         async (tx) => {
           const created = await createShipment(tx, { user, ...p, currencyDecimals: currency.decimals });
           const total = created.items.reduce((sum, i) => sum.plus(i.lineCost ?? 0), new Prisma.Decimal(0));
-          await writeAudit(tx, { user, action: "shipment.create", entityType: "Shipment", entityId: created.id, reference: created.shipmentNo, after: { items: created.items.length, totalCost: total, reference: p.reference, expectedDate: p.expectedDate } });
-          await notifyPermission(tx, "shipments.receive", { type: "shipment.announced", title: `Stock is on its way: ${created.shipmentNo}`, body: `${created.items.length} product${created.items.length === 1 ? "" : "s"} expected${p.expectedDate ? ` around ${p.expectedDate}` : ""}${p.reference ? ` · ${p.reference}` : ""}`, link: `/shipments/${created.id}` });
+          await writeAudit(tx, { user, action: "shipment.create", entityType: "Shipment", entityId: created.id, reference: created.shipmentNo, after: { items: created.items.length, totalCost: total, cargo: p.cargoName, reference: p.reference, expectedDate: p.expectedDate } });
+          await notifyPermission(tx, "shipments.receive", { type: "shipment.announced", title: `New purchase order on its way: ${created.shipmentNo}`, body: `${created.items.length} product${created.items.length === 1 ? "" : "s"} expected${p.expectedDate ? ` around ${p.expectedDate}` : ""}${p.cargoName ? ` · ${p.cargoName}` : p.reference ? ` · ${p.reference}` : ""}`, link: `/shipments/${created.id}` });
           return created;
         },
         { timeout: 30000, maxWait: 15000 },

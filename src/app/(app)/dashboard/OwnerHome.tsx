@@ -145,7 +145,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
     can(user, "cash.view") && { href: "/cash", label: "Cash & accounts", icon: Landmark, tone: "sky" as const },
     can(user, "reports.view") && { href: "/reports", label: "Reports", icon: ChartColumn, tone: "emerald" as const },
     (can(user, "returns.approve") || can(user, "expenses.approve") || can(user, "closing.approve")) && { href: "/approvals", label: "Approvals", icon: Inbox, tone: "navy" as const, badge: data.pendingApprovals + (pendingExpenses?._count ?? 0) + closingsToReview.length },
-    can(user, "shipments.manage") && { href: "/shipments", label: "Incoming stock", icon: Truck, tone: "amber" as const },
+    can(user, "shipments.manage") && { href: "/shipments", label: "Purchase orders", icon: Truck, tone: "amber" as const },
     can(user, "resellers.view") && { href: "/resellers", label: "Resellers", icon: Handshake, tone: "violet" as const },
     can(user, "sales.view_all") && { href: "/sales", label: "Sales history", icon: Receipt, tone: "rose" as const },
     can(user, "audit.view") && { href: "/audit", label: "Audit log", icon: ScrollText, tone: "navy" as const },

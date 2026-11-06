@@ -9,12 +9,12 @@ import { getCurrency } from "@/lib/settings";
 import { getActiveLocations, getPickerProducts } from "../../inventory/data";
 import { announceShipment, createProductForShipment } from "../actions";
 
-export const metadata = { title: "New shipment" };
+export const metadata = { title: "New purchase order" };
 
 export default async function NewShipmentPage() {
   const user = await requirePagePermission("shipments.manage");
   const canPrice = can(user, "products.price");
-  const [picker, extras, locations, suppliers, categories, brands, currency] = await Promise.all([
+  const [picker, extras, locations, suppliers, categories, brands, currency, cargoRows] = await Promise.all([
     getPickerProducts(),
     // current prices and picture versions, so each line starts from today's selling price (prices are only read for people who may set them)
     db.product.findMany({ where: { status: "ACTIVE" }, select: { id: true, sellingPrice: true, wholesalePrice: true, image: { select: { updatedAt: true } } } }),
@@ -23,6 +23,7 @@ export default async function NewShipmentPage() {
     db.category.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.brand.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     getCurrency(),
+    db.shipment.findMany({ where: { cargoName: { not: null } }, distinct: ["cargoName"], orderBy: { createdAt: "desc" }, take: 20, select: { cargoName: true } }),
   ]);
   const extra = new Map(extras.map((e) => [e.id, e]));
   const products = picker.map((p) => {
@@ -32,7 +33,7 @@ export default async function NewShipmentPage() {
 
   return (
     <>
-      <PageHeader title="New shipment" description="Write down the stock you bought. It goes on the way to the shop, and they mark it arrived and check it when it lands." back={{ href: "/shipments", label: "Incoming stock" }} />
+      <PageHeader title="New purchase order" description="Write down what you ordered. It goes on the way to the shop, and they mark it arrived and check it when it lands." back={{ href: "/shipments", label: "Purchase orders" }} />
       {locations.length === 0 ? (
         <div className="card">
           <EmptyState title="Add a stock location first" action={<Link href="/settings" className="btn-primary">Open settings</Link>} />
@@ -46,6 +47,7 @@ export default async function NewShipmentPage() {
           suppliers={suppliers}
           categories={categories}
           brands={brands}
+          cargoNames={cargoRows.map((c) => c.cargoName!).filter(Boolean)}
           canPrice={canPrice}
           currencySymbol={currency.symbol}
           submissionKey={randomUUID()}
