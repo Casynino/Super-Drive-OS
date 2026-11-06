@@ -257,3 +257,20 @@ describe("integrity under pressure", () => {
     await expect(db.sale.update({ where: { id: unpaid.id }, data: { amountPaid: 1 } })).rejects.toThrow(); // status says UNPAID
   });
 });
+
+describe("carton-only products", () => {
+  it("refuses single pieces when the product is sold by the carton only, and still sells cartons", async () => {
+    const f = await fixture(100);
+    await db.product.update({ where: { id: f.product.id }, data: { allowPieceSales: false } });
+    await expect(sell(f, { lines: [{ productId: f.product.id, unitId: unitBottle, quantity: "5", unitPrice: "" }] })).rejects.toThrow(SaleError);
+    expect((await qty(f.product.id, f.location.id)).toString()).toBe("100"); // nothing left the shelf
+    await sell(f, { lines: [{ productId: f.product.id, unitId: unitCarton, quantity: "2", unitPrice: "" }] });
+    expect((await qty(f.product.id, f.location.id)).toString()).toBe("76"); // 2 cartons = 24 pieces
+  });
+
+  it("single pieces and cartons can be sold together when pieces are allowed", async () => {
+    const f = await fixture(100);
+    await sell(f, { lines: [{ productId: f.product.id, unitId: unitCarton, quantity: "2", unitPrice: "" }, { productId: f.product.id, unitId: unitBottle, quantity: "5", unitPrice: "" }] });
+    expect((await qty(f.product.id, f.location.id)).toString()).toBe("71"); // 24 + 5 pieces
+  });
+});

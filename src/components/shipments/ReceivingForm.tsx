@@ -7,7 +7,7 @@ import { CheckCheck, ImageOff, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui";
 import ProductPicker from "@/components/inventory/ProductPicker";
 import type { ActionState } from "@/lib/action";
-import type { PickerProduct } from "@/lib/inventory/types";
+import { defaultUnitId, type PickerProduct } from "@/lib/inventory/types";
 import { cn } from "@/lib/utils";
 
 export type CountRow = {
@@ -108,7 +108,7 @@ export default function ReceivingForm({ action, shipmentId, shipmentNo, rows: in
     if (rows.some((r) => r.productId === p.id)) return;
     setRows((all) => [
       ...all,
-      { key: `new-${p.id}`, shipmentItemId: null, productId: p.id, name: p.name, sku: p.sku, imageV: catalogueMeta[p.id]?.imageV ?? null, units: p.units.map((u) => ({ id: u.id, name: u.name, symbol: u.symbol, factor: u.factor })), baseUnitId: p.baseUnitId, baseSymbol: catalogueMeta[p.id]?.baseSymbol ?? "", expected: 0, counted: 0, announcedText: "Not announced", unitId: p.baseUnitId, good: "", damaged: "", note: "" },
+      { key: `new-${p.id}`, shipmentItemId: null, productId: p.id, name: p.name, sku: p.sku, imageV: catalogueMeta[p.id]?.imageV ?? null, units: p.units.map((u) => ({ id: u.id, name: u.name, symbol: u.symbol, factor: u.factor })), baseUnitId: p.baseUnitId, baseSymbol: catalogueMeta[p.id]?.baseSymbol ?? "", expected: 0, counted: 0, announcedText: "Not announced", unitId: defaultUnitId(p, "purchase"), good: "", damaged: "", note: "" },
     ]);
   };
 

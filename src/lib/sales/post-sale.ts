@@ -104,6 +104,15 @@ export async function postSale(tx: Tx, input: SaleInput) {
     throw new SaleError(resolved.message, fe);
   }
 
+  // A product that is sold in cartons only can never leave as single pieces (checked here, not just hidden in the screen)
+  if (!input.reseller) {
+    const rules = await tx.product.findMany({ where: { id: { in: resolved.lines.map((l) => l.productId) } }, select: { id: true, name: true, baseUnitId: true, allowPieceSales: true, _count: { select: { units: true } } } });
+    for (const l of resolved.lines) {
+      const r = rules.find((x) => x.id === l.productId);
+      if (r && !r.allowPieceSales && r._count.units > 0 && l.enteredUnitId === r.baseUnitId) throw new SaleError(`${r.name} is sold by the carton only.`, { [`line.${l.index}`]: "Sold by the carton only." });
+    }
+  }
+
   const wholesale = isWholesaleType(customer?.type);
   const errors: Record<string, string> = {};
   const priced = resolved.lines.flatMap((l) => {

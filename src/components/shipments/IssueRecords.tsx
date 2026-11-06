@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
 import type { IssueView } from "@/lib/shipments/issue-view";
+import { qtyText } from "@/lib/qty";
 import { cn } from "@/lib/utils";
 
 type Action = "FOUND" | "NOT_DELIVERED" | "WRITE_OFF" | "KEEP";
@@ -20,13 +21,16 @@ const CHOICES: Record<Action, { label: string; title: string; help: string; conf
 };
 const OPTIONS: Record<IssueView["kind"], Action[]> = { MISSING: ["FOUND", "NOT_DELIVERED"], DAMAGED: ["WRITE_OFF"], EXTRA: ["KEEP"] };
 
-const pieces = (n: number) => `${Number(n.toFixed(3))}`;
+const show = (r: IssueView, n: number) => qtyText(n, r.pack, r.unit);
 
 function DecisionForm({ r, choice, action, onDone }: { r: IssueView; choice: Action; action: (prev: ActionState, fd: FormData) => Promise<ActionState>; onDone: () => void }) {
   const [state, formAction] = useActionState(action, {});
   const [submissionKey] = useState(() => crypto.randomUUID());
   const fe = state.fieldErrors ?? {};
   const c = CHOICES[choice];
+  // cartons first: start in cartons when what is open divides into whole cartons, otherwise in pieces
+  const wholeCartons = r.pack ? r.open / r.pack.factor : NaN;
+  const startInCartons = Boolean(r.pack) && Number.isInteger(wholeCartons);
   useEffect(() => {
     if (!state.ok) return;
     const t = setTimeout(onDone, 1800);
@@ -47,8 +51,16 @@ function DecisionForm({ r, choice, action, onDone }: { r: IssueView; choice: Act
       <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
         <div>
           <label className="label" htmlFor={`q-${r.key}`}>How many?</label>
-          <input id={`q-${r.key}`} name="quantity" inputMode="decimal" defaultValue={pieces(r.open)} className={cn("input", fe.quantity && "input-error")} />
-          {fe.quantity ? <p className="field-error">{fe.quantity}</p> : <p className="hint">{pieces(r.open)} open. Fewer is fine: the rest stays under investigation.</p>}
+          <div className="flex gap-2">
+            <input id={`q-${r.key}`} name="quantity" inputMode="decimal" defaultValue={startInCartons ? String(wholeCartons) : String(Number(r.open.toFixed(3)))} className={cn("input min-w-0", fe.quantity && "input-error")} />
+            {r.pack && (
+              <select name="qtyUnit" defaultValue={startInCartons ? "pack" : "base"} className="input w-auto" aria-label="Unit">
+                <option value="pack">{r.pack.symbol}</option>
+                <option value="base">{r.unit}</option>
+              </select>
+            )}
+          </div>
+          {fe.quantity ? <p className="field-error">{fe.quantity}</p> : <p className="hint">{show(r, r.open).main} open. Fewer is fine: the rest stays under investigation.</p>}
         </div>
         <div>
           <label className="label" htmlFor={`n-${r.key}`}>{c.reasonRequired ? "Reason" : "Note (optional)"}</label>
@@ -112,10 +124,12 @@ function RecordCard({ r, canAct, closed, action }: { r: IssueView; canAct: boole
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold leading-none tracking-tight text-slate-900">
-            {pieces(r.open)}
-            <span className="ml-1 text-xs font-medium text-slate-500">{r.unit}</span>
+            {show(r, r.open).main}
           </p>
-          <p className="mt-1 text-xs text-slate-500">{done ? "all decided" : r.resolved > 0 ? `still open of ${pieces(r.total)}` : "under investigation"}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {done ? "all decided" : r.resolved > 0 ? `still open of ${show(r, r.total).main}` : "under investigation"}
+            {show(r, r.open).pieces && !done && <span className="block">{show(r, r.open).pieces}</span>}
+          </p>
         </div>
       </div>
 

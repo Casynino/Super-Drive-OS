@@ -165,6 +165,15 @@ export async function decideIssueAction(_prev: ActionState, fd: FormData): Promi
     if (!parsed.success) return fail(BAD);
     const p = parsed.data;
     const currency = await getCurrency();
+    // Quantities are typed in cartons first; the engine counts in base units, so a carton quantity is converted here from the product's own pack size.
+    if (formString(fd, "qtyUnit") === "pack") {
+      const it = await db.shipmentItem.findUnique({ where: { id: p.shipmentItemId }, select: { productId: true } });
+      const packs = it ? await db.productUnit.findMany({ where: { productId: it.productId }, select: { factor: true } }) : [];
+      const factor = packs.map((u) => Number(u.factor)).sort((a, b) => b - a)[0];
+      const typed = Number(p.quantity.trim());
+      if (!factor || factor <= 1 || !Number.isFinite(typed)) return fail("Enter how many.", { quantity: "Enter a number." });
+      p.quantity = String(Number((typed * factor).toFixed(3)));
+    }
     try {
       const r = await db.$transaction(
         async (tx) => {
@@ -284,8 +293,8 @@ export async function createProductForShipment(fd: FormData): Promise<{ ok: true
     if (perCarton && (perCarton < 2 || perCarton > 1000)) return fail("Pieces per carton must be between 2 and 1000.");
     if (await db.product.findFirst({ where: { name: { equals: name, mode: "insensitive" } }, select: { id: true } })) return fail("A product with this name already exists. Pick it from the list instead.");
 
-    const piece = await db.unit.findFirst({ where: { symbol: "pc" } });
-    const ctn = await db.unit.findFirst({ where: { symbol: "ctn" } });
+    const piece = await db.unit.findFirst({ where: { symbol: "PCS" } });
+    const ctn = await db.unit.findFirst({ where: { symbol: "CTN" } });
     if (!piece || (perCarton && !ctn)) return fail("The Piece / Carton units are missing. Add them in Settings first.");
 
     // Selling price is optional and only for people allowed to set prices.
@@ -326,7 +335,7 @@ export async function createProductForShipment(fd: FormData): Promise<{ ok: true
           purchasePrice: 0,
           sellingPrice: price,
           createdById: user.id,
-          ...(perCarton ? { units: { create: [{ unitId: ctn!.id, factor: perCarton }] } } : {}),
+          ...(perCarton ? { units: { create: [{ unitId: ctn!.id, factor: perCarton }] }, defaultSalesUnitId: ctn!.id, defaultPurchaseUnitId: ctn!.id } : {}),
         },
       });
       if (price.gt(0)) await tx.productPriceHistory.create({ data: { productId: p.id, field: "sellingPrice", oldValue: null, newValue: price, changedById: user.id } });

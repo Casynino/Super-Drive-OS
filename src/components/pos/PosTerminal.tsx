@@ -9,7 +9,8 @@ import { parseItemCode } from "@/lib/item-code";
 import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
-import type { LocationOption } from "@/lib/inventory/types";
+import { defaultUnitId, type LocationOption } from "@/lib/inventory/types";
+import { largestPack, qtyText } from "@/lib/qty";
 import { PAYMENT_METHODS, type CartLine, type PosCustomer, type PosProduct } from "@/lib/sales/types";
 import { cn } from "@/lib/utils";
 
@@ -139,9 +140,11 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
   // ── cart actions ──
   const addProduct = (p: PosProduct) =>
     setCart((c) => {
-      const i = c.findIndex((l) => l.productId === p.id && l.unitId === p.baseUnitId);
+      // cartons first: a product starts in its default selling unit (the carton when it has one)
+      const unitId = defaultUnitId(p, "sales");
+      const i = c.findIndex((l) => l.productId === p.id && l.unitId === unitId);
       if (i >= 0) return c.map((l, idx) => (idx === i ? { ...l, quantity: String(Number(l.quantity || 0) + 1) } : l));
-      return [...c, { productId: p.id, unitId: p.baseUnitId, quantity: "1", price: "" }];
+      return [...c, { productId: p.id, unitId, quantity: "1", price: "" }];
     });
   // a line can never hold more scanned pieces than its quantity: lowering the quantity drops the last scanned ones
   const fit = (l: CartLine): CartLine => (l.scanned && l.scanned.length > Math.max(Math.floor(Number(l.quantity || 0)), 0) ? { ...l, scanned: l.scanned.slice(0, Math.max(Math.floor(Number(l.quantity || 0)), 0)) } : l);
@@ -322,7 +325,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                         <Thumb p={p} className="aspect-square w-full rounded-xl [&_img]:p-1.5 [&_img]:transition [&_img]:duration-200 group-hover:[&_img]:scale-105" />
                         {inCart > 0 && <span className="absolute right-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-navy-700 px-1.5 text-xs font-semibold text-white shadow">{trim(inCart)}</span>}
                         <span className={cn("absolute bottom-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-semibold backdrop-blur", left <= 0 ? "bg-brand-red text-white" : left <= 5 ? "bg-oil-400 text-navy-950" : "bg-white/90 text-slate-700 ring-1 ring-slate-200")}>
-                          {left <= 0 ? "Out of stock" : `${trim(left)} left`}
+                          {left <= 0 ? "Out of stock" : `${qtyText(left, largestPack(p.units), p.units[0]?.symbol ?? "").main} left`}
                         </span>
                       </div>
                       <p className="mt-2.5 line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-slate-900">{p.name}</p>
@@ -391,7 +394,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                               </button>
                             </div>
                             <select className="input h-8 w-auto py-0 pr-8 text-sm" value={r.l.unitId} onChange={(e) => patch(i, { unitId: e.target.value, price: "" })} disabled={r.p.units.length === 1 || Boolean(r.l.scanned?.length)} aria-label="Unit">
-                              {r.p.units.filter((u) => u.id === r.l.unitId || !takenUnits.has(u.id)).map((u) => (
+                              {r.p.units.filter((u) => (u.id === r.l.unitId || !takenUnits.has(u.id)) && (u.id !== r.p.baseUnitId || r.p.allowPieceSales !== false || r.p.units.length === 1 || u.id === r.l.unitId)).map((u) => (
                                 <option key={u.id} value={u.id}>
                                   {u.name}
                                 </option>

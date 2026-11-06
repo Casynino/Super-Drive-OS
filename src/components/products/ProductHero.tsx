@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ImageOff } from "lucide-react";
 import { StatusBadge } from "@/components/ui";
 import type { RecordStatus } from "@/generated/prisma/client";
+import { qtyText, type Pack } from "@/lib/qty";
 
 export type HeroStock = { available: number; reseller: number; sold: number; returned: number; damaged: number; missing: number };
 
@@ -20,6 +21,8 @@ export default function ProductHero({
   wholesale,
   minStock,
   stock,
+  pack = null,
+  baseSymbol = "",
 }: {
   id: string;
   name: string;
@@ -31,7 +34,11 @@ export default function ProductHero({
   wholesale: string | null;
   minStock: number;
   stock: HeroStock | null;
+  /** cartons first: the biggest pack and the base unit's label */
+  pack?: Pack | null;
+  baseSymbol?: string;
 }) {
+  const fmt = (n: number) => qtyText(n, pack, baseSymbol);
   const total = stock ? stock.available + stock.reseller + stock.sold + stock.damaged : 0;
   const out = stock ? stock.available === 0 : false;
   const low = stock ? !out && minStock > 0 && stock.available <= minStock : false;
@@ -93,7 +100,8 @@ export default function ProductHero({
             {tiles.map((t) => (
               <div key={t.k}>
                 <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{t.k}</dt>
-                <dd className={`mt-0.5 text-2xl font-bold leading-tight ${t.tone}`}>{new Intl.NumberFormat("en-US").format(t.v)}</dd>
+                <dd className={`mt-0.5 text-2xl font-bold leading-tight ${t.tone}`}>{fmt(t.v).main}</dd>
+                {fmt(t.v).pieces && <dd className="text-xs text-slate-500">{fmt(t.v).pieces}</dd>}
               </div>
             ))}
           </dl>
@@ -101,8 +109,8 @@ export default function ProductHero({
             {segments.map((s) => (s.n > 0 ? <span key={s.label} className={s.cls} style={{ width: `${pct(s.n)}%` }} title={`${s.n} ${s.label}`} /> : null))}
           </div>
           <p className="mt-1.5 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
-            <span>{total} pieces in all{minStock > 0 && <> · reorder when {minStock} or fewer are left</>}</span>
-            {stock.missing > 0 && <span className="text-yellow-700">{stock.missing} marked missing</span>}
+            <span>{fmt(total).main} in all{minStock > 0 && <> · reorder when {fmt(minStock).main} or less is left</>}</span>
+            {stock.missing > 0 && <span className="text-yellow-700">{fmt(stock.missing).main} marked missing</span>}
           </p>
         </div>
       )}

@@ -11,11 +11,11 @@ const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.
 
 const BASE_UNITS = [
   { name: "Litre", symbol: "L", allowsDecimal: true },
-  { name: "Piece", symbol: "pc", allowsDecimal: false },
+  { name: "Piece", symbol: "PCS", allowsDecimal: false },
   { name: "Bottle", symbol: "btl", allowsDecimal: false },
   { name: "Container", symbol: "cont", allowsDecimal: false },
   { name: "Drum", symbol: "drum", allowsDecimal: false },
-  { name: "Carton", symbol: "ctn", allowsDecimal: false },
+  { name: "Carton", symbol: "CTN", allowsDecimal: false },
   { name: "Box", symbol: "box", allowsDecimal: false },
 ];
 

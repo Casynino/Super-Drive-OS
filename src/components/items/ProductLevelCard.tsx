@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ImageOff } from "lucide-react";
+import { qtyText, type Pack } from "@/lib/qty";
 import { cn } from "@/lib/utils";
 
 export type ProductLevel = {
@@ -18,6 +19,9 @@ export type ProductLevel = {
   subtitle?: string | null;
   price?: string | null;
   inactive?: boolean;
+  /** carton-first: the biggest pack and the base unit's label, so numbers read as cartons */
+  pack?: Pack | null;
+  baseSymbol?: string;
 };
 
 /**
@@ -28,6 +32,7 @@ export default function ProductLevelCard({ p, href, active, showStock = true }: 
   const out = p.available === 0;
   const low = !out && p.minStock > 0 && p.available <= p.minStock;
   const pct = (n: number) => (p.total > 0 ? (n / p.total) * 100 : 0);
+  const fmt = (n: number) => qtyText(n, p.pack ?? null, p.baseSymbol ?? "").main;
   const segments = [
     { n: p.available, cls: out ? "bg-brand-red" : low ? "bg-oil-400" : "bg-emerald-500", label: "in the shop" },
     { n: p.reseller, cls: "bg-blue-500", label: "with resellers" },
@@ -61,10 +66,10 @@ export default function ProductLevelCard({ p, href, active, showStock = true }: 
         <>
         <div className="mt-3 flex items-baseline justify-between gap-2">
           <p className="text-2xl font-bold leading-none tracking-tight text-slate-900">
-            {p.available}
+            {fmt(p.available)}
             <span className="ml-1.5 text-xs font-medium text-slate-500">in the shop</span>
           </p>
-          <p className="text-xs text-slate-500">{p.total} pieces in all</p>
+          <p className="text-xs text-slate-500">{fmt(p.total)} in all</p>
         </div>
 
         <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={segments.filter((s) => s.n > 0).map((s) => `${s.n} ${s.label}`).join(", ")}>
@@ -72,9 +77,9 @@ export default function ProductLevelCard({ p, href, active, showStock = true }: 
         </div>
         <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-slate-500">
           <p className="min-w-0 truncate">
-            {p.sold} sold
-            {p.reseller > 0 && <> · {p.reseller} with resellers</>}
-            {p.damaged > 0 && <> · <span className="text-brand-red-dark">{p.damaged} damaged</span></>}
+            {fmt(p.sold)} sold
+            {p.reseller > 0 && <> · {fmt(p.reseller)} with resellers</>}
+            {p.damaged > 0 && <> · <span className="text-brand-red-dark">{fmt(p.damaged)} damaged</span></>}
           </p>
           {p.price && <p className="shrink-0 font-semibold text-slate-700">{p.price}</p>}
         </div>

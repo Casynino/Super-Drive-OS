@@ -137,7 +137,7 @@ async function setup(d: number) {
   owner = { id: ownerUser.id, name: ownerUser.name };
   const loc = await db.location.findFirstOrThrow({ where: { isDefault: true } });
   locId = loc.id;
-  pieceUnit = (await db.unit.findFirstOrThrow({ where: { symbol: "pc" } })).id;
+  pieceUnit = (await db.unit.findFirstOrThrow({ where: { symbol: "PCS" } })).id;
 
   // staff (their passwords are random, written to .backups/demo-accounts.txt, never printed)
   const roles = new Map((await db.role.findMany({ select: { id: true, key: true } })).map((r) => [r.key, r.id]));
@@ -169,7 +169,7 @@ async function setup(d: number) {
     const retail = round500(liters * 16000 * maker + (liters === 1 ? 2000 : 0));
     const wholesale = round500(retail * 0.92);
     const cost = Math.round(retail * 0.62);
-    const carton = p.units.find((u) => u.unit.symbol === "ctn");
+    const carton = p.units.find((u) => u.unit.symbol === "CTN");
     await db.product.update({ where: { id: p.id }, data: { sellingPrice: retail, wholesalePrice: wholesale, purchasePrice: cost, minStock: liters === 1 ? 24 : 10 } });
     await db.productPriceHistory.createMany({ data: [{ productId: p.id, field: "sellingPrice", oldValue: null, newValue: retail, changedById: owner.id }, { productId: p.id, field: "wholesalePrice", oldValue: null, newValue: wholesale, changedById: owner.id }] });
     prods.push({ id: p.id, name: p.name, baseUnitId: p.baseUnitId, cartonUnitId: carton?.unitId ?? null, factor: carton ? Number(carton.factor) : 1, retail, wholesale, cost, liters });

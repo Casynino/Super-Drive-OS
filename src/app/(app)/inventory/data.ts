@@ -14,6 +14,9 @@ export async function getPickerProducts(): Promise<PickerProduct[]> {
     sku: p.sku,
     barcode: p.barcode,
     baseUnitId: p.baseUnitId,
+    defaultSalesUnitId: p.defaultSalesUnitId,
+    defaultPurchaseUnitId: p.defaultPurchaseUnitId,
+    allowPieceSales: p.allowPieceSales,
     units: [
       { id: p.baseUnit.id, name: p.baseUnit.name, symbol: p.baseUnit.symbol, factor: "1", allowsDecimal: p.baseUnit.allowsDecimal },
       ...p.units.map((u) => ({ id: u.unit.id, name: u.unit.name, symbol: u.unit.symbol, factor: u.factor.toString(), allowsDecimal: u.unit.allowsDecimal })),

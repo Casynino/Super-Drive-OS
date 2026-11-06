@@ -28,6 +28,9 @@ export type ProductFormData = {
   sellingPrice: string;
   wholesalePrice: string;
   minStock: string;
+  defaultSalesUnitId: string;
+  defaultPurchaseUnitId: string;
+  allowPieceSales: boolean;
   units: UnitRow[];
 };
 
@@ -50,8 +53,8 @@ export default function ProductForm({ product, categories, brands, units, curren
   const v = (name: keyof ProductFormData): string => state.values?.[name] ?? (product?.[name] as string | undefined) ?? "";
 
   const isEdit = Boolean(product);
-  const piece = units.find((u) => u.symbol === "pc");
-  const carton = units.find((u) => u.symbol === "ctn");
+  const piece = units.find((u) => u.symbol === "PCS");
+  const carton = units.find((u) => u.symbol === "CTN");
 
   const [baseUnitId, setBaseUnitId] = useState(v("baseUnitId") || piece?.id || "");
   const [rows, setRows] = useState<UnitRow[]>(() => {
@@ -209,6 +212,34 @@ export default function ProductForm({ product, categories, brands, units, curren
             </Field>
           )}
         </div>
+
+        {/* Carton first: what people see and type by default, and whether single pieces may be sold */}
+        {(isEdit || packRows.length > 0) && (
+          <div className="mt-5 grid gap-4 border-t border-line pt-5 md:grid-cols-3">
+            {[
+              { name: "defaultSalesUnitId", label: "Sell by default in", hint: "The POS starts with this unit." },
+              { name: "defaultPurchaseUnitId", label: "Buy and receive by default in", hint: "Orders and deliveries start with this unit." },
+            ].map((f) => (
+              <Field key={f.name} label={f.label} name={f.name} hint={f.hint}>
+                <select id={f.name} name={f.name} defaultValue={v(f.name as keyof ProductFormData)} disabled={disabled} className={inputClass()}>
+                  <option value="">Carton (biggest pack)</option>
+                  {baseUnit && <option value={baseUnit.id}>{baseUnit.name} ({baseUnit.symbol})</option>}
+                  {packRows.map((r) => {
+                    const u = units.find((x) => x.id === r.unitId);
+                    return u ? <option key={u.id} value={u.id}>{u.name} ({u.symbol})</option> : null;
+                  })}
+                </select>
+              </Field>
+            ))}
+            <div>
+              <p className="label">Single pieces</p>
+              <label className="flex items-start gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="allowPieceSales" defaultChecked={product ? product.allowPieceSales : true} disabled={disabled} className="mt-0.5 h-4 w-4 rounded border-slate-400" />
+                <span>Allow selling single pieces. Untick it to sell this product by the carton only.</span>
+              </label>
+            </div>
+          </div>
+        )}
 
         {!simplePack && (
           <div className="mt-5">

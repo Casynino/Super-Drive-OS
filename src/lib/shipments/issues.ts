@@ -15,6 +15,7 @@ import { postReceipt } from "@/lib/inventory/documents";
 import { disposeDamagedItems, isTracked } from "@/lib/inventory/items";
 import { resolveLines } from "@/lib/inventory/lines";
 import { todayYmd } from "@/lib/dashboard/range";
+import { largestPack } from "@/lib/qty";
 import { ShipmentError, createShipment } from "./engine";
 
 const D = Prisma.Decimal;
@@ -48,6 +49,8 @@ export type IssueRecord = {
   sku: string;
   imageV: number | null;
   unit: string;
+  /** the carton: quantities are shown in it first (null when the product has no pack) */
+  pack: { symbol: string; factor: number } | null;
   kind: IssueKind;
   type: IssueType;
   /** all pieces of this problem, how many are decided, how many are still open */
@@ -88,7 +91,7 @@ export async function loadIssueRecords(db: Reader, opts: { shipmentIds?: string[
           missingQty: true,
           unexpected: true,
           ...(opts.withCost ? { unitCost: true } : {}),
-          product: { select: { name: true, sku: true, baseUnit: { select: { symbol: true } }, image: { select: { updatedAt: true } } } },
+          product: { select: { name: true, sku: true, baseUnit: { select: { symbol: true } }, image: { select: { updatedAt: true } }, units: { select: { factor: true, unit: { select: { symbol: true } } } } } },
         },
       },
     },
@@ -149,6 +152,7 @@ export async function loadIssueRecords(db: Reader, opts: { shipmentIds?: string[
           sku: i.product.sku,
           imageV: i.product.image ? i.product.image.updatedAt.getTime() : null,
           unit: i.product.baseUnit.symbol,
+          pack: largestPack(i.product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor }))),
           kind: p.kind,
           type,
           total: p.total,

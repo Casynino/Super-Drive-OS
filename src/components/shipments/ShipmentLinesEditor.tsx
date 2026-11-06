@@ -2,7 +2,7 @@
 
 import { ImageOff, Trash2 } from "lucide-react";
 import ProductPicker from "@/components/inventory/ProductPicker";
-import type { PickerProduct } from "@/lib/inventory/types";
+import { defaultUnitId, type PickerProduct } from "@/lib/inventory/types";
 import { cn } from "@/lib/utils";
 
 /** One product on the shipment. Buying price can be typed per piece or as a line total; the other is worked out. */
@@ -61,7 +61,7 @@ export default function ShipmentLinesEditor({ products, lines, onChange, canPric
   const byId = new Map(products.map((p) => [p.id, p]));
   const add = (p: PickerProduct) => {
     if (lines.some((l) => l.productId === p.id)) return;
-    onChange([...lines, newLine(p, p.units[p.units.length - 1]?.id)]); // cartons first when the product has them
+    onChange([...lines, newLine(p, defaultUnitId(p, "purchase"))]); // cartons first
   };
   const update = (i: number, patch: Partial<ShipmentLine>) => onChange(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 

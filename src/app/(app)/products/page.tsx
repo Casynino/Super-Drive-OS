@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
 import { LABELS_ENABLED, PIECE_LIST_ENABLED } from "@/lib/features";
 import { untrackedStock } from "@/lib/inventory/items";
+import { fmtQty, inPacks, largestPack, qtyText } from "@/lib/qty";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -55,7 +56,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       orderBy: { name: "asc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: { category: { select: { name: true } }, brand: { select: { name: true } }, baseUnit: { select: { symbol: true } }, image: { select: { updatedAt: true } } },
+      include: { category: { select: { name: true } }, brand: { select: { name: true } }, baseUnit: { select: { symbol: true } }, image: { select: { updatedAt: true } }, units: { include: { unit: { select: { symbol: true } } } } },
     }),
     db.product.count({ where }),
     db.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -96,30 +97,38 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       subtitle: [p.category.name, p.brand?.name].filter(Boolean).join(" · "),
       price: formatMoney(p.sellingPrice, currency),
       inactive: p.status === "INACTIVE",
+      pack: largestPack(p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor }))),
+      baseSymbol: p.baseUnit.symbol,
     };
   });
 
-  // numbers on top: the whole catalogue, not just this page
-  let top: { products: number; inShop: number; withResellers: number; sold: number; restock: number } | null = null;
+  // numbers on top: the whole catalogue, not just this page. Cartons first; pieces as the small second line.
+  let top: { products: number; inShop: string; inShopPcs: string | null; withResellers: string; sold: string; restock: number } | null = null;
   if (canStock) {
-    const [catalogue, locations, soldTotal] = await Promise.all([
-      db.product.findMany({ where: { status: "ACTIVE" }, select: { id: true, minStock: true } }),
+    const [catalogue, locations, soldByProduct] = await Promise.all([
+      db.product.findMany({ where: { status: "ACTIVE" }, select: { id: true, minStock: true, units: { select: { factor: true, unit: { select: { symbol: true } } } } } }),
       db.location.findMany({ select: { id: true, type: true } }),
-      db.inventoryItem.count({ where: { status: "SOLD" } }),
+      db.inventoryItem.groupBy({ by: ["productId"], where: { status: "SOLD" }, _count: true }),
     ]);
     const isReseller = new Set(locations.filter((l) => l.type === "RESELLER").map((l) => l.id));
+    const packOf = new Map(catalogue.map((c) => [c.id, largestPack(c.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })))]));
     const onShelf = new Map<string, number>();
-    let inShop = 0;
-    let withResellers = 0;
+    let shelfCtn = 0;
+    let shelfPcs = 0;
+    let heldCtn = 0;
     for (const b of allBalances) {
       const n = num(b._sum.quantity);
-      if (isReseller.has(b.locationId)) withResellers += n;
+      const pk = packOf.get(b.productId) ?? null;
+      if (isReseller.has(b.locationId)) heldCtn += inPacks(n, pk);
       else {
-        inShop += n;
+        shelfCtn += inPacks(n, pk);
+        shelfPcs += n;
         onShelf.set(b.productId, (onShelf.get(b.productId) ?? 0) + n);
       }
     }
-    top = { products: catalogue.length, inShop, withResellers, sold: soldTotal, restock: catalogue.filter((c) => (onShelf.get(c.id) ?? 0) <= num(c.minStock)).length };
+    const soldCtn = soldByProduct.reduce((t, r) => t + inPacks(r._count, packOf.get(r.productId) ?? null), 0);
+    const round = (x: number) => fmtQty(Number(x.toFixed(1)));
+    top = { products: catalogue.length, inShop: `${round(shelfCtn)} CTN`, inShopPcs: shelfPcs > 0 ? `${fmtQty(shelfPcs)} PCS` : null, withResellers: `${round(heldCtn)} CTN`, sold: `${round(soldCtn)} CTN`, restock: catalogue.filter((c) => (onShelf.get(c.id) ?? 0) <= num(c.minStock)).length };
   }
   const missing = untracked.reduce((sum, r) => sum + r.missing, 0);
 
@@ -157,9 +166,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       {top && (
         <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
           <KpiCard icon={Boxes} tone="navy" label="Products" value={n(top.products)} hint="Active, on sale" />
-          <KpiCard icon={PackageCheck} tone="green" label="In the shop" value={n(top.inShop)} hint="Pieces on the shelf" />
-          <KpiCard icon={Handshake} tone="blue" label="With resellers" value={n(top.withResellers)} hint="Held on trust" />
-          <KpiCard icon={ShoppingCart} tone="slate" label="Sold" value={n(top.sold)} hint="Pieces sold so far" />
+          <KpiCard icon={PackageCheck} tone="green" label="In the shop" value={top.inShop} hint={top.inShopPcs ?? "On the shelf"} />
+          <KpiCard icon={Handshake} tone="blue" label="With resellers" value={top.withResellers} hint="Held on trust" />
+          <KpiCard icon={ShoppingCart} tone="slate" label="Sold" value={top.sold} hint="Sold so far" />
           <KpiCard icon={AlertTriangle} tone={top.restock > 0 ? "yellow" : "slate"} label="Restock" value={n(top.restock)} hint={top.restock > 0 ? "Low or out of stock" : "Nothing is low"} />
         </div>
       )}
@@ -260,7 +269,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                     </td>
                     <td className="hidden sm:table-cell">{p.category.name}</td>
                     <td className="hidden md:table-cell">{p.baseUnit.symbol}</td>
-                    {canStock && <td className="text-right font-medium">{n(levels[i]!.available)}</td>}
+                    {canStock && <td className="text-right font-medium">{qtyText(levels[i]!.available, levels[i]!.pack ?? null, levels[i]!.baseSymbol ?? "").main}</td>}
                     <td className="text-right font-medium">{formatMoney(p.sellingPrice, currency)}</td>
                     {canCost && <td className="hidden text-right md:table-cell">{formatMoney(p.purchasePrice, currency)}</td>}
                     <td>

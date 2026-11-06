@@ -57,12 +57,12 @@ export default function StockCard(p: StockCardProps) {
 
         {p.levelPct !== null ? (
           <div className="mt-3">
-            <div className="relative h-2 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Stock level against a minimum of ${p.min} ${p.unit}`}>
+            <div className="relative h-2 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Stock level against a minimum of ${p.min}`}>
               <div className={cn("h-full rounded-full transition-all", BAR[p.status])} style={{ width: `${Math.max(p.status === "out" ? 0 : 4, p.levelPct)}%` }} />
               <span className="absolute inset-y-0 left-1/3 w-px bg-slate-400/70" />
             </div>
             <p className="mt-1 text-[11px] text-slate-500">
-              Minimum {p.min} {p.unit}
+              Minimum {p.min}
             </p>
           </div>
         ) : (
@@ -71,7 +71,7 @@ export default function StockCard(p: StockCardProps) {
 
         {(p.away || p.value) && (
           <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
-            <span>{p.away ? `${p.away} ${p.unit} with resellers` : ""}</span>
+            <span>{p.away ? `${p.away} with resellers` : ""}</span>
             {p.value && <span className="font-medium text-slate-700">{p.value}</span>}
           </div>
         )}

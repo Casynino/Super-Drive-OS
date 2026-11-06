@@ -14,7 +14,19 @@ export type PickerProduct = {
   sellingPrice?: string;
   wholesalePrice?: string | null;
   imageV?: number | null;
+  /** carton-first: the unit forms start with (null = the biggest pack, else the base unit) and whether single pieces may be sold */
+  defaultSalesUnitId?: string | null;
+  defaultPurchaseUnitId?: string | null;
+  allowPieceSales?: boolean;
 };
+
+/** The unit a form should start with for this product: the product's chosen default, else its biggest pack (the carton), else the base unit. */
+export function defaultUnitId(p: Pick<PickerProduct, "units" | "baseUnitId" | "defaultSalesUnitId" | "defaultPurchaseUnitId">, kind: "sales" | "purchase"): string {
+  const chosen = kind === "sales" ? p.defaultSalesUnitId : p.defaultPurchaseUnitId;
+  if (chosen && p.units.some((u) => u.id === chosen)) return chosen;
+  const biggest = [...p.units].sort((a, b) => Number(b.factor) - Number(a.factor))[0];
+  return biggest && Number(biggest.factor) > 1 ? biggest.id : p.baseUnitId;
+}
 
 export type EditorLine = { productId: string; unitId: string; quantity: string; totalCost: string };
 

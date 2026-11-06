@@ -11,7 +11,7 @@ import { printDocument } from "./printSheet";
 import ShipmentLinesEditor, { lineFigures, newLine, type ShipmentLine } from "./ShipmentLinesEditor";
 import NewProductPanel from "./NewProductPanel";
 import type { ActionState } from "@/lib/action";
-import type { LocationOption, PickerProduct } from "@/lib/inventory/types";
+import { defaultUnitId, type LocationOption, type PickerProduct } from "@/lib/inventory/types";
 import { cn, formatDate } from "@/lib/utils";
 
 type Option = { id: string; name: string };
@@ -277,7 +277,7 @@ export default function ShipmentForm({ action, createProduct, products: initialP
                 create={createProduct}
                 onCreated={(p) => {
                   setProducts((all) => [...all, p]);
-                  setLines((l) => [...l, newLine(p, p.units[p.units.length - 1]?.id)]);
+                  setLines((l) => [...l, newLine(p, defaultUnitId(p, "purchase"))]);
                 }}
               />
             </div>

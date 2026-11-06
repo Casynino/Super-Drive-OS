@@ -55,6 +55,9 @@ type Snapshot = {
   sellingPrice: string;
   wholesalePrice: string | null;
   status: string;
+  defaultSalesUnitId: string | null;
+  defaultPurchaseUnitId: string | null;
+  allowPieceSales: boolean;
   units: { unitId: string; factor: string; sellingPrice: string | null; wholesalePrice: string | null }[];
 };
 
@@ -76,6 +79,9 @@ function snapshot(p: ProductWithUnits): Snapshot {
     sellingPrice: dec(p.sellingPrice)!,
     wholesalePrice: dec(p.wholesalePrice),
     status: p.status,
+    defaultSalesUnitId: p.defaultSalesUnitId,
+    defaultPurchaseUnitId: p.defaultPurchaseUnitId,
+    allowPieceSales: p.allowPieceSales,
     units: p.units
       .map((u) => ({ unitId: u.unitId, factor: dec(u.factor)!, sellingPrice: dec(u.sellingPrice), wholesalePrice: dec(u.wholesalePrice) }))
       .sort((a, b) => a.unitId.localeCompare(b.unitId)),
@@ -187,6 +193,9 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
 
     if (Object.keys(errors).length > 0 || !basic.success) return fail("Please fix the highlighted fields.", errors, values);
     const b = basic.data;
+    // a chosen default must be the base unit or one of this product's packs; anything else falls back to the biggest pack
+    const biggestPack = [...parsedUnits].sort((x, y) => y.factor.comparedTo(x.factor))[0]?.unitId ?? null;
+    const pickDefaultUnit = (raw: string): string | null => (raw && (raw === baseUnitId || parsedUnits.some((u) => u.unitId === raw)) ? raw : biggestPack);
 
     // Friendly uniqueness checks (the DB unique indexes remain the real guard)
     const dupSku = b.sku ? await db.product.findFirst({ where: { sku: b.sku, ...(id ? { NOT: { id } } : {}) }, select: { id: true } }) : null;
@@ -215,6 +224,10 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
       purchasePrice: canCost ? (purchasePrice ?? new D(0)) : (existing?.purchasePrice ?? new D(0)),
       sellingPrice: canPrice ? (sellingPrice ?? new D(0)) : (existing?.sellingPrice ?? new D(0)),
       wholesalePrice: canPrice ? wholesalePrice : (existing?.wholesalePrice ?? null),
+      // Carton-first: the unit forms start with, and whether single pieces may be sold. Left empty it means the biggest pack (the carton).
+      defaultSalesUnitId: pickDefaultUnit(formString(fd, "defaultSalesUnitId")),
+      defaultPurchaseUnitId: pickDefaultUnit(formString(fd, "defaultPurchaseUnitId")),
+      allowPieceSales: formString(fd, "allowPieceSales") === "on",
     };
 
     // A picture can be added while creating the product (optional); it is checked and shrunk before anything is saved.

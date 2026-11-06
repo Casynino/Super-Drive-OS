@@ -17,8 +17,8 @@ type Item = { sku: string; name: string; brand: string; category: string; packag
 
 async function main() {
   const catalog = JSON.parse(readFileSync(join(dir, "catalog.json"), "utf8")) as { categories: string[]; brands: string[]; products: Item[] };
-  const piece = await db.unit.findFirstOrThrow({ where: { symbol: "pc" } });
-  const carton = await db.unit.findFirstOrThrow({ where: { symbol: "ctn" } });
+  const piece = await db.unit.findFirstOrThrow({ where: { symbol: "PCS" } });
+  const carton = await db.unit.findFirstOrThrow({ where: { symbol: "CTN" } });
 
   const categoryId = new Map<string, string>();
   for (const name of catalog.categories) {
@@ -48,6 +48,8 @@ async function main() {
           purchasePrice: 0,
           sellingPrice: 0,
           units: { create: [{ unitId: carton.id, factor: p.perCarton }] },
+          defaultSalesUnitId: carton.id, // cartons first
+          defaultPurchaseUnitId: carton.id,
         },
       });
       await db.auditLog.create({ data: { userName: "Catalog import", action: "catalog.import", entityType: "Product", entityId: product.id, reference: p.sku, after: { name: p.name, perCarton: p.perCarton } } });

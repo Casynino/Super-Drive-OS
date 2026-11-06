@@ -208,48 +208,56 @@ model Unit {
   resellerIssueItems  ResellerIssueItem[]
   resellerReturnItems ResellerReturnItem[]
   receivingItems      ShipmentReceivingItem[]
+  salesDefaultFor     Product[]               @relation("ProductDefaultSalesUnit")
+  purchaseDefaultFor  Product[]               @relation("ProductDefaultPurchaseUnit")
 }
 
 model Product {
-  id                  String                  @id @default(cuid())
-  sku                 String                  @unique // stored uppercase
-  barcode             String?                 @unique
-  name                String
-  description         String?
-  categoryId          String
-  category            Category                @relation(fields: [categoryId], references: [id])
-  brandId             String?
-  brand               Brand?                  @relation(fields: [brandId], references: [id])
-  packagingType       String?
-  size                String? // e.g. "5L"; shown on labels
-  baseUnitId          String
-  baseUnit            Unit                    @relation(fields: [baseUnitId], references: [id])
-  purchasePrice       Decimal                 @db.Decimal(14, 2) // per base unit (default/last cost)
-  sellingPrice        Decimal                 @db.Decimal(14, 2) // per base unit
-  wholesalePrice      Decimal?                @db.Decimal(14, 2) // per base unit
-  minStock            Decimal                 @default(0) @db.Decimal(14, 3) // in base units
-  avgCost             Decimal                 @default(0) @db.Decimal(16, 4) // weighted-average cost per base unit, maintained by stock receipts
-  imageUrl            String?
-  status              RecordStatus            @default(ACTIVE)
-  createdById         String?
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  units               ProductUnit[]
-  balances            StockBalance[]
-  movements           StockMovement[]
-  receiptItems        StockReceiptItem[]
-  transferItems       StockTransferItem[]
-  adjustItems         StockAdjustmentItem[]
-  saleItems           SaleItem[]
-  image               ProductImage?
-  reversalItems       ReversalItem[]
-  shipmentItems       ShipmentItem[]
-  resellerIssueItems  ResellerIssueItem[]
-  resellerReturnItems ResellerReturnItem[]
-  receivingItems      ShipmentReceivingItem[]
-  priceHistory        ProductPriceHistory[]
-  items               InventoryItem[]
-  issueDecisions      ShipmentIssueDecision[]
+  id                    String                  @id @default(cuid())
+  sku                   String                  @unique // stored uppercase
+  barcode               String?                 @unique
+  name                  String
+  description           String?
+  categoryId            String
+  category              Category                @relation(fields: [categoryId], references: [id])
+  brandId               String?
+  brand                 Brand?                  @relation(fields: [brandId], references: [id])
+  packagingType         String?
+  size                  String? // e.g. "5L"; shown on labels
+  baseUnitId            String
+  baseUnit              Unit                    @relation(fields: [baseUnitId], references: [id])
+  // Carton-first: the unit shown and typed by default (usually the carton). Stock is still kept in the base unit; these only choose what people see first.
+  defaultSalesUnitId    String?
+  defaultSalesUnit      Unit?                   @relation("ProductDefaultSalesUnit", fields: [defaultSalesUnitId], references: [id])
+  defaultPurchaseUnitId String?
+  defaultPurchaseUnit   Unit?                   @relation("ProductDefaultPurchaseUnit", fields: [defaultPurchaseUnitId], references: [id])
+  allowPieceSales       Boolean                 @default(true) // false = this product can only be sold in its packs (cartons), never as single pieces
+  purchasePrice         Decimal                 @db.Decimal(14, 2) // per base unit (default/last cost)
+  sellingPrice          Decimal                 @db.Decimal(14, 2) // per base unit
+  wholesalePrice        Decimal?                @db.Decimal(14, 2) // per base unit
+  minStock              Decimal                 @default(0) @db.Decimal(14, 3) // in base units
+  avgCost               Decimal                 @default(0) @db.Decimal(16, 4) // weighted-average cost per base unit, maintained by stock receipts
+  imageUrl              String?
+  status                RecordStatus            @default(ACTIVE)
+  createdById           String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  units                 ProductUnit[]
+  balances              StockBalance[]
+  movements             StockMovement[]
+  receiptItems          StockReceiptItem[]
+  transferItems         StockTransferItem[]
+  adjustItems           StockAdjustmentItem[]
+  saleItems             SaleItem[]
+  image                 ProductImage?
+  reversalItems         ReversalItem[]
+  shipmentItems         ShipmentItem[]
+  resellerIssueItems    ResellerIssueItem[]
+  resellerReturnItems   ResellerReturnItem[]
+  receivingItems        ShipmentReceivingItem[]
+  priceHistory          ProductPriceHistory[]
+  items                 InventoryItem[]
+  issueDecisions        ShipmentIssueDecision[]
 
   @@index([categoryId])
   @@index([brandId])

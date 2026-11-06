@@ -14,6 +14,7 @@ export type IssueView = {
   sku: string;
   imageV: number | null;
   unit: string;
+  pack: { symbol: string; factor: number } | null;
   kind: IssueRecord["kind"];
   typeLabel: string;
   total: number;
@@ -36,6 +37,7 @@ export function toIssueViews(records: IssueRecord[]): IssueView[] {
     sku: r.sku,
     imageV: r.imageV,
     unit: r.unit,
+    pack: r.pack,
     kind: r.kind,
     typeLabel: ISSUE_TYPE_LABEL[r.type],
     total: r.total,

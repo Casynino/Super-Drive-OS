@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import type { EditorLine, PickerProduct } from "@/lib/inventory/types";
+import { defaultUnitId, type EditorLine, type PickerProduct } from "@/lib/inventory/types";
 import ProductPicker from "./ProductPicker";
 
 type Props = {
@@ -28,7 +28,7 @@ export default function StockLinesEditor({ products, lines, onChange, showCost, 
 
   const add = (p: PickerProduct) => {
     if (lines.some((l) => l.productId === p.id)) return; // one line per product
-    onChange([...lines, { productId: p.id, unitId: p.baseUnitId, quantity: "", totalCost: "" }]);
+    onChange([...lines, { productId: p.id, unitId: defaultUnitId(p, "purchase"), quantity: "", totalCost: "" }]);
   };
   const update = (i: number, patch: Partial<EditorLine>) => onChange(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 

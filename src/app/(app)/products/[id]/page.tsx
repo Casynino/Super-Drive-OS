@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { Prisma, type ItemStatus } from "@/generated/prisma/client";
 import { ITEM_STATUSES, ITEM_STATUS_LABEL } from "@/lib/inventory/item-labels";
 import { formatMoney } from "@/lib/money";
+import { largestPack } from "@/lib/qty";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { LABELS_ENABLED, PIECE_LIST_ENABLED } from "@/lib/features";
 import { getProductFormOptions } from "../options";
@@ -29,7 +30,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   const { id } = await params;
   const sp = await searchParams;
 
-  const product = await db.product.findUnique({ where: { id }, include: { units: true, category: { select: { name: true } }, brand: { select: { name: true } } } });
+  const product = await db.product.findUnique({ where: { id }, include: { units: { include: { unit: { select: { symbol: true } } } }, baseUnit: { select: { symbol: true } }, category: { select: { name: true } }, brand: { select: { name: true } } } });
   if (!product) notFound();
   const image = await db.productImage.findUnique({ where: { productId: id }, select: { updatedAt: true } });
   const currency = (await getProductFormOptions({ categoryId: product.categoryId, brandId: product.brandId ?? undefined, unitIds: [product.baseUnitId, ...product.units.map((u) => u.unitId)] })).currency;
@@ -110,6 +111,9 @@ export default async function EditProductPage({ params, searchParams }: { params
     sellingPrice: str(product.sellingPrice),
     wholesalePrice: str(product.wholesalePrice),
     minStock: str(product.minStock),
+    defaultSalesUnitId: product.defaultSalesUnitId ?? "",
+    defaultPurchaseUnitId: product.defaultPurchaseUnitId ?? "",
+    allowPieceSales: product.allowPieceSales,
     units: product.units.map((u) => ({
       unitId: u.unitId,
       factor: str(u.factor),
@@ -144,6 +148,8 @@ export default async function EditProductPage({ params, searchParams }: { params
         wholesale={product.wholesalePrice && Number(product.wholesalePrice) > 0 ? formatMoney(product.wholesalePrice, currency) : null}
         minStock={Number(product.minStock)}
         stock={stock}
+        pack={largestPack(product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })))}
+        baseSymbol={product.baseUnit.symbol}
       />
       {sp.created && (
         <div className="mb-4">
