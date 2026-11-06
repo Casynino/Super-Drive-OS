@@ -114,46 +114,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
     <>
       <PageHeader title="Audit" description="Everything people do: when they sign in, what they open and what they change. Nothing here can be edited or deleted." />
 
-      <section className="card mb-5 overflow-hidden" aria-label="Who is working">
-        <div className="border-b border-line px-4 py-3 sm:px-5">
-          <h2 className="text-base font-semibold text-slate-900">Who is working</h2>
-        </div>
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Now</th>
-                <th className="hidden md:table-cell">Last opened</th>
-                <th className="text-right">Today</th>
-              </tr>
-            </thead>
-            <tbody>
-              {people.map((p) => {
-                const last = seen(p);
-                const online = last !== null && now - last.getTime() < 5 * 60_000;
-                return (
-                  <tr key={p.id} className="relative">
-                    <td className="font-medium">
-                      <Link href={href({ who: p.id, page: undefined })} className="after:absolute after:inset-0 after:content-[''] hover:text-navy-700">
-                        {p.name}
-                      </Link>
-                    </td>
-                    <td className="text-slate-600">{p.role}</td>
-                    <td className={online ? "font-medium text-emerald-600" : "text-slate-500"}>{online ? "Online now" : last ? `Last seen ${ago(last)}` : "Never signed in"}</td>
-                    <td className="hidden text-slate-600 md:table-cell">{p.lastTitle ?? "—"}</td>
-                    <td className="text-right tabular-nums text-slate-600">
-                      {Number(p.actionsToday)} changes · {Number(p.pagesToday)} pages
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_21rem]">
+      <div className="min-w-0">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {TABS.map((t) => (
           <Link key={t.key} href={href({ tab: t.key === "all" ? undefined : t.key, page: undefined })} className={pill(tab.key === t.key)}>
@@ -223,7 +185,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                         <td>
                           {r.kind === "page" ? <span className="text-slate-700">Opened {r.what}</span> : <span className={cn(r.kind === "sign" && /failed|Wrong|Locked|unknown/i.test(describeAction(r.what)) ? "font-medium text-brand-red-dark" : "text-slate-900")}>{describeAction(r.what)}</span>}
                         </td>
-                        <td className="break-words text-slate-600">
+                        <td className={cn("text-slate-600", r.kind === "page" ? "truncate" : "break-words")} title={r.kind === "page" ? (r.detail ?? undefined) : undefined}>
                           {r.detail ?? ""}
                           {r.reason && <span className="block text-xs text-slate-500">“{r.reason}”</span>}
                           {r.before != null || r.after != null ? (
@@ -264,6 +226,39 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           </div>
         </div>
       )}
+      </div>
+
+      {/* who is working: on the side, so the log stays the main thing */}
+      <aside className="card overflow-hidden xl:sticky xl:top-20" aria-label="Who is working">
+        <div className="border-b border-line px-4 py-3">
+          <h2 className="text-base font-semibold text-slate-900">Who is working</h2>
+          <p className="text-xs text-slate-500">Press a name to see only their activity</p>
+        </div>
+        <ul className="divide-y divide-line">
+          {people.map((p) => {
+            const last = seen(p);
+            const online = last !== null && now - last.getTime() < 5 * 60_000;
+            return (
+              <li key={p.id} className={cn("relative px-4 py-3", who === p.id && "bg-slate-50")}>
+                <Link href={href({ who: who === p.id ? undefined : p.id, page: undefined })} className="block after:absolute after:inset-0 after:content-['']">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="truncate text-sm font-semibold text-slate-900">{p.name}</span>
+                    <span className={cn("shrink-0 text-xs", online ? "font-semibold text-emerald-600" : "text-slate-500")}>{online ? "Online now" : last ? `Seen ${ago(last)}` : "Never signed in"}</span>
+                  </span>
+                  <span className="mt-0.5 flex items-baseline justify-between gap-3 text-xs text-slate-500">
+                    <span className="truncate">{p.role}</span>
+                    <span className="shrink-0 tabular-nums">
+                      {Number(p.actionsToday)} changes · {Number(p.pagesToday)} pages
+                    </span>
+                  </span>
+                  {p.lastTitle && <span className="mt-0.5 block truncate text-xs text-slate-400">Last opened: {p.lastTitle}</span>}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </aside>
+      </div>
     </>
   );
 }
