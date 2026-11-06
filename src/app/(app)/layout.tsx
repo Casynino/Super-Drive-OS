@@ -1,4 +1,4 @@
-import Image from "next/image";
+import BrandLogo from "@/components/BrandLogo";
 import AppShell from "@/components/AppShell";
 import { NAV } from "@/components/nav";
 import { can, canAny } from "@/lib/auth/can";
@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     return (
       <div className="flex min-h-dvh items-center justify-center px-5 py-10">
         <div className="w-full max-w-sm">
-          <Image src="/brand/logo-full.png" alt="Super Drive Oil" width={900} height={456} className="mx-auto mb-6 h-16 w-auto" />
+          <BrandLogo className="mx-auto mb-6 h-16" />
           <h1 className="text-xl font-semibold text-slate-900">Set a new password</h1>
           <p className="mt-1 text-sm text-slate-500">You must choose your own password before continuing.</p>
           <ChangePasswordForm />

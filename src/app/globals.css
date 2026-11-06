@@ -213,12 +213,15 @@ body {
   html.dark .border-navy-100, html.dark .border-navy-200, html.dark .ring-navy-100, html.dark .ring-navy-200 { border-color: rgba(79, 143, 224, 0.35); --tw-ring-color: rgba(79, 143, 224, 0.3); }
   /* white plates for pictures and the logo stay light */
   html.dark .to-slate-100 { --tw-gradient-to: #e6ecf5; }
-  html.dark .brand-logo { background: #fff; padding: 4px 10px; border-radius: 10px; }
-  /* in the menu the logo sits on a clean white brand bar across the top (with the oil-yellow line), not on a white sticker */
-  html.dark .brand-header { background: #ffffff; border-bottom: 3px solid #fdc400; }
-  html.dark .brand-header .brand-logo { background: transparent; padding: 0; border-radius: 0; }
   /* charts */
   html.dark .recharts-tooltip-wrapper .recharts-default-tooltip { background-color: var(--card) !important; border-color: var(--chart-grid) !important; }
   html.dark .recharts-default-tooltip .recharts-tooltip-label, html.dark .recharts-default-tooltip .recharts-tooltip-item { color: var(--chart-label) !important; }
   html.dark .recharts-pie .recharts-sector { stroke: var(--card); }
+}
+
+/* The logo follows the theme: the normal one in light, the one with light lettering in dark. No white plate behind it. */
+.logo-dark { display: none; }
+@media screen {
+  html.dark .logo-light { display: none; }
+  html.dark .logo-dark { display: block; }
 }

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { trackPage } from "@/lib/auth/track-page";
 import { useEffect, useState } from "react";
 import { Bell, ChevronDown, LogOut, Menu, X } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import { NAV, type NavItem } from "./nav";
@@ -84,9 +85,9 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <div className="brand-header flex items-center justify-between border-b border-line px-4 py-3">
+      <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <Link href="/dashboard" className="block" aria-label={`${businessName} home`}>
-          <Image src="/brand/logo-full.png" alt={businessName} width={900} height={456} className="brand-logo h-12 w-auto" priority />
+          <BrandLogo alt={businessName} className="h-12" priority />
         </Link>
         <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
           <X size={16} />

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import Image from "next/image";
+import BrandLogo from "@/components/BrandLogo";
 import { redirect } from "next/navigation";
 import { Boxes, HandCoins, ShieldCheck, Wallet } from "lucide-react";
 import { getSessionUser } from "@/lib/auth/session";
@@ -17,9 +17,8 @@ const FEATURES = [
   { icon: HandCoins, label: "Credit control" },
 ];
 
-const Logo = ({ className }: { className: string }) => (
-  <Image src="/brand/logo-full.png" alt="Super Drive Oil" width={900} height={456} className={`brand-logo w-auto ${className}`} priority />
-);
+// the sign-in scene is always dark, so it always gets the logo with light lettering, with no white box behind it
+const Logo = ({ className }: { className: string }) => <BrandLogo onDark className={className} priority />;
 
 export default async function LoginPage() {
   if (await getSessionUser()) redirect("/dashboard");
@@ -32,7 +31,7 @@ export default async function LoginPage() {
       <div className="relative z-10 grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
         {/* Words (wide screens) */}
         <section className="hidden flex-col justify-between p-12 text-white lg:flex">
-          <div className="ls-up w-fit rounded-2xl bg-white px-6 py-4 shadow-lg" style={delay(0.05)}>
+          <div className="ls-up w-fit" style={delay(0.05)}>
             <Logo className="h-16" />
           </div>
 
@@ -59,7 +58,7 @@ export default async function LoginPage() {
 
         {/* Sign-in card, floating over the scene */}
         <section className="flex flex-col items-center px-5 py-6 lg:justify-center lg:py-10">
-          <div className="mb-5 self-start rounded-xl bg-white px-3.5 py-2 shadow-lg lg:hidden">
+          <div className="mb-5 self-start lg:hidden">
             <Logo className="h-10" />
           </div>
           <div className="ls-card ls-up w-full max-w-sm p-7 sm:p-8" style={delay(0.2)}>
