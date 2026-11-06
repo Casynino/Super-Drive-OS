@@ -113,7 +113,7 @@ export default async function CreditPage({ searchParams }: { searchParams: Promi
   const invoiceOrder = Prisma.raw(sort === "owed" ? `owed DESC, s."dueDate" ASC` : sort === "new" ? `s."createdAt" DESC` : `s."dueDate" ASC NULLS LAST, s."createdAt" ASC`);
   const customerOrder = Prisma.raw(sort === "owed" ? `owed DESC` : `MIN(s."dueDate") ASC NULLS LAST, owed DESC`);
 
-  const [sumRows, advance, recentCollections] = await Promise.all([
+  const [sumRows, advance] = await Promise.all([
     // numbers for the cards, pills and the age bar: always for the whole book (no search or view filter)
     db.$queryRaw<
       {
@@ -152,7 +152,6 @@ export default async function CreditPage({ searchParams }: { searchParams: Promi
       SELECT COALESCE(SUM(p."amount" - COALESCE(a."s", 0)), 0) AS s
         FROM "Payment" p LEFT JOIN (SELECT "paymentId", SUM("amount") AS s FROM "PaymentAllocation" GROUP BY "paymentId") a ON a."paymentId" = p."id"
        WHERE p."customerId" IS NOT NULL`,
-    db.payment.findMany({ where: { source: "DEBT_COLLECTION" }, orderBy: { receivedAt: "desc" }, take: 6, include: { customer: { select: { name: true } } } }),
   ]);
 
   // the list itself (and how many rows it has) for the chosen view
@@ -515,29 +514,6 @@ export default async function CreditPage({ searchParams }: { searchParams: Promi
           </>
         )}
       </div>
-
-      <section className="card mt-5 overflow-hidden">
-        <h2 className="border-b border-line px-5 py-3 text-base font-semibold text-slate-900">Recent debt collections</h2>
-        {recentCollections.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-slate-500">No payments collected on credit yet.</p>
-        ) : (
-          <ul className="divide-y divide-slate-100 text-sm">
-            {recentCollections.map((p) => (
-              <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                <span className="min-w-0">
-                  <Link href={`/payments/${p.id}`} className="font-medium text-navy-700 hover:underline">
-                    {p.paymentNo}
-                  </Link>
-                  <span className="block truncate text-xs text-slate-500">
-                    {p.customer?.name} · {formatDate(p.receivedAt)}
-                  </span>
-                </span>
-                <span className="shrink-0 font-semibold text-emerald-700">{money(p.amount)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </>
   );
 }
