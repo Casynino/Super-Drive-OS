@@ -86,47 +86,49 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </h2>
               <p className="text-xs text-slate-500">Business health, sales and growth, products, money, expenses, customers and cash, as a document</p>
             </div>
-            <ul className="grid divide-y divide-line sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-5 lg:divide-x">
+            <ul className="grid grid-cols-2 gap-px bg-line lg:grid-cols-5">
               {ready.map((x) => (
-                <li key={x.label} className="px-4 py-4 sm:px-5">
+                <li key={x.label} className="bg-[var(--card)] px-4 py-4 first:col-span-2 sm:px-5 lg:first:col-span-1">
                   <p className="text-sm font-semibold text-slate-900">{x.label}</p>
                   <p className="text-xs text-slate-500">
                     {short(x.from)} – {short(x.to)}
                     {x.sub ? ` · ${x.sub}` : ""}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    <Link href={href(x.from, x.to)} target="_blank" className="btn-secondary btn-sm">
-                      <ExternalLink size={14} /> Open
+                  <div className="mt-3 inline-flex overflow-hidden rounded-lg border border-line bg-white text-xs font-medium text-slate-700">
+                    <Link href={href(x.from, x.to)} target="_blank" className="inline-flex items-center gap-1.5 px-3 py-2 transition hover:bg-slate-50 sm:py-1.5">
+                      <ExternalLink size={13} /> Open
                     </Link>
-                    <Link href={href(x.from, x.to, "&print=1&save=1")} target="_blank" className="btn-secondary btn-sm" aria-label={`Download ${x.label} as PDF`}>
-                      <Download size={14} /> Download
+                    <Link href={href(x.from, x.to, "&print=1&save=1")} target="_blank" className="inline-flex items-center border-l border-line px-2.5 py-2 transition hover:bg-slate-50 sm:py-1.5" title="Download as PDF" aria-label={`Download ${x.label} as PDF`}>
+                      <Download size={14} />
                     </Link>
-                    <Link href={href(x.from, x.to, "&print=1")} target="_blank" className="btn-secondary btn-sm" aria-label={`Print ${x.label}`}>
-                      <Printer size={14} /> Print
+                    <Link href={href(x.from, x.to, "&print=1")} target="_blank" className="inline-flex items-center border-l border-line px-2.5 py-2 transition hover:bg-slate-50 sm:py-1.5" title="Print" aria-label={`Print ${x.label}`}>
+                      <Printer size={14} />
                     </Link>
                   </div>
                 </li>
               ))}
             </ul>
             <form method="get" action="/print/report" target="_blank" className="flex flex-wrap items-end gap-3 border-t border-line bg-slate-50/60 px-4 py-3 sm:px-5">
-              <span className="pb-2 text-sm font-medium text-slate-700">Any dates</span>
-              <label className="text-xs text-slate-500">
+              <span className="pb-2 text-sm font-medium text-slate-700 max-sm:w-full">Any dates</span>
+              <label className="text-xs text-slate-500 max-sm:min-w-[8.5rem] max-sm:flex-1">
                 From
-                <input type="date" name="from" defaultValue={weekStart} max={today} className="input mt-1 block" />
+                <input type="date" name="from" defaultValue={weekStart} max={today} className="input mt-1 block w-full" />
               </label>
-              <label className="text-xs text-slate-500">
+              <label className="text-xs text-slate-500 max-sm:min-w-[8.5rem] max-sm:flex-1">
                 To
-                <input type="date" name="to" defaultValue={today} max={today} className="input mt-1 block" />
+                <input type="date" name="to" defaultValue={today} max={today} className="input mt-1 block w-full" />
               </label>
-              <button type="submit" className="btn-secondary">
-                <ExternalLink size={15} /> Open
-              </button>
-              <button type="submit" name="save" value="1" className="btn-secondary">
-                <Download size={15} /> Download
-              </button>
-              <button type="submit" name="print" value="1" className="btn-secondary">
-                <Printer size={15} /> Print
-              </button>
+              <div className="inline-flex overflow-hidden rounded-lg border border-line bg-white text-xs font-medium text-slate-700">
+                <button type="submit" className="inline-flex items-center gap-1.5 px-3 py-2 transition hover:bg-slate-50 sm:py-1.5">
+                  <ExternalLink size={13} /> Open
+                </button>
+                <button type="submit" name="save" value="1" className="inline-flex items-center border-l border-line px-2.5 py-2 transition hover:bg-slate-50 sm:py-1.5" title="Download as PDF" aria-label="Download as PDF">
+                  <Download size={14} />
+                </button>
+                <button type="submit" name="print" value="1" className="inline-flex items-center border-l border-line px-2.5 py-2 transition hover:bg-slate-50 sm:py-1.5" title="Print" aria-label="Print">
+                  <Printer size={14} />
+                </button>
+              </div>
             </form>
           </section>
         );
