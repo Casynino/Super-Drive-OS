@@ -1,6 +1,20 @@
 {
   "crons": [
-    { "path": "/api/cron/daily-report", "schedule": "0 17 * * *" },
-    { "path": "/api/cron/payment-reminders", "schedule": "0 6 * * *" }
+    {
+      "path": "/api/cron/daily-report",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/payment-reminders",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/period-reports?kind=weekly",
+      "schedule": "0 6 * * 0"
+    },
+    {
+      "path": "/api/cron/period-reports?kind=monthly",
+      "schedule": "0 6 1 * *"
+    }
   ]
 }

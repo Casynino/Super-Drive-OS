@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { fail, formString, formValues, guarded, zodErrors, type ActionState } from "@/lib/action";
 import { cleanPhone } from "@/lib/reports/format";
-import { runDailyReport } from "@/lib/reports/whatsapp";
+import { runDailyReport, runPeriodReport } from "@/lib/reports/whatsapp";
 import { businessDay } from "@/lib/cash/ledger";
 
 export async function saveReportSettings(_prev: ActionState, fd: FormData): Promise<ActionState> {
@@ -37,6 +37,18 @@ export async function sendReportNowAction(_prev: ActionState, fd: FormData): Pro
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > businessDay()) return fail("Choose a day that has already started.");
     const result = await runDailyReport(db, { day, trigger: "MANUAL", requestedById: user.id });
     await db.$transaction((tx) => writeAudit(tx, { user, action: "report.send_manual", entityType: "WhatsAppReport", entityId: day, reference: day, after: { outcome: result.outcome, sent: result.sent, total: result.total } }));
+    revalidatePath("/settings/whatsapp");
+    return result.outcome === "sent" ? { ok: true, message: result.message } : fail(result.message);
+  });
+}
+
+/** Send the last finished week or month on WhatsApp right now (the scheduled ones go on Sunday and on the 1st at 09:00). */
+export async function sendPeriodNowAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return guarded("settings.manage", async (user) => {
+    const kind = formString(fd, "kind");
+    if (kind !== "WEEKLY" && kind !== "MONTHLY") return fail("Unknown report.");
+    const result = await runPeriodReport(db, { kind, trigger: "MANUAL", requestedById: user.id });
+    await db.$transaction((tx) => writeAudit(tx, { user, action: "report.send_manual", entityType: "WhatsAppReport", entityId: kind, reference: kind, after: { outcome: result.outcome, sent: result.sent, total: result.total } }));
     revalidatePath("/settings/whatsapp");
     return result.outcome === "sent" ? { ok: true, message: result.message } : fail(result.message);
   });

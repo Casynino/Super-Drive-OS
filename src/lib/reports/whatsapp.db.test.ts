@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { dayToDate, defaultLocationId } from "@/lib/cash/ledger";
-import { runDailyReport, type Sender } from "./whatsapp";
+import { periodToSend, runDailyReport, runPeriodReport, type Sender } from "./whatsapp";
 
 let userId: string;
 let locationId: string;
@@ -52,12 +52,9 @@ describe("the daily WhatsApp report", () => {
     expect(b.sent[1]).toContain("DAILY DETAILED REPORT");
     expect(b.sent[1]).toMatch(/PART 1\/\d+/);
     await run(day, b.sender);
-    // 1 March 2020 was a Sunday: the week's report goes out after the daily ones, once
-    expect(b.sent.length).toBe(1 + (await db.whatsAppReport.count({ where: { businessDate: dayToDate(day), kind: { in: ["DETAIL", "WEEKLY"] } } })));
-    const week = b.sent.find((t) => t.includes("WEEKLY BUSINESS REPORT"));
-    expect(week).toContain("24 February 2020 to 01 March 2020");
-    expect(week).toContain("Profit:");
-    expect(b.sent.filter((t) => t.includes("WEEKLY BUSINESS REPORT"))).toHaveLength(1);
+    // the daily report no longer carries the week: that goes out by itself on Sunday at 09:00
+    expect(b.sent.some((t) => t.includes("WEEKLY BUSINESS REPORT"))).toBe(false);
+    expect(b.sent.length).toBe(1 + (await db.whatsAppReport.count({ where: { businessDate: dayToDate(day), kind: "DETAIL" } })));
     expect(await db.whatsAppReport.count({ where: { businessDate: dayToDate(day), status: { not: "SENT" } } })).toBe(0);
   });
 
@@ -125,5 +122,56 @@ describe("the daily WhatsApp report", () => {
     expect(rows.every((r) => r.toPhone === "2557…678")).toBe(true);
     expect(JSON.stringify(rows)).not.toContain("super-secret-key-123");
     delete process.env.CALLMEBOT_API_KEY;
+  });
+});
+
+describe("sent as the day closes, and the weekly and monthly reports", () => {
+  it("a day that has just been closed is sent at once, before the evening time, and the evening run then has nothing more to send", async () => {
+    const day = "2020-04-06";
+    await closeDay(day);
+    const a = recorder();
+    expect((await run(day, a.sender, { now: at(day, "15:00") })).outcome).toBe("skipped"); // a normal run waits for the evening
+    expect((await run(day, a.sender, { now: at(day, "15:00"), afterClosing: true })).outcome).toBe("sent");
+    expect(a.sent[0]).toContain("DAILY BUSINESS SUMMARY");
+    expect((await run(day, a.sender, { now: at(day, "20:30") })).message).toMatch(/Nothing new/);
+    expect(a.sent.filter((t) => t.includes("DAILY BUSINESS SUMMARY"))).toHaveLength(1);
+  });
+
+  it("works out what each report covers: the seven days up to Saturday on a Sunday, the month before on the 1st", () => {
+    expect(periodToSend("WEEKLY", "2020-03-08")).toEqual({ from: "2020-03-01", to: "2020-03-07" });
+    expect(periodToSend("MONTHLY", "2020-04-01")).toEqual({ from: "2020-03-01", to: "2020-03-31" });
+    expect(periodToSend("MONTHLY", "2020-01-01")).toEqual({ from: "2019-12-01", to: "2019-12-31" });
+    expect(periodToSend("MONTHLY", "2020-03-01")).toEqual({ from: "2020-02-01", to: "2020-02-29" });
+  });
+
+  it("the weekly report goes out on Sunday at 09:00 and is sent once, however often the scheduler runs", async () => {
+    const a = recorder();
+    const go = () => runPeriodReport(db, { kind: "WEEKLY", trigger: "SCHEDULED", sender: a.sender, sleep: noSleep, now: at("2020-03-08", "09:00") });
+    expect((await go()).outcome).toBe("sent");
+    expect(a.sent).toHaveLength(1);
+    expect(a.sent[0]).toContain("WEEKLY BUSINESS REPORT");
+    expect(a.sent[0]).toContain("01 March 2020 to 07 March 2020");
+    expect(a.sent[0]).toContain("Profit:");
+    expect((await go()).message).toMatch(/Nothing new/);
+    expect(a.sent).toHaveLength(1);
+  });
+
+  it("the monthly report goes out on the 1st at 09:00 for the whole month before", async () => {
+    const a = recorder();
+    expect((await runPeriodReport(db, { kind: "MONTHLY", trigger: "SCHEDULED", sender: a.sender, sleep: noSleep, now: at("2020-04-01", "09:00") })).outcome).toBe("sent");
+    expect(a.sent[0]).toContain("MONTHLY BUSINESS REPORT");
+    expect(a.sent[0]).toContain("01 March 2020 to 31 March 2020");
+  });
+
+  it("a failed weekly report is kept and tried again by the next run; a manual send always sends a new one", async () => {
+    const bad = recorder(() => true);
+    const when = at("2020-03-15", "09:00");
+    expect((await runPeriodReport(db, { kind: "WEEKLY", trigger: "SCHEDULED", sender: bad.sender, sleep: noSleep, now: when })).outcome).toBe("failed");
+    const good = recorder();
+    expect((await runPeriodReport(db, { kind: "WEEKLY", trigger: "SCHEDULED", sender: good.sender, sleep: noSleep, now: when })).outcome).toBe("sent");
+    expect(good.sent).toHaveLength(1);
+    const manual = recorder();
+    expect((await runPeriodReport(db, { kind: "WEEKLY", trigger: "MANUAL", sender: manual.sender, sleep: noSleep, now: when })).outcome).toBe("sent");
+    expect(manual.sent).toHaveLength(1);
   });
 });

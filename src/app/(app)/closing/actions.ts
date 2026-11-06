@@ -7,7 +7,9 @@ import { writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
 import { fail, formString, formValues, guarded, isUniqueViolation, type ActionState } from "@/lib/action";
 import { ImageError, processDocumentImage, saveAttachment } from "@/lib/cash/attachments";
+import { after } from "next/server";
 import { correctClosingCount, submitClosing } from "@/lib/cash/closing";
+import { runDailyReport } from "@/lib/reports/whatsapp";
 import { postDeposit } from "@/lib/cash/deposits";
 import { CashError, defaultLocationId } from "@/lib/cash/ledger";
 import { formatMoney } from "@/lib/money";
@@ -69,6 +71,16 @@ export async function submitClosingAction(_prev: ActionState, fd: FormData): Pro
         { timeout: 30000, maxWait: 15000 },
       );
       refresh();
+      // the Director gets the day's report on WhatsApp as soon as the day is closed, after the page has answered; if it cannot be sent now
+      // (no number, no key, no signal) the evening run sends it
+      const closedDay = formString(fd, "day");
+      after(async () => {
+        try {
+          await runDailyReport(db, { day: closedDay, trigger: "SCHEDULED", afterClosing: true });
+        } catch {
+          /* the scheduled run will try again */
+        }
+      });
       return { ok: true, message: out };
     } catch (e) {
       if (e instanceof CashError) return fail(e.message, e.fieldErrors, values);

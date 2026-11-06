@@ -11,7 +11,7 @@ import type { Db } from "@/lib/db";
 import { businessDay, dayToDate, defaultLocationId } from "@/lib/cash/ledger";
 import { buildDailyReport } from "./daily";
 import { appBaseUrl } from "./links";
-import { buildPeriodMessage, periodsEndingOn } from "./period";
+import { buildPeriodMessage, shiftDay } from "./period";
 import { cleanPhone, maskPhone } from "./format";
 
 export type SendResult = { ok: boolean; error?: string };
@@ -64,22 +64,9 @@ export type RunResult = {
 
 type PlannedRow = { kind: ReportKind; part: number; parts: number; content: string };
 
-/** After a closed Sunday the week's report goes too; after the last day of a month, the month's. A failure here never stops the daily report. */
-async function periodRows(db: Db, locationId: string, day: string): Promise<PlannedRow[]> {
-  const out: PlannedRow[] = [];
-  for (const p of periodsEndingOn(day)) {
-    try {
-      out.push({ kind: p.kind, part: 1, parts: 1, content: await buildPeriodMessage(db, locationId, p.kind, p.from, p.to, appBaseUrl()) });
-    } catch {
-      /* skipped: the daily report must still be sent */
-    }
-  }
-  return out;
-}
-
 export async function runDailyReport(
   db: Db,
-  input: { day?: string; trigger: ReportTrigger; requestedById?: string | null; sender?: Sender; sleep?: (ms: number) => Promise<void>; now?: Date; budgetMs?: number },
+  input: { day?: string; trigger: ReportTrigger; requestedById?: string | null; sender?: Sender; sleep?: (ms: number) => Promise<void>; now?: Date; budgetMs?: number; /** the shop has just closed the day: send now, do not wait for the evening time */ afterClosing?: boolean },
 ): Promise<RunResult> {
   const sender = input.sender ?? callMeBotSender;
   const sleep = input.sleep ?? sleepReal;
@@ -92,11 +79,10 @@ export async function runDailyReport(
   if (!phone) return { outcome: "skipped", message: "No reporting number is set.", sent: 0, total: 0 };
   if (input.trigger === "SCHEDULED") {
     if (!settings.enabled) return { outcome: "skipped", message: "Daily reports are switched off.", sent: 0, total: 0 };
-    if (day === businessDay(now) && nowHm(now) < settings.time) return { outcome: "skipped", message: `Not time yet (reports go out at ${settings.time}).`, sent: 0, total: 0 };
+    if (day === businessDay(now) && nowHm(now) < settings.time && !input.afterClosing) return { outcome: "skipped", message: `Not time yet (reports go out at ${settings.time}).`, sent: 0, total: 0 };
   }
 
   // 1. The messages to send: reuse what a scheduled run already created for this day, otherwise build them now
-  type Row = { id: string; status: string; attempts: number; content: string };
   let rows: Row[] = [];
   if (input.trigger === "SCHEDULED") {
     const existing = await db.whatsAppReport.findMany({ where: { businessDate: dayToDate(day), trigger: "SCHEDULED" }, orderBy: [{ kind: "asc" }, { part: "asc" }] });
@@ -107,7 +93,7 @@ export async function runDailyReport(
       const locationId = await defaultLocationId(db);
       const report = await buildDailyReport(db, locationId, day);
       const planned: PlannedRow[] = report.closed
-        ? [{ kind: "SUMMARY", part: 1, parts: 1, content: report.summary }, ...report.detail.map((c, i) => ({ kind: "DETAIL" as const, part: i + 1, parts: report.detail.length, content: c })), ...(await periodRows(db, locationId, day))]
+        ? [{ kind: "SUMMARY", part: 1, parts: 1, content: report.summary }, ...report.detail.map((c, i) => ({ kind: "DETAIL" as const, part: i + 1, parts: report.detail.length, content: c }))]
         : [{ kind: "EXCEPTION", part: 1, parts: 1, content: report.exception }];
       for (const p of planned) {
         // a unique clash means another run created it a moment ago: use that one
@@ -120,11 +106,19 @@ export async function runDailyReport(
     const locationId = await defaultLocationId(db);
     const report = await buildDailyReport(db, locationId, day);
     const planned: PlannedRow[] = report.closed
-      ? [{ kind: "SUMMARY", part: 1, parts: 1, content: report.summary }, ...report.detail.map((c, i) => ({ kind: "DETAIL" as const, part: i + 1, parts: report.detail.length, content: c })), ...(await periodRows(db, locationId, day))]
+      ? [{ kind: "SUMMARY", part: 1, parts: 1, content: report.summary }, ...report.detail.map((c, i) => ({ kind: "DETAIL" as const, part: i + 1, parts: report.detail.length, content: c }))]
       : [{ kind: "EXCEPTION", part: 1, parts: 1, content: report.exception }];
     for (const p of planned) rows.push(await db.whatsAppReport.create({ data: { businessDate: dayToDate(day), trigger: "MANUAL", requestedById: input.requestedById ?? null, toPhone: maskPhone(phone), ...p } }));
   }
 
+  return deliver(db, rows, { phone, sender, sleep, deadline });
+}
+
+type Row = { id: string; status: string; attempts: number; content: string };
+
+/** Sends the rows in order, claiming each one first; the first failure stops the run and the rest wait for the next run. */
+async function deliver(db: Db, rows: Row[], o: { phone: string; sender: Sender; sleep: (ms: number) => Promise<void>; deadline: number }): Promise<RunResult> {
+  const { phone, sender, sleep, deadline } = o;
   // 2. Send in order; stop at the first failure
   const total = rows.length;
   let sent = rows.filter((r) => r.status === "SENT").length;
@@ -165,4 +159,49 @@ export async function runDailyReport(
   if (sent === total && total > 0) return { outcome: "sent", message: sentNow === 0 ? "Nothing new to send." : total === 1 ? "The message was sent." : `All ${total} messages were sent.`, sent, total };
   if (failure) return { outcome: sent > 0 ? "partial" : "failed", message: `${failure} ${sent} of ${total} sent. The rest will be tried again.`, sent, total };
   return { outcome: sent > 0 ? "partial" : "skipped", message: sent === total ? "Nothing new to send." : `${sent} of ${total} sent so far.`, sent, total };
+}
+
+/**
+ * What the weekly and monthly reports cover (Nino, 2026-11-07): the WEEKLY report goes out on Sunday at 09:00 and covers the seven
+ * days up to Saturday; the MONTHLY report goes out on the 1st at 09:00 and covers the whole month before.
+ */
+export function periodToSend(kind: "WEEKLY" | "MONTHLY", today: string): { from: string; to: string } {
+  if (kind === "WEEKLY") {
+    const to = shiftDay(today, -1);
+    return { from: shiftDay(to, -6), to };
+  }
+  const to = shiftDay(`${today.slice(0, 8)}01`, -1);
+  return { from: `${to.slice(0, 8)}01`, to };
+}
+
+export async function runPeriodReport(
+  db: Db,
+  input: { kind: "WEEKLY" | "MONTHLY"; trigger: ReportTrigger; requestedById?: string | null; sender?: Sender; sleep?: (ms: number) => Promise<void>; now?: Date; budgetMs?: number },
+): Promise<RunResult> {
+  const sender = input.sender ?? callMeBotSender;
+  const sleep = input.sleep ?? sleepReal;
+  const now = input.now ?? new Date();
+  const deadline = Date.now() + (input.budgetMs ?? 50_000);
+  const settings = await getReportSettings(db);
+  const phone = cleanPhone(settings.phone);
+  if (!phone) return { outcome: "skipped", message: "No reporting number is set.", sent: 0, total: 0 };
+  if (input.trigger === "SCHEDULED" && !settings.enabled) return { outcome: "skipped", message: "WhatsApp reports are switched off.", sent: 0, total: 0 };
+
+  const { from, to } = periodToSend(input.kind, businessDay(now));
+  const date = dayToDate(to);
+  let rows: Row[];
+  if (input.trigger === "SCHEDULED") {
+    // one scheduled row per period: a scheduler that runs twice sends it once, and a failed one is retried
+    let existing = await db.whatsAppReport.findFirst({ where: { businessDate: date, trigger: "SCHEDULED", kind: input.kind } });
+    if (!existing) {
+      const content = await buildPeriodMessage(db, await defaultLocationId(db), input.kind, from, to, appBaseUrl());
+      await db.whatsAppReport.create({ data: { businessDate: date, trigger: "SCHEDULED", toPhone: maskPhone(phone), kind: input.kind, part: 1, parts: 1, content } }).catch(() => undefined);
+      existing = await db.whatsAppReport.findFirst({ where: { businessDate: date, trigger: "SCHEDULED", kind: input.kind } });
+    }
+    rows = existing ? [existing] : [];
+  } else {
+    const content = await buildPeriodMessage(db, await defaultLocationId(db), input.kind, from, to, appBaseUrl());
+    rows = [await db.whatsAppReport.create({ data: { businessDate: date, trigger: "MANUAL", requestedById: input.requestedById ?? null, toPhone: maskPhone(phone), kind: input.kind, part: 1, parts: 1, content } })];
+  }
+  return deliver(db, rows, { phone, sender, sleep, deadline });
 }

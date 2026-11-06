@@ -166,7 +166,7 @@ export async function buildPeriodMessage(db: Db, locationId: string, kind: "WEEK
   ];
   if (s.expensesByCategory.length) lines.push("", "BIGGEST EXPENSES", ...s.expensesByCategory.slice(0, 3).map((c) => `${c.name}: ${m(c.value)}`));
   if (s.topProducts.length) lines.push("", "BEST SELLERS", ...s.topProducts.slice(0, 3).map((p) => `${p.name}: ${m(p.value)}`));
-  if (baseUrl) lines.push("", "Full report:", `${baseUrl}/reports/period?from=${from}&to=${to}`);
+  if (baseUrl) lines.push("", "Full report (open, download or print):", `${baseUrl}/print/report?from=${from}&to=${to}`);
   lines.push("", `${name} MANAGEMENT SYSTEM`);
   return lines.join("\n");
 }
