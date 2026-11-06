@@ -5,14 +5,14 @@ import { Prisma, type PaymentMethod } from "@/generated/prisma/client";
 import type { Db } from "@/lib/db";
 import { nextDocumentNo, type Tx } from "@/lib/inventory/engine";
 import { parseMoney } from "@/lib/money";
-import { CashError, assertCanSpend, defaultLocationId, getAccount, lockAccount, postCash } from "./ledger";
+import { CashError, assertCanSpend, defaultLocationId, lockAccount, postCash, resolveAccount } from "./ledger";
 
 const D = Prisma.Decimal;
 const n = (v: unknown) => Number(v ?? 0);
 
 export async function paySupplier(
   tx: Tx,
-  input: { user: { id: string }; supplierId: string; shipmentId: string | null; amount: string; method: PaymentMethod; reference: string; notes: string | null; submissionKey: string; currencyDecimals: number; /** blank = the default location */ locationId?: string },
+  input: { user: { id: string }; supplierId: string; shipmentId: string | null; amount: string; method: PaymentMethod; /** the exact account it is paid from */ accountId?: string | null; reference: string; notes: string | null; submissionKey: string; currencyDecimals: number; /** blank = the default location */ locationId?: string },
 ) {
   const fe: Record<string, string> = {};
   const amount = parseMoney(input.amount, input.currencyDecimals);
@@ -27,7 +27,7 @@ export async function paySupplier(
     if (!sh || sh.supplierId !== supplier.id) throw new CashError("That shipment is not from this supplier.", { shipmentId: "Choose one of this supplier's shipments." });
   }
   const locationId = input.locationId ?? (await defaultLocationId(tx));
-  const account = await getAccount(tx, locationId, input.method);
+  const account = await resolveAccount(tx, { locationId, method: input.method, accountId: input.accountId, field: "accountId" });
   await lockAccount(tx, account.id);
   const paymentNo = await nextDocumentNo(tx, "SPY");
   // Insert first: a double-submitted form fails here (unique key) before any money moves.
@@ -35,7 +35,7 @@ export async function paySupplier(
     data: { paymentNo, supplierId: supplier.id, shipmentId: input.shipmentId, amount, method: input.method, reference: input.reference.trim() || null, notes: input.notes?.trim() || null, locationId, createdById: input.user.id, submissionKey: input.submissionKey },
   });
   await assertCanSpend(tx, account.id, input.method, amount, "amount");
-  await postCash(tx, { locationId, method: input.method, type: "SUPPLIER_PAYMENT", amount: amount.neg(), referenceType: "SupplierPayment", referenceId: payment.id, referenceNo: paymentNo, description: `Paid ${supplier.name}`, userId: input.user.id });
+  await postCash(tx, { locationId, method: input.method, accountId: account.id, type: "SUPPLIER_PAYMENT", amount: amount.neg(), referenceType: "SupplierPayment", referenceId: payment.id, referenceNo: paymentNo, description: `Paid ${supplier.name}`, userId: input.user.id });
   return { payment, supplier };
 }
 

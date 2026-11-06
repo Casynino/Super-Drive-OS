@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Banknote, Landmark, Smartphone } from "lucide-react";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Banknote, Landmark, Plus, Smartphone, Star } from "lucide-react";
+import { AccountOpButton, AddAccountForm, EditAccountForm } from "@/components/cash/AccountAdmin";
 import { ManualCashForm } from "@/components/cash/CashForms";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import { Prisma, type CashTxType, type PaymentMethod } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
-import { ACCOUNT_NAME, METHODS, TX_LABEL, defaultLocationId, getBalances } from "@/lib/cash/ledger";
+import { METHODS, TX_LABEL, defaultLocationId, getAccountBalances, listAccounts } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
@@ -16,7 +17,7 @@ import { manualCashAction } from "./actions";
 export const metadata = { title: "Cash & Accounts" };
 
 const PAGE_SIZE = 40;
-type Search = { method?: string; type?: string; from?: string; to?: string; page?: string; done?: string };
+type Search = { account?: string; method?: string; type?: string; from?: string; to?: string; page?: string; done?: string };
 const isDate = (s?: string) => Boolean(s && /^\d{4}-\d{2}-\d{2}$/.test(s));
 const ICON: Record<PaymentMethod, typeof Banknote> = { CASH: Banknote, MOBILE_MONEY: Smartphone, BANK: Landmark };
 
@@ -32,26 +33,28 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
   if (isDate(sp.from)) businessDate.gte = new Date(`${sp.from}T00:00:00Z`);
   if (isDate(sp.to)) businessDate.lte = new Date(`${sp.to}T00:00:00Z`);
   const where: Prisma.CashTransactionWhereInput = {
-    account: { locationId, ...(METHODS.includes(sp.method as PaymentMethod) ? { method: sp.method as PaymentMethod } : {}) },
+    account: { locationId, ...(sp.account ? { id: sp.account } : METHODS.includes(sp.method as PaymentMethod) ? { method: sp.method as PaymentMethod } : {}) },
     ...(sp.type && sp.type in TX_LABEL ? { type: sp.type as CashTxType } : {}),
     ...(Object.keys(businessDate).length ? { businessDate } : {}),
   };
 
-  const [balances, rows, total, openings, closings, unclosed] = await Promise.all([
-    getBalances(db, locationId),
-    db.cashTransaction.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE, include: { account: { select: { method: true } }, user: { select: { name: true } } } }),
+  const [balances, openAccounts, rows, total, openings, closings, unclosed] = await Promise.all([
+    getAccountBalances(db, locationId),
+    listAccounts(db, locationId),
+    db.cashTransaction.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE, include: { account: { select: { method: true, name: true, accountNumber: true } }, user: { select: { name: true } } } }),
     db.cashTransaction.count({ where }),
-    db.cashTransaction.findMany({ where: { type: "OPENING_BALANCE", account: { locationId } }, select: { account: { select: { method: true } } } }),
+    db.cashTransaction.findMany({ where: { type: "OPENING_BALANCE", account: { locationId } }, select: { accountId: true } }),
     db.dailyClosing.count({ where: { locationId } }),
     db.cashTransaction.count({ where: { account: { locationId }, closingId: null, businessDate: { lt: new Date(`${new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Dar_es_Salaam" }).format(new Date())}T00:00:00Z`) } } }),
   ]);
-  const openingDone = Object.fromEntries(METHODS.map((m) => [m, openings.some((o) => o.account.method === m)]));
-  const noStart = !openingDone.CASH && closings === 0;
+  const openingDone = Object.fromEntries(balances.map((a) => [a.id, openings.some((o) => o.accountId === a.id)]));
+  const till = balances.find((a) => a.method === "CASH");
+  const noStart = Boolean(till && !openingDone[till.id]) && closings === 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const hasFilters = Boolean(sp.method || sp.type || sp.from || sp.to);
+  const hasFilters = Boolean(sp.account || sp.method || sp.type || sp.from || sp.to);
   const href = (p: number) => {
     const q = new URLSearchParams();
-    for (const [k, v] of Object.entries({ method: sp.method, type: sp.type, from: sp.from, to: sp.to })) if (v) q.set(k, v);
+    for (const [k, v] of Object.entries({ account: sp.account, method: sp.method, type: sp.type, from: sp.from, to: sp.to })) if (v) q.set(k, v);
     if (p > 1) q.set("page", String(p));
     return `/cash?${q.toString()}`;
   };
@@ -96,30 +99,83 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         </div>
       )}
 
-      <div className="mb-5 grid gap-3 sm:gap-4 md:grid-cols-3">
+      <div className="mb-5 grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
         {balances.map((b) => {
           const Icon = ICON[b.method];
+          const closed = b.status !== "ACTIVE";
           return (
-            <div key={b.method} className="card card-pad">
-              <div className="flex items-center justify-between">
-                <p className="text-[13px] font-medium text-slate-500">{ACCOUNT_NAME[b.method]}</p>
-                <span className={cn("grid h-8 w-8 place-items-center rounded-lg", b.method === "CASH" ? "bg-oil-soft text-yellow-800" : b.method === "BANK" ? "bg-navy-50 text-navy-700" : "bg-emerald-50 text-emerald-700")}>
-                  <Icon size={17} />
-                </span>
+            <div key={b.id} className={cn("card flex flex-col overflow-hidden", closed && "opacity-70")}>
+              <div className="card-pad flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-slate-900">
+                      {b.name}
+                      {b.isDefault && b.method !== "CASH" && (
+                        <span className="badge-blue inline-flex items-center gap-1">
+                          <Star size={11} /> Main
+                        </span>
+                      )}
+                      {closed && <span className="badge-gray">Closed</span>}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {b.method === "CASH" ? "The till" : b.method === "BANK" ? "Bank" : "Mobile money"}
+                      {b.accountNumber ? ` · ${b.accountNumber}` : ""}
+                    </p>
+                    {b.holderName && <p className="truncate text-xs text-slate-500">{b.holderName}</p>}
+                  </div>
+                  <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", b.method === "CASH" ? "bg-oil-soft text-yellow-800" : b.method === "BANK" ? "bg-navy-50 text-navy-700" : "bg-emerald-50 text-emerald-700")}>
+                    <Icon size={18} />
+                  </span>
+                </div>
+                <p className={cn("mt-3 text-2xl font-semibold tracking-tight", b.balance.lt(0) ? "text-brand-red-dark" : "text-slate-900")}>{formatMoney(b.balance, currency)}</p>
+                <p className="mt-2 flex flex-wrap gap-x-4 text-xs text-slate-500">
+                  <span className="inline-flex items-center gap-1">
+                    <ArrowDownLeft size={13} className="text-emerald-600" /> In today {formatMoney(b.inToday, currency)}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <ArrowUpRight size={13} className="text-brand-red" /> Out today {formatMoney(b.outToday, currency)}
+                  </span>
+                </p>
               </div>
-              <p className={cn("mt-2 text-2xl font-semibold tracking-tight", b.balance.lt(0) ? "text-brand-red-dark" : "text-slate-900")}>{formatMoney(b.balance, currency)}</p>
-              <p className="mt-2 flex flex-wrap gap-x-4 text-xs text-slate-500">
-                <span className="inline-flex items-center gap-1">
-                  <ArrowDownLeft size={13} className="text-emerald-600" /> In today {formatMoney(b.inToday, currency)}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <ArrowUpRight size={13} className="text-brand-red" /> Out today {formatMoney(b.outToday, currency)}
-                </span>
-              </p>
+              <div className="flex items-center justify-between gap-2 border-t border-line bg-slate-50/60 px-4 py-2 text-xs">
+                <Link href={`/cash?account=${b.id}`} className="font-medium text-navy-700 hover:underline">
+                  See every entry ({b.movements})
+                </Link>
+                {canAdjust && (
+                  <details className="group relative">
+                    <summary className="cursor-pointer list-none font-medium text-slate-600 hover:text-slate-900">Manage</summary>
+                    <div className="absolute bottom-full right-0 z-20 mb-2 w-72 space-y-3 rounded-xl border border-line bg-white p-4 shadow-xl">
+                      <EditAccountForm id={b.id} name={b.name} accountNumber={b.accountNumber} holderName={b.holderName} />
+                      {b.method !== "CASH" && (
+                        <div className="flex flex-wrap gap-2 border-t border-line pt-3">
+                          {!closed && !b.isDefault && <AccountOpButton id={b.id} op="default">Make main</AccountOpButton>}
+                          {!closed && !b.isDefault && <AccountOpButton id={b.id} op="close" danger>Close</AccountOpButton>}
+                          {closed && <AccountOpButton id={b.id} op="reopen">Open again</AccountOpButton>}
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
+
+      {canAdjust && (
+        <details className="card mb-5 group">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 text-base font-semibold text-slate-900 sm:px-5">
+            <span className="inline-flex items-center gap-2">
+              <Plus size={17} /> Add an account
+            </span>
+            <span className="text-sm font-normal text-slate-500 group-open:hidden">CRDB, NMB, M-PESA, Lipa number...</span>
+          </summary>
+          <div className="border-t border-line px-4 py-4 sm:px-5">
+            <p className="mb-3 text-sm text-slate-500">Every account you add can be chosen when selling, collecting a debt, paying an expense or a supplier. Its balance is the total of the money recorded in it.</p>
+            <AddAccountForm />
+          </div>
+        </details>
+      )}
 
       {canAdjust && (
         <details className="card mb-5 group" open={noStart || undefined}>
@@ -128,17 +184,18 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
             <span className="text-sm font-normal text-slate-500 group-open:hidden">Opening balance, withdrawal or correction</span>
           </summary>
           <div className="border-t border-line px-4 py-4 sm:px-5">
-            <ManualCashForm action={manualCashAction} submissionKey={randomUUID()} openingDone={openingDone} />
+            <ManualCashForm action={manualCashAction} submissionKey={randomUUID()} openingDone={openingDone} accounts={openAccounts.map((a) => ({ id: a.id, name: a.name, accountNumber: a.accountNumber, method: a.method }))} />
           </div>
         </details>
       )}
 
       <form method="get" className="card card-pad mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]">
-        <select name="method" defaultValue={sp.method ?? ""} className="input" aria-label="Account">
+        <select name="account" defaultValue={sp.account ?? ""} className="input" aria-label="Account">
           <option value="">All accounts</option>
-          {METHODS.map((m) => (
-            <option key={m} value={m}>
-              {ACCOUNT_NAME[m]}
+          {balances.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+              {a.accountNumber ? ` · ${a.accountNumber}` : ""}
             </option>
           ))}
         </select>
@@ -188,7 +245,10 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
                       {formatDateTime(r.createdAt)}
                       <span className="block text-xs text-slate-400">Day {formatDate(r.businessDate)}</span>
                     </td>
-                    <td>{ACCOUNT_NAME[r.account.method]}</td>
+                    <td>
+                      {r.account.name}
+                      {r.account.accountNumber && <span className="block text-xs text-slate-500">{r.account.accountNumber}</span>}
+                    </td>
                     <td>
                       {TX_LABEL[r.type]}
                       {r.description && <span className="block max-w-[280px] truncate text-xs text-slate-500">{r.description}</span>}

@@ -172,7 +172,7 @@ export type SubmitClosingInput = {
   day: string;
   countedCash: string;
   notes: string | null;
-  deposit: { amount: string; bankReference: string; notes: string | null; slipId: string | null } | null;
+  deposit: { amount: string; bankReference: string; notes: string | null; slipId: string | null; bankAccountId?: string | null } | null;
   submissionKey: string;
   currencyDecimals: number;
   tolerance: Dec;
@@ -243,7 +243,7 @@ export async function submitClosing(tx: Tx, input: SubmitClosingInput) {
   let depositNo: string | null = null;
   if (depositAmount && input.deposit) {
     const dep = await postDeposit(tx, {
-      user: input.user, locationId: input.locationId, amount: depositAmount.toString(), bankReference: input.deposit.bankReference, notes: input.deposit.notes, slipId: input.deposit.slipId,
+      user: input.user, locationId: input.locationId, amount: depositAmount.toString(), bankReference: input.deposit.bankReference, notes: input.deposit.notes, slipId: input.deposit.slipId, bankAccountId: input.deposit.bankAccountId,
       submissionKey: `${input.submissionKey}:deposit`, currencyDecimals: input.currencyDecimals, closingId: closing.id,
     });
     depositNo = dep.depositNo;

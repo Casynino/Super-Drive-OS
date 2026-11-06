@@ -29,8 +29,11 @@ export async function recordExpenseAction(_prev: ActionState, fd: FormData): Pro
   const result = await guarded("expenses.create", async (user) => {
     const currency = await getCurrency();
     const settings = await getCashSettings(db);
-    const method = formString(fd, "method");
-    if (method !== "CASH" && method !== "MOBILE_MONEY" && method !== "BANK") return fail("Choose where the money came from.", { method: "Choose where the money came from." }, values);
+    const accountId = formString(fd, "accountId") || null;
+    // the account decides the method (older forms still send the method)
+    const chosen = accountId ? await db.cashAccount.findUnique({ where: { id: accountId }, select: { method: true } }) : null;
+    const method = chosen?.method ?? formString(fd, "method");
+    if (method !== "CASH" && method !== "MOBILE_MONEY" && method !== "BANK") return fail("Choose where the money came from.", { accountId: "Choose where the money came from." }, values);
     const submissionKey = formString(fd, "submissionKey");
     if (submissionKey.length < 16) return fail("The form could not be read. Reload the page and try again.", undefined, values);
 
@@ -50,7 +53,7 @@ export async function recordExpenseAction(_prev: ActionState, fd: FormData): Pro
         async (tx) => {
           const att = receipt ? await saveAttachment(tx, { kind: "EXPENSE_RECEIPT", data: receipt, userId: user.id }) : null;
           const r = await recordExpense(tx, {
-            user, categoryId: formString(fd, "categoryId"), description, amount: formString(fd, "amount"), method, expenseDate: formString(fd, "expenseDate"),
+            user, categoryId: formString(fd, "categoryId"), description, amount: formString(fd, "amount"), method, accountId, expenseDate: formString(fd, "expenseDate"),
             notes: formString(fd, "notes") || null, receiptId: att?.id ?? null, submissionKey, currencyDecimals: currency.decimals,
             approvalLimit: settings.expenseApprovalLimit, canApprove: can(user, "expenses.approve"),
           });

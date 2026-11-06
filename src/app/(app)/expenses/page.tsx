@@ -10,6 +10,7 @@ import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { businessDay } from "@/lib/cash/ledger";
 import { getCashSettings } from "@/lib/cash/settings";
+import { defaultLocationId, listAccounts } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { methodLabel } from "@/lib/sales/types";
@@ -102,7 +103,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
             {categories.length === 0 ? (
               <Alert kind="info">The owner has not set up expense categories yet (Settings → Expenses).</Alert>
             ) : (
-              <ExpenseForm key={sp.recorded ?? "new"} action={recordExpenseAction} categories={categories} today={today} submissionKey={randomUUID()} limitText={limitText} />
+              <ExpenseForm key={sp.recorded ?? "new"} action={recordExpenseAction} accounts={await listAccounts(db, await defaultLocationId(db))} categories={categories} today={today} submissionKey={randomUUID()} limitText={limitText} />
             )}
           </div>
         </section>

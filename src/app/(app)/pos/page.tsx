@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { outstandingByCustomer } from "@/lib/sales/outstanding";
 import { listPrice } from "@/lib/sales/pricing";
 import type { PosCustomer, PosProduct } from "@/lib/sales/types";
+import { listAccounts } from "@/lib/cash/ledger";
 import { getCurrency } from "@/lib/settings";
 import { createSale } from "./actions";
 import { quickCreateCustomer } from "../customers/actions";
@@ -21,7 +22,7 @@ export default async function PosPage() {
   const user = await requirePagePermission("sales.pos");
   const canCredit = can(user, "sales.credit");
 
-  const [products, locations, stockByLocation, customers, owed, currency] = await Promise.all([
+  const [products, locations, stockByLocation, customers, owed, currency, accounts] = await Promise.all([
     db.product.findMany({
       where: { status: "ACTIVE" },
       orderBy: { name: "asc" },
@@ -32,6 +33,7 @@ export default async function PosPage() {
     can(user, "customers.view") ? db.customer.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, take: 3000 }) : [],
     canCredit ? outstandingByCustomer(db) : new Map(),
     getCurrency(),
+    listAccounts(db),
   ]);
 
   // Prices are worked out here from the database; the browser only displays them (the server recomputes on sale).
@@ -95,6 +97,7 @@ export default async function PosPage() {
           submissionKey={randomUUID()}
           unitMode={await getUnitMode()}
           currency={currency}
+          accounts={accounts.map((a) => ({ id: a.id, locationId: a.locationId, method: a.method, name: a.name, accountNumber: a.accountNumber, isDefault: a.isDefault }))}
           perms={{ credit: canCredit, discount: can(user, "sales.discount"), addCustomer: can(user, "customers.create"), creditException: can(user, "credit.approve_exception") }}
         />
       )}

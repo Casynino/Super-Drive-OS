@@ -6,7 +6,7 @@
 import { Prisma, type PaymentMethod } from "@/generated/prisma/client";
 import { nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
 import { parseMoney } from "@/lib/money";
-import { CashError, assertCanSpend, businessDay, dayToDate, defaultLocationId, getAccount, postCash } from "./ledger";
+import { CashError, assertCanSpend, businessDay, dayToDate, defaultLocationId, postCash, resolveAccount } from "./ledger";
 
 const D = Prisma.Decimal;
 
@@ -16,6 +16,8 @@ export type RecordExpenseInput = {
   description: string;
   amount: string;
   method: PaymentMethod;
+  /** the exact account it is paid from (CRDB, M-PESA, ...); required when the method has several open accounts */
+  accountId?: string | null;
   /** "YYYY-MM-DD"; blank = today */
   expenseDate: string;
   notes: string | null;
@@ -49,6 +51,7 @@ export async function recordExpense(tx: Tx, input: RecordExpenseInput) {
   const limit = category.approvalLimit ?? input.approvalLimit;
   const approvedNow = input.canApprove || amount.lte(limit);
   const locationId = input.locationId ?? (await defaultLocationId(tx));
+  const account = await resolveAccount(tx, { locationId, method: input.method, accountId: input.accountId, field: "accountId" });
   const expenseNo = await nextDocumentNo(tx, "EXP");
 
   // Insert first: a double-submitted form fails here (unique submissionKey), before any money moves.
@@ -59,6 +62,7 @@ export async function recordExpense(tx: Tx, input: RecordExpenseInput) {
       description,
       amount,
       method: input.method,
+      cashAccountId: account.id,
       expenseDate: dayToDate(day),
       notes: input.notes?.trim() || null,
       receiptId: input.receiptId,
@@ -75,10 +79,11 @@ export async function recordExpense(tx: Tx, input: RecordExpenseInput) {
   return { expense, approvedNow, categoryName: category.name };
 }
 
-async function payOut(tx: Tx, e: { id: string; expenseNo: string; amount: Dec; method: PaymentMethod; locationId: string; description: string }, userId: string) {
-  const account = await getAccount(tx, e.locationId, e.method);
+async function payOut(tx: Tx, e: { id: string; expenseNo: string; amount: Dec; method: PaymentMethod; cashAccountId: string | null; locationId: string; description: string }, userId: string) {
+  // the account chosen when the expense was recorded (older expenses: the default account of the method)
+  const account = await resolveAccount(tx, { locationId: e.locationId, method: e.method, accountId: e.cashAccountId, lenient: true });
   await assertCanSpend(tx, account.id, e.method, e.amount, "method");
-  await postCash(tx, { locationId: e.locationId, method: e.method, type: "EXPENSE", amount: e.amount.neg(), referenceType: "Expense", referenceId: e.id, referenceNo: e.expenseNo, description: e.description, userId });
+  await postCash(tx, { locationId: e.locationId, method: e.method, accountId: account.id, type: "EXPENSE", amount: e.amount.neg(), referenceType: "Expense", referenceId: e.id, referenceNo: e.expenseNo, description: e.description, userId });
 }
 
 async function lockExpense(tx: Tx, id: string) {
@@ -108,9 +113,14 @@ export async function reverseExpense(tx: Tx, input: { expenseId: string; by: { i
   if (reason.length < 3) throw new CashError("Say why the expense is being reversed.", { reason: "A reason is required." });
   const e = await lockExpense(tx, input.expenseId);
   if (e.status !== "APPROVED") throw new CashError(`Only an approved expense can be reversed (this one is ${e.status.toLowerCase()}).`);
+  // the money goes back to the account it left
+  const paidFrom = await tx.cashTransaction.findFirst({ where: { referenceType: "Expense", referenceId: e.id, type: "EXPENSE" }, select: { accountId: true } });
   await postCash(tx, {
     locationId: e.locationId,
     method: e.method,
+    accountId: paidFrom?.accountId,
+    allowClosed: true,
+    lenient: true,
     type: "EXPENSE_REVERSAL",
     amount: e.amount,
     referenceType: "Expense",

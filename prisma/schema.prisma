@@ -975,16 +975,24 @@ model ShipmentReceivingItem {
 
 // One account per payment method per location. Cash = physical money in the till; mobile money and the bank are
 // separate balances and are never mixed with it. The balance is always the sum of the ledger, never stored.
+// A place money sits: the till, or one mobile-money / bank account (CRDB, NMB, M-PESA, ...). A location has ONE cash
+// account (the till) and as many mobile-money and bank accounts as the owner adds. Exactly one account per method is the
+// default, used when a flow does not name an account (the DB guards both rules).
 model CashAccount {
-  id           String            @id @default(cuid())
-  locationId   String
-  location     Location          @relation(fields: [locationId], references: [id])
-  method       PaymentMethod
-  name         String
-  createdAt    DateTime          @default(now())
-  transactions CashTransaction[]
+  id            String            @id @default(cuid())
+  locationId    String
+  location      Location          @relation(fields: [locationId], references: [id])
+  method        PaymentMethod
+  name          String
+  accountNumber String? // bank account number, mobile-money number, lipa number...
+  holderName    String? // the name the account is registered in
+  status        RecordStatus      @default(ACTIVE) // a closed account keeps its history but cannot be chosen any more
+  isDefault     Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+  transactions  CashTransaction[]
+  expenses      Expense[]
 
-  @@unique([locationId, method])
+  @@index([locationId, method])
 }
 
 enum CashTxType {
@@ -1052,6 +1060,8 @@ model Expense {
   description    String
   amount         Decimal         @db.Decimal(14, 2)
   method         PaymentMethod // which account the money comes from
+  cashAccountId  String? // the exact account (CRDB, M-PESA...) the money comes from
+  cashAccount    CashAccount?    @relation(fields: [cashAccountId], references: [id])
   expenseDate    DateTime        @db.Date
   notes          String?
   receiptId      String?

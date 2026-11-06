@@ -11,7 +11,7 @@ import { CashError, defaultLocationId } from "@/lib/cash/ledger";
 import { getCurrency } from "@/lib/settings";
 
 const schema = z.object({
-  method: z.enum(["CASH", "MOBILE_MONEY", "BANK"]),
+  accountId: z.string().min(1, "Choose the account.").max(40),
   kind: z.enum(["OPENING", "WITHDRAWAL", "CORRECTION_IN", "CORRECTION_OUT"]),
   amount: z.string().trim().min(1, "Enter the amount."),
   reason: z.string().trim().max(300),
@@ -22,15 +22,17 @@ const schema = z.object({
 export async function manualCashAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const values = formValues(fd);
   const result = await guarded("cash.adjust", async (user) => {
-    const parsed = schema.safeParse({ method: formString(fd, "method"), kind: formString(fd, "kind"), amount: formString(fd, "amount"), reason: formString(fd, "reason"), submissionKey: formString(fd, "submissionKey") });
+    const parsed = schema.safeParse({ accountId: formString(fd, "accountId"), kind: formString(fd, "kind"), amount: formString(fd, "amount"), reason: formString(fd, "reason"), submissionKey: formString(fd, "submissionKey") });
     if (!parsed.success) return { ...zodErrors(parsed.error), values };
     const currency = await getCurrency();
+    const account = await db.cashAccount.findUnique({ where: { id: parsed.data.accountId }, select: { method: true, name: true } });
+    if (!account) return fail("Choose the account.", { accountId: "Choose the account." }, values);
     try {
       await db.$transaction(
         async (tx) => {
           const locationId = await defaultLocationId(tx);
-          const row = await postManualCash(tx, { user, locationId, ...parsed.data, currencyDecimals: currency.decimals });
-          await writeAudit(tx, { user, action: `cash.${parsed.data.kind.toLowerCase()}`, entityType: "CashTransaction", entityId: row.id, reference: parsed.data.method, reason: parsed.data.reason || undefined, after: { amount: row.amount.toString(), method: parsed.data.method } });
+          const row = await postManualCash(tx, { user, locationId, ...parsed.data, method: account.method, currencyDecimals: currency.decimals });
+          await writeAudit(tx, { user, action: `cash.${parsed.data.kind.toLowerCase()}`, entityType: "CashTransaction", entityId: row.id, reference: account.name, reason: parsed.data.reason || undefined, after: { amount: row.amount.toString(), method: account.method, account: account.name } });
         },
         { timeout: 30000 },
       );

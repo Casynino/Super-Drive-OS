@@ -15,14 +15,17 @@ export async function paySupplierAction(_prev: ActionState, fd: FormData): Promi
   const supplierId = formString(fd, "supplierId");
   const result = await guarded("suppliers.pay", async (user) => {
     const currency = await getCurrency();
-    const method = formString(fd, "method");
-    if (method !== "CASH" && method !== "MOBILE_MONEY" && method !== "BANK") return fail("Choose how it was paid.", { method: "Choose how it was paid." }, values);
+    const accountId = formString(fd, "accountId") || null;
+    // the account decides the method (older forms still send the method)
+    const chosen = accountId ? await db.cashAccount.findUnique({ where: { id: accountId }, select: { method: true } }) : null;
+    const method = chosen?.method ?? formString(fd, "method");
+    if (method !== "CASH" && method !== "MOBILE_MONEY" && method !== "BANK") return fail("Choose how it was paid.", { accountId: "Choose where the money was paid from." }, values);
     const submissionKey = formString(fd, "submissionKey");
     if (submissionKey.length < 16) return fail("The form could not be read. Reload the page and try again.", undefined, values);
     try {
       const r = await db.$transaction(
         async (tx) => {
-          const out = await paySupplier(tx, { user, supplierId, shipmentId: formString(fd, "shipmentId") || null, amount: formString(fd, "amount"), method, reference: formString(fd, "reference"), notes: formString(fd, "notes") || null, submissionKey, currencyDecimals: currency.decimals });
+          const out = await paySupplier(tx, { user, supplierId, shipmentId: formString(fd, "shipmentId") || null, amount: formString(fd, "amount"), method, accountId, reference: formString(fd, "reference"), notes: formString(fd, "notes") || null, submissionKey, currencyDecimals: currency.decimals });
           await writeAudit(tx, { user, action: "supplier.payment", entityType: "SupplierPayment", entityId: out.payment.id, reference: `${out.payment.paymentNo} · ${out.supplier.name}`, after: { amount: formatMoney(out.payment.amount, currency), method } });
           return out.payment.paymentNo;
         },

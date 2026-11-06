@@ -14,6 +14,7 @@ const allocationSchema = z.array(z.object({ saleId: z.string().min(1), amount: z
 const collectSchema = z.object({
   customerId: z.string().min(1),
   method: z.enum(["CASH", "MOBILE_MONEY", "BANK"], { error: "Choose how the customer paid." }),
+  accountId: z.string().max(40).nullable().optional(),
   amount: z.string().max(24),
   reference: z.string().trim().max(80).nullable(),
   notes: z.string().trim().max(500).nullable(),

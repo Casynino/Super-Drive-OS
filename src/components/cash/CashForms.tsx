@@ -3,13 +3,14 @@
 import { useActionState, useId, useState } from "react";
 import { Camera } from "lucide-react";
 import { Alert } from "@/components/ui";
+import AccountSelect, { type FormAccount } from "@/components/cash/AccountSelect";
 import { Field, SubmitButton, inputClass } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
 
 type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>;
 const initial: ActionState = {};
 
-export function DepositForm({ action, submissionKey, cashBalance }: { action: Action; submissionKey: string; cashBalance: string }) {
+export function DepositForm({ action, submissionKey, cashBalance, bankAccounts }: { action: Action; submissionKey: string; cashBalance: string; bankAccounts: FormAccount[] }) {
   const [state, formAction] = useActionState(action, initial);
   const uid = useId();
   const id = (n: string) => `${uid}-${n}`;
@@ -22,6 +23,9 @@ export function DepositForm({ action, submissionKey, cashBalance }: { action: Ac
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Amount deposited" name="depositAmount" id={id("amt")} error={fe.depositAmount} hint={`Cash on hand now: ${cashBalance}`} required>
           <input id={id("amt")} name="depositAmount" inputMode="numeric" autoComplete="off" defaultValue={v.depositAmount ?? ""} placeholder="0" className={`${inputClass(fe.depositAmount)} text-lg font-semibold`} />
+        </Field>
+        <Field label="Into which bank account" name="bankAccountId" id={id("bank")} error={fe.bankAccountId}>
+          <AccountSelect accounts={bankAccounts} id={id("bank")} name="bankAccountId" defaultValue={v.bankAccountId} error={fe.bankAccountId} />
         </Field>
         <Field label="Bank reference" name="bankReference" id={id("ref")} error={fe.bankReference} hint="From the deposit slip." required>
           <input id={id("ref")} name="bankReference" autoComplete="off" defaultValue={v.bankReference ?? ""} className={inputClass(fe.bankReference)} />
@@ -51,15 +55,15 @@ const KINDS = [
   { value: "CORRECTION_OUT", label: "Correction: remove money" },
 ];
 
-export function ManualCashForm({ action, submissionKey, openingDone }: { action: Action; submissionKey: string; openingDone: Record<string, boolean> }) {
+export function ManualCashForm({ action, submissionKey, openingDone, accounts }: { action: Action; submissionKey: string; openingDone: Record<string, boolean>; accounts: { id: string; name: string; accountNumber: string | null; method: string }[] }) {
   const [state, formAction] = useActionState(action, initial);
   const uid = useId();
   const id = (n: string) => `${uid}-${n}`;
   const fe = state.fieldErrors ?? {};
   const v = state.values ?? {};
   const [kind, setKind] = useState(v.kind ?? "WITHDRAWAL");
-  const [method, setMethod] = useState(v.method ?? "CASH");
-  const blocked = kind === "OPENING" && openingDone[method];
+  const [accountId, setAccountId] = useState(v.accountId ?? accounts.find((a) => a.method === "CASH")?.id ?? accounts[0]?.id ?? "");
+  const blocked = kind === "OPENING" && openingDone[accountId];
   return (
     <form action={formAction} noValidate className="space-y-4">
       <input type="hidden" name="submissionKey" value={submissionKey} />
@@ -74,11 +78,14 @@ export function ManualCashForm({ action, submissionKey, openingDone }: { action:
             ))}
           </select>
         </Field>
-        <Field label="Account" name="method" id={id("method")} error={fe.method}>
-          <select id={id("method")} name="method" value={method} onChange={(e) => setMethod(e.target.value)} className={inputClass(fe.method)}>
-            <option value="CASH">Cash on hand</option>
-            <option value="MOBILE_MONEY">Mobile money</option>
-            <option value="BANK">Bank account</option>
+        <Field label="Account" name="accountId" id={id("account")} error={fe.accountId}>
+          <select id={id("account")} name="accountId" value={accountId} onChange={(e) => setAccountId(e.target.value)} className={inputClass(fe.accountId)}>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {a.accountNumber ? ` · ${a.accountNumber}` : ""}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label="Amount" name="amount" id={id("amount")} error={fe.amount} required>

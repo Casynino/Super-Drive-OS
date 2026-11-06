@@ -3,6 +3,7 @@
 import { useActionState, useId, useState } from "react";
 import { Camera } from "lucide-react";
 import { Alert } from "@/components/ui";
+import AccountSelect, { type FormAccount } from "@/components/cash/AccountSelect";
 import { Field, SubmitButton, inputClass } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ export default function ClosingForm({
   symbol,
   canDeposit,
   submissionKey,
+  bankAccounts,
 }: {
   action: Action;
   day: string;
@@ -30,6 +32,7 @@ export default function ClosingForm({
   symbol: string;
   canDeposit: boolean;
   submissionKey: string;
+  bankAccounts: FormAccount[];
 }) {
   const [state, formAction] = useActionState(action, initial);
   const uid = useId();
@@ -105,6 +108,9 @@ export default function ClosingForm({
                     </button>
                   )}
                 </div>
+              </Field>
+              <Field label="Into which bank account" name="bankAccountId" id={id("bank")} error={fe.bankAccountId}>
+                <AccountSelect accounts={bankAccounts} id={id("bank")} name="bankAccountId" defaultValue={v.bankAccountId} error={fe.bankAccountId} />
               </Field>
               <Field label="Bank reference" name="bankReference" id={id("ref")} error={fe.bankReference} hint="From the deposit slip.">
                 <input id={id("ref")} name="bankReference" autoComplete="off" defaultValue={v.bankReference ?? ""} className={inputClass(fe.bankReference)} />

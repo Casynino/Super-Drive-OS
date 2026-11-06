@@ -9,7 +9,7 @@ import type { Prisma, ClosingStatus } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { getClosingPreview, unclosedDays } from "@/lib/cash/closing";
-import { businessDay, defaultLocationId, getBalances } from "@/lib/cash/ledger";
+import { businessDay, defaultLocationId, getBalances, listAccounts } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
@@ -102,7 +102,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                       <p className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">{formatMoney(preview.expectedCash, currency)}</p>
                     </div>
                     <div className="px-4 py-4 sm:px-5">
-                      <ClosingForm action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={can(user, "deposits.record")} submissionKey={randomUUID()} />
+                      <ClosingForm action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={can(user, "deposits.record")} submissionKey={randomUUID()} bankAccounts={(await listAccounts(db, locationId)).filter((a) => a.method === "BANK")} />
                     </div>
                   </div>
                 </aside>

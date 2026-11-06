@@ -6,7 +6,7 @@ import { DepositForm } from "@/components/cash/CashForms";
 import { Alert, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
-import { defaultLocationId, getBalances } from "@/lib/cash/ledger";
+import { defaultLocationId, getBalances, listAccounts } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
@@ -55,7 +55,7 @@ export default async function DepositsPage({ searchParams }: { searchParams: Pro
             <h2 className="text-base font-semibold text-slate-900">Record a deposit</h2>
           </div>
           <div className="px-4 py-4 sm:px-5">
-            <DepositForm key={sp.recorded ?? "new"} action={recordDepositAction} submissionKey={randomUUID()} cashBalance={formatMoney(cash.balance, currency)} />
+            <DepositForm key={sp.recorded ?? "new"} action={recordDepositAction} submissionKey={randomUUID()} cashBalance={formatMoney(cash.balance, currency)} bankAccounts={(await listAccounts(db, locationId)).filter((a) => a.method === "BANK")} />
           </div>
         </section>
       )}

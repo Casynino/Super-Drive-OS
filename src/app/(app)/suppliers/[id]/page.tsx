@@ -12,6 +12,7 @@ import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { formatDate } from "@/lib/utils";
 import { paySupplierAction } from "../pay-actions";
+import { defaultLocationId, listAccounts } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { saveSupplier } from "../actions";
 
@@ -57,7 +58,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
           <div className="mb-5 grid gap-5 lg:grid-cols-2">
             <section className="card card-pad">
               <h2 className="mb-3 text-base font-semibold text-slate-900">Pay this supplier</h2>
-              <SupplierPayForm action={paySupplierAction} supplierId={id} submissionKey={randomUUID()} shipments={shipments.map((x) => ({ id: x.id, label: `${x.shipmentNo}${x.reference ? ` · ${x.reference}` : ""}` }))} />
+              <SupplierPayForm action={paySupplierAction} accounts={await listAccounts(db, await defaultLocationId(db))} supplierId={id} submissionKey={randomUUID()} shipments={shipments.map((x) => ({ id: x.id, label: `${x.shipmentNo}${x.reference ? ` · ${x.reference}` : ""}` }))} />
             </section>
             <section className="card overflow-hidden">
               <h2 className="border-b border-line px-4 py-3 text-base font-semibold text-slate-900 sm:px-5">Payments made</h2>

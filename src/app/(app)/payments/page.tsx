@@ -48,6 +48,10 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     db.payment.count({ where }),
     db.payment.groupBy({ by: ["method"], where, _sum: { amount: true } }),
   ]);
+  // which account each payment went into (the account of its cash ledger row)
+  const accountOf = new Map(
+    (await db.cashTransaction.findMany({ where: { referenceType: "Payment", referenceId: { in: rows.map((r) => r.id) }, type: { in: ["SALE_PAYMENT", "COLLECTION"] } }, select: { referenceId: true, account: { select: { name: true, accountNumber: true } } } })).map((t) => [t.referenceId, t.account]),
+  );
   const sum = (m: PaymentMethod) => byMethod.find((b) => b.method === m)?._sum.amount ?? new Prisma.Decimal(0);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilters = Boolean(q || sp.method || sp.source || sp.from || sp.to);
@@ -127,7 +131,10 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                     </td>
                     <td className="whitespace-nowrap text-slate-600">{formatDateTime(p.receivedAt)}</td>
                     <td className="hidden sm:table-cell">{p.customer?.name ?? <span className="text-slate-400">Walk-in</span>}</td>
-                    <td>{methodLabel(p.method)}</td>
+                    <td>
+                      {accountOf.get(p.id)?.name ?? methodLabel(p.method)}
+                      {accountOf.get(p.id) && <span className="block text-xs text-slate-500">{methodLabel(p.method)}{accountOf.get(p.id)?.accountNumber ? ` · ${accountOf.get(p.id)!.accountNumber}` : ""}</span>}
+                    </td>
                     <td className="hidden md:table-cell">{p.source === "AT_SALE" ? <span className="badge-blue">Paid at sale</span> : <span className="badge-green">Debt collection</span>}</td>
                     <td className="text-right font-semibold">{formatMoney(p.amount, currency)}</td>
                     <td className="hidden text-slate-600 lg:table-cell">{p.receivedBy.name}</td>

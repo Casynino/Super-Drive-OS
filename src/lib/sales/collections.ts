@@ -4,7 +4,7 @@
 //
 // Lock order (matches post-sale.ts): customer row → invoice rows → payment counter.
 import { Prisma, type PaymentMethod, type PaymentStatus } from "@/generated/prisma/client";
-import { recordPaymentCash } from "@/lib/cash/ledger";
+import { CashError, recordPaymentCash } from "@/lib/cash/ledger";
 import { nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
 import { parseMoney } from "@/lib/money";
 import { netPaid, netTotal, owedOf } from "./owed";
@@ -92,6 +92,8 @@ export type CollectionInput = {
   user: { id: string };
   customerId: string;
   method: PaymentMethod;
+  /** the exact account the money went into (CRDB, M-PESA, ...); required when the method has several open accounts */
+  accountId?: string | null;
   amount: string;
   reference: string | null;
   notes: string | null;
@@ -138,7 +140,12 @@ export async function postCollection(tx: Tx, input: CollectionInput) {
     },
   });
   await bumpSales(tx, rows);
-  await recordPaymentCash(tx, { id: payment.id, paymentNo, source: "DEBT_COLLECTION", method: input.method, amount }, { locationId: rows[0]?.sale.locationId, userId: input.user.id });
+  try {
+    await recordPaymentCash(tx, { id: payment.id, paymentNo, source: "DEBT_COLLECTION", method: input.method, amount, accountId: input.accountId }, { locationId: rows[0]?.sale.locationId, userId: input.user.id });
+  } catch (e) {
+    if (e instanceof CashError) throw new CollectionError(e.message, { accountId: e.fieldErrors?.accountId ?? e.message });
+    throw e;
+  }
 
   return { payment, allocated, extra, invoices: rows.map((r) => ({ saleNo: r.sale.saleNo, amount: r.amount })) };
 }

@@ -37,4 +37,7 @@ export const PAYMENT_METHODS = [
   { value: "BANK", label: "Bank" },
 ] as const;
 
+/** An account the money of a payment can go into (what the "Paid by" buttons show). */
+export type PayAccount = { id: string; locationId: string; method: "CASH" | "MOBILE_MONEY" | "BANK"; name: string; accountNumber: string | null; isDefault: boolean };
+
 export const methodLabel = (m: string) => PAYMENT_METHODS.find((x) => x.value === m)?.label ?? m;

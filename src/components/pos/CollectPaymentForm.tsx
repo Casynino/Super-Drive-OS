@@ -5,7 +5,8 @@ import { useActionState, useState } from "react";
 import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
-import { PAYMENT_METHODS } from "@/lib/sales/types";
+import AccountButtons from "@/components/cash/AccountButtons";
+import { PAYMENT_METHODS, type PayAccount } from "@/lib/sales/types";
 import { cn } from "@/lib/utils";
 
 export type OpenInvoice = { id: string; saleNo: string; date: string; dueDate: string | null; total: string; owed: string; overdue: boolean };
@@ -17,6 +18,8 @@ type Props = {
   invoices: OpenInvoice[];
   /** unallocated advance credit (credit mode: the maximum that can be applied) */
   creditAvailable: number;
+  /** the open accounts the money can go into (collect mode) */
+  accounts?: PayAccount[];
   submissionKey: string;
   currency: { symbol: string; decimals: number };
   cancelHref: string;
@@ -24,14 +27,17 @@ type Props = {
 
 const initial: ActionState = {};
 
-export default function CollectPaymentForm({ mode, action, customerId, invoices, creditAvailable, submissionKey: key, currency, cancelHref }: Props) {
+export default function CollectPaymentForm({ mode, action, customerId, invoices, creditAvailable, accounts = [], submissionKey: key, currency, cancelHref }: Props) {
   const [state, formAction] = useActionState(action, initial);
   const fe = state.fieldErrors ?? {};
   const [submissionKey] = useState(key);
   const nf = new Intl.NumberFormat("en-US", { minimumFractionDigits: currency.decimals, maximumFractionDigits: currency.decimals });
   const fmt = (n: number) => `${currency.symbol} ${nf.format(n)}`;
 
-  const [method, setMethod] = useState("CASH");
+  const [accountPick, setAccountPick] = useState("");
+  const [methodPick, setMethodPick] = useState<PayAccount["method"]>("CASH"); // only used when no accounts are set up yet
+  const account = accounts.find((a) => a.id === accountPick) ?? accounts.find((a) => a.method === "CASH") ?? accounts[0] ?? null;
+  const method = account?.method ?? methodPick;
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
@@ -59,7 +65,7 @@ export default function CollectPaymentForm({ mode, action, customerId, invoices,
 
   const payload = JSON.stringify({
     customerId,
-    ...(mode === "collect" ? { method, amount, reference: reference.trim() || null, keepExtraAsCredit: keepExtra } : {}),
+    ...(mode === "collect" ? { method, accountId: account?.id ?? null, amount, reference: reference.trim() || null, keepExtraAsCredit: keepExtra } : {}),
     notes: notes.trim() || null,
     allocations: invoices.filter((i) => num(alloc[i.id]) > 0).map((i) => ({ saleId: i.id, amount: alloc[i.id]! })),
     submissionKey,
@@ -93,13 +99,18 @@ export default function CollectPaymentForm({ mode, action, customerId, invoices,
             </div>
             <div>
               <p className="label">Paid by</p>
-              <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Payment method">
-                {PAYMENT_METHODS.map((m) => (
-                  <button key={m.value} type="button" role="radio" aria-checked={method === m.value} onClick={() => setMethod(m.value)} className={cn("rounded-lg border px-2 py-2 text-sm font-medium transition", method === m.value ? "border-navy-600 bg-navy-50 text-navy-800" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50")}>
-                    {m.label}
-                  </button>
-                ))}
-              </div>
+              {accounts.length > 0 ? (
+                <AccountButtons accounts={accounts} value={account?.id ?? ""} onChange={setAccountPick} />
+              ) : (
+                <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Payment method">
+                  {PAYMENT_METHODS.map((m) => (
+                    <button key={m.value} type="button" role="radio" aria-checked={method === m.value} onClick={() => setMethodPick(m.value)} className={cn("rounded-lg border px-2 py-2 text-sm font-medium transition", method === m.value ? "border-navy-600 bg-navy-50 text-navy-800" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50")}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {fe.accountId && <p className="field-error">{fe.accountId}</p>}
             </div>
             {method !== "CASH" && (
               <div className="md:col-span-2">

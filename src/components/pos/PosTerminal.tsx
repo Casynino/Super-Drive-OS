@@ -11,7 +11,8 @@ import { SubmitButton } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
 import { defaultUnitId, type LocationOption } from "@/lib/inventory/types";
 import { largestPack, qtyText, type UnitMode } from "@/lib/qty";
-import { PAYMENT_METHODS, type CartLine, type PosCustomer, type PosProduct } from "@/lib/sales/types";
+import AccountButtons from "@/components/cash/AccountButtons";
+import { PAYMENT_METHODS, type CartLine, type PayAccount, type PosCustomer, type PosProduct } from "@/lib/sales/types";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -21,6 +22,8 @@ type Props = {
   locations: LocationOption[];
   stockByLocation: Record<string, Record<string, string>>;
   customers: PosCustomer[];
+  /** every open cash / mobile-money / bank account: the cashier says which one the money went into */
+  accounts: PayAccount[];
   submissionKey: string;
   currency: { code: string; symbol: string; decimals: number };
   perms: { credit: boolean; discount: boolean; addCustomer: boolean; creditException: boolean };
@@ -54,7 +57,7 @@ function Thumb({ p, className }: { p: PosProduct; className?: string }) {
   );
 }
 
-export default function PosTerminal({ action, quickAddCustomer, products, locations, stockByLocation, customers: initialCustomers, submissionKey: key, currency, perms, unitMode }: Props) {
+export default function PosTerminal({ action, quickAddCustomer, products, locations, stockByLocation, customers: initialCustomers, accounts, submissionKey: key, currency, perms, unitMode }: Props) {
   const [state, formAction] = useActionState(action, initial);
   const fe = state.fieldErrors ?? {};
   const [submissionKey] = useState(key); // one key per page visit: a double click cannot create two sales
@@ -64,7 +67,12 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
   const [customer, setCustomer] = useState<PosCustomer | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [mode, setMode] = useState<"FULL" | "CREDIT" | "PART">("FULL");
-  const [method, setMethod] = useState("CASH");
+  const [accountPick, setAccountPick] = useState("");
+  const [methodPick, setMethodPick] = useState<PayAccount["method"]>("CASH"); // only used when no accounts are set up yet
+  const locAccounts = accounts.filter((a) => a.locationId === locationId);
+  // the account chosen at this location; until one is pressed, the till
+  const account = locAccounts.find((a) => a.id === accountPick) ?? locAccounts.find((a) => a.method === "CASH") ?? locAccounts[0] ?? null;
+  const method = account?.method ?? methodPick;
   const [partAmount, setPartAmount] = useState("");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
@@ -130,6 +138,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
     locationId,
     mode,
     method: mode === "CREDIT" ? null : method,
+    accountId: mode === "CREDIT" ? null : (account?.id ?? null),
     partAmount: mode === "PART" ? partAmount : null,
     reference: reference.trim() || null,
     notes: notes.trim() || null,
@@ -568,13 +577,17 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
             {mode !== "CREDIT" && (
               <>
                 <p className="label">Paid by</p>
-                <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Payment method">
-                  {PAYMENT_METHODS.map((m) => (
-                    <button key={m.value} type="button" role="radio" aria-checked={method === m.value} onClick={() => setMethod(m.value)} className={cn("rounded-lg border px-2 py-2 text-sm font-medium transition", method === m.value ? "border-navy-600 bg-navy-50 text-navy-800" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50")}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
+                {locAccounts.length > 0 ? (
+                  <AccountButtons accounts={locAccounts} value={account?.id ?? ""} onChange={setAccountPick} />
+                ) : (
+                  <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="Payment method">
+                    {PAYMENT_METHODS.map((m) => (
+                      <button key={m.value} type="button" role="radio" aria-checked={method === m.value} onClick={() => setMethodPick(m.value)} className={cn("rounded-lg border px-2 py-2 text-sm font-medium transition", method === m.value ? "border-navy-600 bg-navy-50 text-navy-800" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50")}>
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {method !== "CASH" && <input className="input mt-2.5" placeholder="Transaction reference (optional)" value={reference} onChange={(e) => setReference(e.target.value)} aria-label="Payment reference" />}
               </>
             )}
@@ -587,7 +600,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                 {fe.partAmount && <p className="field-error">{fe.partAmount}</p>}
               </div>
             )}
-            {(fe.method || fe.payment) && <p className="field-error">{fe.method ?? fe.payment}</p>}
+            {(fe.method || fe.payment || fe.accountId) && <p className="field-error">{fe.method ?? fe.payment ?? fe.accountId}</p>}
 
             {overLimit && (
               <div className="mt-3 rounded-lg border border-yellow-300 bg-oil-soft px-3 py-2 text-sm text-yellow-900">

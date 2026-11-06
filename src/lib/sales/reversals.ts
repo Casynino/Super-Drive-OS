@@ -204,7 +204,17 @@ export async function completeReversal(tx: Tx, input: { reversalId: string; appr
     data: { status: "COMPLETED", decidedById: input.approver.id, decidedAt: new Date(), decisionNote: input.note ?? null, returnValue, refundAmount: refund },
   });
   // The refund leaves the account it is paid from (the till, mobile money or the bank).
-  if (refund.gt(0)) await recordRefundCash(tx, { id: reversal.id, reversalNo: reversal.reversalNo, method: reversal.refundMethod!, amount: refund }, { locationId: sale.locationId, userId: input.approver.id });
+  if (refund.gt(0)) {
+    // the same account the customer paid into (when they paid with this method), otherwise the default account of the method
+    const origin = await tx.$queryRaw<{ id: string }[]>`
+      SELECT t."accountId" AS id FROM "PaymentAllocation" pa
+        JOIN "Payment" p ON p."id" = pa."paymentId"
+        JOIN "CashTransaction" t ON t."referenceType" = 'Payment' AND t."referenceId" = p."id"
+        JOIN "CashAccount" a ON a."id" = t."accountId"
+       WHERE pa."saleId" = ${sale.id} AND p."method" = ${reversal.refundMethod!}::"PaymentMethod" AND a."locationId" = ${sale.locationId}
+       ORDER BY p."receivedAt" DESC LIMIT 1`;
+    await recordRefundCash(tx, { id: reversal.id, reversalNo: reversal.reversalNo, method: reversal.refundMethod!, amount: refund, accountId: origin[0]?.id }, { locationId: sale.locationId, userId: input.approver.id });
+  }
   return { reversal: done2, returnValue, refund, saleNo: sale.saleNo, saleCancelled: newReturned.eq(sale.total), requestedById: reversal.requestedById };
 }
 

@@ -51,12 +51,44 @@ export async function defaultLocationId(tx: Pick<Tx, "location">) {
   return l.id;
 }
 
-/** The account for a payment method at a location (created the first time it is needed). */
+export type AccountInfo = { id: string; locationId: string; method: PaymentMethod; name: string; accountNumber: string | null; holderName: string | null; status: "ACTIVE" | "INACTIVE"; isDefault: boolean };
+
+/** "CRDB Bank · 0152841983800": the name people recognise, with the number when there is one. */
+export const accountLabel = (a: { name: string; accountNumber?: string | null }) => (a.accountNumber ? `${a.name} · ${a.accountNumber}` : a.name);
+
+/** The DEFAULT account of a payment method at a location (created the first time it is needed). */
 export async function getAccount(tx: Tx, locationId: string, method: PaymentMethod) {
-  const found = await tx.cashAccount.findUnique({ where: { locationId_method: { locationId, method } } });
+  const found = await tx.cashAccount.findFirst({ where: { locationId, method, isDefault: true } });
   if (found) return found;
-  await tx.$executeRaw`INSERT INTO "CashAccount" ("id", "locationId", "method", "name") VALUES (${randomUUID()}, ${locationId}, ${method}::"PaymentMethod", ${ACCOUNT_NAME[method]}) ON CONFLICT ("locationId", "method") DO NOTHING`;
-  return tx.cashAccount.findUniqueOrThrow({ where: { locationId_method: { locationId, method } } });
+  await tx.$executeRaw`INSERT INTO "CashAccount" ("id", "locationId", "method", "name", "isDefault") VALUES (${randomUUID()}, ${locationId}, ${method}::"PaymentMethod", ${ACCOUNT_NAME[method]}, true) ON CONFLICT ("locationId", "method") WHERE "isDefault" DO NOTHING`;
+  return tx.cashAccount.findFirstOrThrow({ where: { locationId, method, isDefault: true } });
+}
+
+/**
+ * The account a movement of money uses. With an `accountId` it must be an account of that location and method, and open
+ * (unless `allowClosed`, for putting money back where it came from). Without one, the default account of the method is used,
+ * but only when the method has a single open account: when there are several, the person has to say which one
+ * (`lenient` takes the default instead, for flows that have no screen to ask on, such as refunds).
+ */
+export async function resolveAccount(tx: Tx, o: { locationId: string; method: PaymentMethod; accountId?: string | null; field?: string; lenient?: boolean; allowClosed?: boolean }) {
+  const field = o.field ?? "accountId";
+  if (o.accountId) {
+    const a = await tx.cashAccount.findUnique({ where: { id: o.accountId } });
+    if (!a || a.locationId !== o.locationId) throw new CashError("This account does not exist here.", { [field]: "Choose an account from the list." });
+    if (a.method !== o.method) throw new CashError(`${a.name} is not a ${ACCOUNT_NAME[o.method].toLowerCase()}.`, { [field]: "This account does not match the payment method." });
+    if (a.status !== "ACTIVE" && !o.allowClosed) throw new CashError(`${a.name} is closed and cannot be used any more.`, { [field]: "This account is closed." });
+    return a;
+  }
+  const open = await tx.cashAccount.findMany({ where: { locationId: o.locationId, method: o.method, status: "ACTIVE" }, select: { id: true }, take: 2 });
+  if (open.length > 1 && !o.lenient) throw new CashError(`Choose which account the money goes through (${ACCOUNT_NAME[o.method].toLowerCase()}).`, { [field]: "Choose the account." });
+  return getAccount(tx, o.locationId, o.method);
+}
+
+/** The accounts of a location for pickers: the till first, then mobile money, then banks; the default of each method first. */
+export async function listAccounts(db: Pick<Tx, "cashAccount">, locationId?: string, opts: { includeClosed?: boolean } = {}): Promise<AccountInfo[]> {
+  const rows = await db.cashAccount.findMany({ where: { ...(locationId ? { locationId } : {}), ...(opts.includeClosed ? {} : { status: "ACTIVE" }) }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] });
+  const rank = (m: PaymentMethod) => METHODS.indexOf(m);
+  return rows.sort((x, y) => rank(x.method) - rank(y.method)).map((r) => ({ id: r.id, locationId: r.locationId, method: r.method, name: r.name, accountNumber: r.accountNumber, holderName: r.holderName, status: r.status, isDefault: r.isDefault }));
 }
 
 export type PostCashInput = {
@@ -72,10 +104,15 @@ export type PostCashInput = {
   userId: string;
   at?: Date;
   closingId?: string | null;
+  /** the exact account; empty = the default account of the method (see resolveAccount) */
+  accountId?: string | null;
+  field?: string;
+  lenient?: boolean;
+  allowClosed?: boolean;
 };
 
 export async function postCash(tx: Tx, i: PostCashInput) {
-  const account = await getAccount(tx, i.locationId, i.method);
+  const account = await resolveAccount(tx, { locationId: i.locationId, method: i.method, accountId: i.accountId, field: i.field, lenient: i.lenient, allowClosed: i.allowClosed });
   return tx.cashTransaction.create({
     data: {
       accountId: account.id,
@@ -95,12 +132,13 @@ export async function postCash(tx: Tx, i: PostCashInput) {
 /** Money received from a customer lands in the account of the method used. Called wherever a Payment is created. */
 export async function recordPaymentCash(
   tx: Tx,
-  p: { id: string; paymentNo: string; source: "AT_SALE" | "DEBT_COLLECTION"; method: PaymentMethod; amount: Dec },
+  p: { id: string; paymentNo: string; source: "AT_SALE" | "DEBT_COLLECTION"; method: PaymentMethod; amount: Dec; accountId?: string | null },
   by: { locationId?: string | null; userId: string },
 ) {
   return postCash(tx, {
     locationId: by.locationId ?? (await defaultLocationId(tx)),
     method: p.method,
+    accountId: p.accountId,
     type: p.source === "AT_SALE" ? "SALE_PAYMENT" : "COLLECTION",
     amount: p.amount,
     referenceType: "Payment",
@@ -113,12 +151,15 @@ export async function recordPaymentCash(
 /** Money paid back to a customer leaves the account of the refund method. */
 export async function recordRefundCash(
   tx: Tx,
-  r: { id: string; reversalNo: string; method: PaymentMethod; amount: Dec },
+  r: { id: string; reversalNo: string; method: PaymentMethod; amount: Dec; accountId?: string | null },
   by: { locationId: string; userId: string },
 ) {
   return postCash(tx, {
     locationId: by.locationId,
     method: r.method,
+    accountId: r.accountId,
+    lenient: true,
+    allowClosed: true,
     type: "REFUND",
     amount: r.amount.neg(),
     referenceType: "SaleReversal",
@@ -145,7 +186,7 @@ export async function assertCanSpend(tx: Tx, accountId: string, method: PaymentM
   await lockAccount(tx, accountId);
   const balance = await accountBalance(tx, accountId);
   if (amount.gt(balance)) {
-    const label = ACCOUNT_NAME[method].toLowerCase();
+    const label = (await tx.cashAccount.findUnique({ where: { id: accountId }, select: { name: true } }))?.name ?? ACCOUNT_NAME[method].toLowerCase();
     const fmt = (v: Dec) => new Intl.NumberFormat("en-US").format(Number(v.toString()));
     throw new CashError(
       `There is only ${fmt(balance)} in ${label} according to the records, which is not enough for ${fmt(amount)}. If the money really is there, record the opening balance or a correction in Cash & Accounts first.`,
@@ -168,4 +209,26 @@ export async function getBalances(db: Pick<Tx, "$queryRaw">, locationId: string,
     const r = byMethod.get(method);
     return { method, name: ACCOUNT_NAME[method], balance: new D(r?.balance ?? 0), inToday: new D(r?.inToday ?? 0), outToday: new D(r?.outToday ?? 0) };
   });
+}
+
+export type AccountBalance = AccountInfo & { balance: Dec; inToday: Dec; outToday: Dec; movements: number; lastAt: Date | null };
+
+/** Every account of a location with its balance (the sum of its ledger rows) and what moved today. Closed accounts are listed only while they hold money or have history. */
+export async function getAccountBalances(db: Pick<Tx, "$queryRaw">, locationId: string, today = businessDay()): Promise<AccountBalance[]> {
+  const rows = await db.$queryRaw<
+    { id: string; locationId: string; method: PaymentMethod; name: string; accountNumber: string | null; holderName: string | null; status: "ACTIVE" | "INACTIVE"; isDefault: boolean; balance: Dec | null; inToday: Dec | null; outToday: Dec | null; movements: bigint; lastAt: Date | null }[]
+  >`
+    SELECT a."id", a."locationId", a."method", a."name", a."accountNumber", a."holderName", a."status", a."isDefault",
+           SUM(t."amount") AS balance,
+           SUM(CASE WHEN t."businessDate" = ${today}::date AND t."amount" > 0 THEN t."amount" ELSE 0 END) AS "inToday",
+           SUM(CASE WHEN t."businessDate" = ${today}::date AND t."amount" < 0 THEN -t."amount" ELSE 0 END) AS "outToday",
+           COUNT(t."id") AS movements, MAX(t."createdAt") AS "lastAt"
+      FROM "CashAccount" a LEFT JOIN "CashTransaction" t ON t."accountId" = a."id"
+     WHERE a."locationId" = ${locationId}
+     GROUP BY a."id"`;
+  const rank = (m: PaymentMethod) => METHODS.indexOf(m);
+  return rows
+    .map((r) => ({ ...r, balance: new D(r.balance ?? 0), inToday: new D(r.inToday ?? 0), outToday: new D(r.outToday ?? 0), movements: Number(r.movements) }))
+    .filter((r) => r.status === "ACTIVE" || r.movements > 0)
+    .sort((x, y) => rank(x.method) - rank(y.method) || Number(y.isDefault) - Number(x.isDefault) || (x.name < y.name ? -1 : 1));
 }

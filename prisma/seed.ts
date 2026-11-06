@@ -83,7 +83,7 @@ async function main() {
   // Cash accounts (structure, no money): cash, mobile money and bank for every location
   for (const loc of await db.location.findMany({ select: { id: true } })) {
     for (const [method, name] of [["CASH", "Cash on hand"], ["MOBILE_MONEY", "Mobile money"], ["BANK", "Bank account"]] as const) {
-      await db.cashAccount.upsert({ where: { locationId_method: { locationId: loc.id, method } }, update: {}, create: { locationId: loc.id, method, name } });
+      if (!(await db.cashAccount.findFirst({ where: { locationId: loc.id, method, isDefault: true }, select: { id: true } }))) await db.cashAccount.create({ data: { locationId: loc.id, method, name, isDefault: true } });
     }
   }
   // Starting expense categories (the examples from the brief); only when none exist, so the owner's edits are never undone

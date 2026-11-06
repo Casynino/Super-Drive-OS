@@ -4,6 +4,7 @@ import { useActionState, useId } from "react";
 import { useFormStatus } from "react-dom";
 import { Camera } from "lucide-react";
 import { Alert } from "@/components/ui";
+import AccountSelect, { type FormAccount } from "@/components/cash/AccountSelect";
 import { Field, SubmitButton, inputClass } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
 
@@ -16,8 +17,10 @@ export function ExpenseForm({
   today,
   submissionKey,
   limitText,
+  accounts,
 }: {
   action: Action;
+  accounts: FormAccount[];
   categories: { id: string; name: string }[];
   today: string;
   submissionKey: string;
@@ -52,12 +55,8 @@ export function ExpenseForm({
         <Field label="Description" name="description" id={id("desc")} error={fe.description} required className="sm:col-span-2">
           <input id={id("desc")} name="description" autoComplete="off" defaultValue={v.description ?? ""} placeholder="e.g. Taxi to deliver 4 cartons to Mwenge" className={inputClass(fe.description)} />
         </Field>
-        <Field label="Paid from" name="method" id={id("method")} error={fe.method}>
-          <select id={id("method")} name="method" defaultValue={v.method ?? "CASH"} className={inputClass(fe.method)}>
-            <option value="CASH">Cash in the till</option>
-            <option value="MOBILE_MONEY">Mobile money</option>
-            <option value="BANK">Bank account</option>
-          </select>
+        <Field label="Paid from" name="accountId" id={id("account")} error={fe.accountId ?? fe.method}>
+          <AccountSelect accounts={accounts} id={id("account")} defaultValue={v.accountId ?? accounts.find((a) => a.method === "CASH")?.id} error={fe.accountId ?? fe.method} />
         </Field>
         <Field label="Date" name="expenseDate" id={id("date")} error={fe.expenseDate}>
           <input id={id("date")} type="date" name="expenseDate" defaultValue={v.expenseDate ?? today} max={today} className={inputClass(fe.expenseDate)} />

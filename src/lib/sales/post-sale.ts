@@ -5,7 +5,7 @@
 //   invoice number counter → customer row → product rows (shared) → stock balance rows → payment counter.
 import { randomUUID } from "node:crypto";
 import { Prisma, type PaymentMethod } from "@/generated/prisma/client";
-import { recordPaymentCash } from "@/lib/cash/ledger";
+import { CashError, recordPaymentCash } from "@/lib/cash/ledger";
 import { lockProductsShared, nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
 import { ItemError, moveStockTracked, resolveItemCodes } from "@/lib/inventory/items";
 import { resolveLines } from "@/lib/inventory/lines";
@@ -44,6 +44,8 @@ export type SaleInput = {
   locationId: string;
   mode: SaleMode;
   method: PaymentMethod | null;
+  /** the exact account the money went into (CRDB, M-PESA, ...); required when the method has several open accounts */
+  accountId?: string | null;
   partAmount: string | null;
   reference: string | null;
   notes: string | null;
@@ -290,7 +292,12 @@ export async function postSale(tx: Tx, input: SaleInput) {
     });
     payment = { id: p.id, paymentNo };
     // The money is now in the till / mobile money / bank, in the same transaction as the sale.
-    await recordPaymentCash(tx, { id: p.id, paymentNo, source: "AT_SALE", method: input.method!, amount: paidNow }, { locationId: input.locationId, userId: input.user.id });
+    try {
+      await recordPaymentCash(tx, { id: p.id, paymentNo, source: "AT_SALE", method: input.method!, amount: paidNow, accountId: input.accountId }, { locationId: input.locationId, userId: input.user.id });
+    } catch (e) {
+      if (e instanceof CashError) throw new SaleError(e.message, { accountId: e.fieldErrors?.accountId ?? e.message });
+      throw e;
+    }
   }
 
   return { sale, payment, creditExceptionUsed: creditApprovedById !== null, onCredit, total };

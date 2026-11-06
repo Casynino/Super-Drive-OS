@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Alert, PageHeader } from "@/components/ui";
 import CollectPaymentForm, { type OpenInvoice } from "@/components/pos/CollectPaymentForm";
 import { requirePagePermission } from "@/lib/auth/guard";
+import { defaultLocationId, listAccounts } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { customerCredit } from "@/lib/sales/collections";
 import { owedOf } from "@/lib/sales/owed";
@@ -17,10 +18,11 @@ export default async function CustomerPayPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const customer = await db.customer.findUnique({ where: { id } });
   if (!customer) notFound();
-  const [currency, credit, sales] = await Promise.all([
+  const [currency, credit, sales, accounts] = await Promise.all([
     getCurrency(),
     customerCredit(db, id),
     db.sale.findMany({ where: { customerId: id, status: "COMPLETED", paymentStatus: { in: ["UNPAID", "PARTIALLY_PAID"] } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
+    defaultLocationId(db).then((l) => listAccounts(db, l)),
   ]);
 
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
@@ -56,7 +58,7 @@ export default async function CustomerPayPage({ params }: { params: Promise<{ id
       </div>
 
       <div className="space-y-8">
-        <CollectPaymentForm mode="collect" action={recordCollection} customerId={id} invoices={invoices} creditAvailable={0} submissionKey={randomUUID()} currency={cur} cancelHref={`/customers/${id}`} />
+        <CollectPaymentForm mode="collect" action={recordCollection} customerId={id} invoices={invoices} creditAvailable={0} accounts={accounts.map((a) => ({ id: a.id, locationId: a.locationId, method: a.method, name: a.name, accountNumber: a.accountNumber, isDefault: a.isDefault }))} submissionKey={randomUUID()} currency={cur} cancelHref={`/customers/${id}`} />
 
         {credit.gt(0) && invoices.length > 0 && (
           <section>

@@ -5,7 +5,7 @@
 import { Prisma, type PaymentMethod } from "@/generated/prisma/client";
 import { nextDocumentNo, type Tx } from "@/lib/inventory/engine";
 import { parseMoney } from "@/lib/money";
-import { CashError, assertCanSpend, businessDay, dayToDate, getAccount, lockAccount, postCash } from "./ledger";
+import { CashError, assertCanSpend, businessDay, dayToDate, getAccount, lockAccount, postCash, resolveAccount } from "./ledger";
 
 const D = Prisma.Decimal;
 
@@ -16,6 +16,8 @@ export type DepositInput = {
   bankReference: string;
   notes: string | null;
   slipId: string | null;
+  /** the bank account the money is paid into; required when there are several open bank accounts */
+  bankAccountId?: string | null;
   submissionKey: string;
   currencyDecimals: number;
   /** set when the deposit is made as part of a daily closing */
@@ -34,6 +36,7 @@ export async function postDeposit(tx: Tx, input: DepositInput) {
   // The account is locked BEFORE the number counter (daily closings take them in this order too), so they cannot deadlock.
   const cash = await getAccount(tx, input.locationId, "CASH");
   await lockAccount(tx, cash.id);
+  const bank = await resolveAccount(tx, { locationId: input.locationId, method: "BANK", accountId: input.bankAccountId, field: "bankAccountId" });
   const depositNo = await nextDocumentNo(tx, "DEP");
   // Insert first: a double-submitted form fails here before any money moves.
   const deposit = await tx.bankDeposit.create({
@@ -53,7 +56,7 @@ export async function postDeposit(tx: Tx, input: DepositInput) {
   await assertCanSpend(tx, cash.id, "CASH", amount, "depositAmount");
   const common = { referenceType: "BankDeposit", referenceId: deposit.id, referenceNo: depositNo, userId: input.user.id, closingId: input.closingId ?? null };
   await postCash(tx, { ...common, locationId: input.locationId, method: "CASH", type: "DEPOSIT_OUT", amount: amount.neg(), description: `Bank deposit ${ref}` });
-  await postCash(tx, { ...common, locationId: input.locationId, method: "BANK", type: "DEPOSIT_IN", amount, description: `Bank deposit ${ref}` });
+  await postCash(tx, { ...common, locationId: input.locationId, method: "BANK", accountId: bank.id, type: "DEPOSIT_IN", amount, description: `Bank deposit ${ref}` });
   return deposit;
 }
 
@@ -65,6 +68,8 @@ export type ManualCashInput = {
   user: { id: string };
   locationId: string;
   method: PaymentMethod;
+  /** the exact account; required when the method has several open accounts */
+  accountId?: string | null;
   kind: ManualKind;
   amount: string;
   reason: string;
@@ -82,20 +87,21 @@ export async function postManualCash(tx: Tx, input: ManualCashInput) {
   if (reason.length > 300) fe.reason = "Keep the reason under 300 characters.";
   if (Object.keys(fe).length || !amount) throw new CashError("Please fix the highlighted fields.", fe);
 
-  const account = await getAccount(tx, input.locationId, input.method);
+  const account = await resolveAccount(tx, { locationId: input.locationId, method: input.method, accountId: input.accountId, field: "accountId" });
   const label = { OPENING: "Opening balance", WITHDRAWAL: "Withdrawal", CORRECTION_IN: "Correction (added)", CORRECTION_OUT: "Correction (removed)" }[input.kind];
   const description = reason ? `${label}: ${reason}` : label;
 
   if (input.kind === "OPENING") {
     const exists = await tx.cashTransaction.findFirst({ where: { accountId: account.id, type: "OPENING_BALANCE" }, select: { id: true } });
     if (exists) throw new CashError("The opening balance of this account was already recorded. Use a correction to change the balance.", { amount: "Already recorded." });
-    return postCash(tx, { locationId: input.locationId, method: input.method, type: "OPENING_BALANCE", amount, referenceType: "Opening", referenceId: account.id, description, userId: input.user.id });
+    return postCash(tx, { locationId: input.locationId, method: input.method, accountId: account.id, type: "OPENING_BALANCE", amount, referenceType: "Opening", referenceId: account.id, description, userId: input.user.id });
   }
   const outgoing = input.kind !== "CORRECTION_IN";
   if (outgoing) await assertCanSpend(tx, account.id, input.method, amount, "amount");
   return postCash(tx, {
     locationId: input.locationId,
     method: input.method,
+    accountId: account.id,
     type: input.kind === "WITHDRAWAL" ? "WITHDRAWAL" : "ADJUSTMENT",
     amount: outgoing ? amount.neg() : amount,
     referenceType: "Manual",
