@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { PackageCheck, Plus } from "lucide-react";
-import { EmptyState, PageHeader } from "@/components/ui";
+import { Plus } from "lucide-react";
+import { PageHeader } from "@/components/ui";
+import ReceiptsTable from "@/components/inventory/ReceiptsTable";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
-import { formatDate } from "@/lib/utils";
 
 export const metadata = { title: "Deliveries" };
 
@@ -37,42 +37,10 @@ export default async function ReceivingPage() {
         }
       />
       <div className="card overflow-hidden">
-        {receipts.length === 0 ? (
-          <EmptyState icon={<PackageCheck size={22} />} title="No stock received yet" description="Record your first delivery, or enter the stock you already have as opening stock." />
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Receipt</th>
-                  <th>Date</th>
-                  <th className="hidden sm:table-cell">From</th>
-                  <th className="hidden md:table-cell">Into</th>
-                  <th className="text-right">Items</th>
-                  {showCost && <th className="text-right">Total cost</th>}
-                  <th className="hidden lg:table-cell">Received by</th>
-                </tr>
-              </thead>
-              <tbody>
-                {receipts.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <Link href={`/inventory/receiving/${r.id}`} className="font-medium text-navy-700 hover:underline">
-                        {r.receiptNo}
-                      </Link>
-                    </td>
-                    <td className="whitespace-nowrap">{formatDate(r.receivedDate)}</td>
-                    <td className="hidden sm:table-cell">{r.type === "OPENING_STOCK" ? <span className="badge-yellow">Opening stock</span> : (r.supplier?.name ?? "—")}</td>
-                    <td className="hidden md:table-cell">{r.location.name}</td>
-                    <td className="text-right">{r._count.items}</td>
-                    {showCost && <td className="text-right font-medium">{formatMoney(r.totalCost, currency)}</td>}
-                    <td className="hidden text-slate-600 lg:table-cell">{r.receivedBy.name}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <ReceiptsTable
+          rows={receipts.map((r) => ({ id: r.id, receiptNo: r.receiptNo, date: r.receivedDate, openingStock: r.type === "OPENING_STOCK", supplier: r.supplier?.name ?? null, location: r.location.name, lines: r._count.items, cost: showCost ? formatMoney(r.totalCost, currency) : null, receivedBy: r.receivedBy.name }))}
+          showCost={showCost}
+        />
       </div>
     </>
   );

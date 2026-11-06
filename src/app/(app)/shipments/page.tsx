@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ClipboardCheck, PackageCheck, PackageOpen, Plus, Search as SearchIcon, ShieldAlert, Truck } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
+import ReceiptsTable from "@/components/inventory/ReceiptsTable";
 import MarkArrivedButton from "@/components/shipments/MarkArrivedButton";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -17,8 +18,9 @@ import { PhaseBadge } from "./badges";
 
 export const metadata = { title: "Purchase orders" };
 
-type Tab = "way" | "check" | "investigation" | "history";
-const TAB_PHASES: Record<Tab, ShipmentPhase[]> = {
+type PhaseTab = "way" | "check" | "investigation" | "history";
+type Tab = PhaseTab | "deliveries";
+const TAB_PHASES: Record<PhaseTab, ShipmentPhase[]> = {
   way: ["ON_THE_WAY"],
   check: ["ARRIVED", "CHECKING"],
   investigation: ["INVESTIGATION"],
@@ -32,6 +34,22 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   const manage = can(user, "shipments.manage");
   const receive = can(user, "shipments.receive");
   const currency = await getCurrency();
+  // The goods that were counted into stock (delivery receipts) live here too, for people who may see them
+  const deliveriesAllowed = canAny(user, ["inventory.receive", "inventory.movements", "purchasing.view"]);
+  const showCost = can(user, "inventory.valuation") || can(user, "products.cost");
+  const wantDeliveries = deliveriesAllowed && sp.tab === "deliveries";
+  const [receiptCount, receipts] = deliveriesAllowed
+    ? await Promise.all([
+        db.stockReceipt.count(),
+        wantDeliveries
+          ? db.stockReceipt.findMany({
+              orderBy: { createdAt: "desc" },
+              take: 100,
+              include: { supplier: { select: { name: true } }, location: { select: { name: true } }, receivedBy: { select: { name: true } }, _count: { select: { items: true } } },
+            })
+          : Promise.resolve([]),
+      ])
+    : [0, []];
 
   const shipments = await db.shipment.findMany({
     orderBy: [{ createdAt: "desc" }],
@@ -44,12 +62,12 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
     },
   });
   const rows = shipments.map((s) => ({ s, phase: shipmentPhase(s) }));
-  const inTab = (t: Tab) => rows.filter((r) => TAB_PHASES[t].includes(r.phase));
-  const counts: Record<Tab, number> = { way: inTab("way").length, check: inTab("check").length, investigation: inTab("investigation").length, history: inTab("history").length };
+  const inTab = (t: PhaseTab) => rows.filter((r) => TAB_PHASES[t].includes(r.phase));
+  const counts: Record<PhaseTab, number> = { way: inTab("way").length, check: inTab("check").length, investigation: inTab("investigation").length, history: inTab("history").length };
 
-  const fallback: Tab = manage && counts.investigation > 0 ? "investigation" : receive && counts.check > 0 ? "check" : counts.way > 0 ? "way" : counts.check > 0 ? "check" : counts.investigation > 0 ? "investigation" : "history";
-  const tab: Tab = sp.tab && sp.tab in TAB_PHASES ? (sp.tab as Tab) : fallback;
-  const list = inTab(tab);
+  const fallback: PhaseTab = manage && counts.investigation > 0 ? "investigation" : receive && counts.check > 0 ? "check" : counts.way > 0 ? "way" : counts.check > 0 ? "check" : counts.investigation > 0 ? "investigation" : "history";
+  const tab: Tab = wantDeliveries ? "deliveries" : sp.tab && sp.tab in TAB_PHASES ? (sp.tab as PhaseTab) : fallback;
+  const list = tab === "deliveries" ? [] : inTab(tab);
 
   const units = (s: (typeof shipments)[number]) => s.items.filter((i) => !i.unexpected).reduce((sum, i) => sum + Number(i.expectedQty), 0);
   const productCount = (s: (typeof shipments)[number]) => s.items.filter((i) => !i.unexpected).length;
@@ -69,8 +87,10 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
     { key: "check", label: "To check" },
     { key: "investigation", label: "Investigation" },
     { key: "history", label: "History" },
+    ...(deliveriesAllowed ? [{ key: "deliveries" as const, label: "Deliveries" }] : []),
   ];
-  const empty: Record<Tab, { title: string; text: string }> = {
+  const countOf = (k: Tab) => (k === "deliveries" ? receiptCount : counts[k]);
+  const empty: Record<PhaseTab, { title: string; text: string }> = {
     way: { title: "Nothing is on the way", text: manage ? "Make a purchase order and it shows up here." : "When the owner sends a purchase order it shows up here." },
     check: { title: "Nothing to check", text: "When a delivery is marked as arrived it waits here to be counted." },
     investigation: { title: "No problems", text: "Damaged, missing or extra goods are listed here until they are investigated." },
@@ -125,7 +145,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
         />
         <KpiCard icon={PackageCheck} tone="yellow" label="To check" value={counts.check} hint={counts.check ? "Arrived, waiting to be counted" : "All counted"} href="/shipments?tab=check" active={tab === "check"} />
         <KpiCard icon={ShieldAlert} tone={counts.investigation ? "red" : "slate"} label="Investigation" value={counts.investigation} hint={counts.investigation ? "Damaged, missing or extra goods" : "No problems"} href="/shipments?tab=investigation" active={tab === "investigation"} />
-        <KpiCard icon={PackageOpen} tone="green" label="In stock" value={doneRecently} hint="Fully received, last 30 days" href="/shipments?tab=history" active={tab === "history"} />
+        <KpiCard icon={PackageOpen} tone="green" label="In stock" value={doneRecently} hint="Fully received, last 30 days" href={deliveriesAllowed ? "/shipments?tab=deliveries" : "/shipments?tab=history"} active={tab === "deliveries" || (!deliveriesAllowed && tab === "history")} />
       </div>
 
       <nav className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Order stages">
@@ -139,12 +159,28 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
               className={cn("inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition", active ? "border-navy-700 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900")}
             >
               {t.label}
-              <span className={cn("rounded-full px-1.5 text-xs font-semibold", active ? "bg-white/20 text-white" : t.key === "investigation" && counts.investigation > 0 ? "bg-brand-red text-white" : "bg-slate-100 text-slate-600")}>{counts[t.key]}</span>
+              <span className={cn("rounded-full px-1.5 text-xs font-semibold", active ? "bg-white/20 text-white" : t.key === "investigation" && counts.investigation > 0 ? "bg-brand-red text-white" : "bg-slate-100 text-slate-600")}>{countOf(t.key)}</span>
             </Link>
           );
         })}
       </nav>
 
+      {tab === "deliveries" ? (
+        <section className="card overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
+            <p className="text-sm text-slate-600">Goods that arrived, were checked by the shop and are now in stock. Damaged pieces are written off and missing ones never show here.</p>
+            {can(user, "inventory.receive") && (
+              <Link href="/inventory/receiving/new" className="btn-secondary btn-sm">
+                <Plus size={14} /> Receive stock
+              </Link>
+            )}
+          </div>
+          <ReceiptsTable
+            rows={receipts.map((r) => ({ id: r.id, receiptNo: r.receiptNo, date: r.receivedDate, openingStock: r.type === "OPENING_STOCK", supplier: r.supplier?.name ?? null, location: r.location.name, lines: r._count.items, cost: showCost ? formatMoney(r.totalCost, currency) : null, receivedBy: r.receivedBy.name }))}
+            showCost={showCost}
+          />
+        </section>
+      ) : (
       <section className="card overflow-hidden">
         {list.length === 0 ? (
           <EmptyState
@@ -217,6 +253,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
           </div>
         )}
       </section>
+      )}
     </>
   );
 }

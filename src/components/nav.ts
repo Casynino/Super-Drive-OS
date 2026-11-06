@@ -40,6 +40,8 @@ export type NavItem = {
   ready: boolean;
   /** other pages that belong to this item, so it stays lit while you are on them */
   also?: string[];
+  /** hidden for people who have any of these: for them this screen lives inside another one (kept for roles that have no other way in) */
+  hideIfAny?: PermissionKey[];
   /** a count shown beside the item (computed on the server for the signed-in person) */
   badge?: "approvals" | "incoming";
 };
@@ -71,9 +73,9 @@ export const NAV: NavGroup[] = [
     icon: Boxes,
     items: [
       { label: "Overview", href: "/inventory", icon: Boxes, permissions: ["inventory.view"], ready: true },
-      { label: "Orders", href: "/shipments", icon: Truck, permissions: ["shipments.manage", "shipments.receive"], ready: true, badge: "incoming" },
+      { label: "Orders", href: "/shipments", icon: Truck, permissions: ["shipments.manage", "shipments.receive"], ready: true, badge: "incoming", also: ["/inventory/receiving"] },
       { label: "Scan", href: "/scan", icon: ScanBarcode, permissions: ["inventory.view", "sales.pos"], ready: true },
-      { label: "Deliveries", href: "/inventory/receiving", icon: PackageCheck, permissions: ["inventory.receive", "inventory.movements", "purchasing.view"], ready: true },
+      { label: "Deliveries", href: "/inventory/receiving", icon: PackageCheck, permissions: ["inventory.receive", "inventory.movements", "purchasing.view"], ready: true, hideIfAny: ["shipments.manage", "shipments.receive"] },
       { label: "Products", href: "/products", icon: Package, permissions: ["products.view"], ready: true, also: ["/items"] },
       { label: "Transfers", href: "/inventory/transfers", icon: ArrowLeftRight, permissions: ["inventory.transfer", "inventory.movements"], ready: true },
       { label: "Adjustments", href: "/inventory/adjustments", icon: ClipboardCheck, permissions: ["inventory.adjust", "inventory.count", "inventory.report_damage", "inventory.movements"], ready: true },

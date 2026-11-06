@@ -26,7 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const visibleHrefs = NAV.flatMap((g) => g.items)
-    .filter((i) => i.ready && (i.permissions.length === 0 || canAny(user, i.permissions)))
+    .filter((i) => i.ready && (i.permissions.length === 0 || canAny(user, i.permissions)) && !(i.hideIfAny && canAny(user, i.hideIfAny)))
     .map((i) => i.href);
 
   // Counts beside the menu items that need someone to act
