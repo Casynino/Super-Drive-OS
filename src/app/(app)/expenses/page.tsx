@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
-import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, ReceiptText, Search, TrendingDown } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, ReceiptText, Search, Tag, Wallet } from "lucide-react";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
-import KpiCard from "@/components/dashboard/KpiCard";
 import { ExpenseDecisionForm, ExpenseForm } from "@/components/cash/ExpenseForms";
 import { ExpenseStatusBadge } from "@/components/cash/Display";
+import KpiCard from "@/components/dashboard/KpiCard";
 import { Prisma, type ExpenseStatus } from "@/generated/prisma/client";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { businessDay, defaultLocationId, listAccounts } from "@/lib/cash/ledger";
 import { getCashSettings } from "@/lib/cash/settings";
+import { getMoneySummary } from "@/lib/cash/summary";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { methodLabel } from "@/lib/sales/types";
@@ -21,7 +22,8 @@ import { decideExpenseAction, recordExpenseAction } from "./actions";
 export const metadata = { title: "Expenses" };
 
 const PAGE_SIZE = 30;
-type Search = { status?: string; category?: string; q?: string; from?: string; to?: string; page?: string; recorded?: string; state?: string };
+const DOTS = ["bg-brand-red", "bg-oil-400", "bg-navy-400", "bg-emerald-500", "bg-violet-500", "bg-sky-500", "bg-orange-400", "bg-slate-400"] as const;
+type Search = { status?: string; category?: string; q?: string; from?: string; to?: string; all?: string; page?: string; recorded?: string; state?: string };
 const isDate = (s?: string) => Boolean(s && /^\d{4}-\d{2}-\d{2}$/.test(s));
 const shift = (ymd: string, days: number) => new Date(new Date(`${ymd}T12:00:00Z`).getTime() + days * 86_400_000).toISOString().slice(0, 10);
 const ymdOf = (d: Date) => d.toISOString().slice(0, 10);
@@ -55,6 +57,11 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const yesterday = shift(today, -1);
   const weekStart = shift(today, -6);
   const monthStart = `${today.slice(0, 8)}01`;
+  const yearStart = `${today.slice(0, 5)}01-01`;
+  // the period: this month unless another is chosen ("All time" turns it off)
+  const allTime = sp.all === "1";
+  const from = isDate(sp.from) ? sp.from! : allTime || isDate(sp.to) ? undefined : monthStart;
+  const to = isDate(sp.to) ? sp.to! : allTime || isDate(sp.from) ? undefined : today;
   const q = sp.q?.trim().slice(0, 80) ?? "";
   const status = (["PENDING", "APPROVED", "REJECTED", "REVERSED"] as const).find((s) => s === sp.status);
 
@@ -63,8 +70,8 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
 
   const mine: Prisma.ExpenseWhereInput = seeAll ? {} : { requestedById: user.id };
   const expenseDate: Prisma.DateTimeFilter = {};
-  if (isDate(sp.from)) expenseDate.gte = new Date(`${sp.from}T00:00:00Z`);
-  if (isDate(sp.to)) expenseDate.lte = new Date(`${sp.to}T00:00:00Z`);
+  if (from) expenseDate.gte = new Date(`${from}T00:00:00Z`);
+  if (to) expenseDate.lte = new Date(`${to}T00:00:00Z`);
   // every filter except the status (the status pills show how many each has under the other filters)
   const base: Prisma.ExpenseWhereInput = {
     ...mine,
@@ -75,15 +82,19 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const where: Prisma.ExpenseWhereInput = { ...base, ...(status ? { status } : {}) };
   const include = { category: { select: { name: true } }, requestedBy: { select: { name: true } }, cashAccount: { select: { name: true, accountNumber: true } } } as const;
 
-  const [rows, total, statusCounts, spentToday, spentYesterday, spentMonth, pendingAgg, pendingRows] = await Promise.all([
+  const locationId = await defaultLocationId(db);
+  // the same filters as the list, but not the category, so every category card shows its own total
+  const forCards: Prisma.ExpenseWhereInput = { ...mine, ...(Object.keys(expenseDate).length ? { expenseDate } : {}) };
+
+  const [rows, total, statusCounts, byCategory, pendingAgg, pendingRows, summary] = await Promise.all([
     db.expense.findMany({ where, orderBy: [{ expenseDate: "desc" }, { requestedAt: "desc" }, { id: "desc" }], skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE, include }),
     db.expense.count({ where }),
     db.expense.groupBy({ by: ["status"], where: base, _count: true }),
-    db.expense.aggregate({ where: { ...mine, status: "APPROVED", expenseDate: new Date(`${today}T00:00:00Z`) }, _sum: { amount: true }, _count: true }),
-    db.expense.aggregate({ where: { ...mine, status: "APPROVED", expenseDate: new Date(`${yesterday}T00:00:00Z`) }, _sum: { amount: true } }),
-    db.expense.aggregate({ where: { ...mine, status: "APPROVED", expenseDate: { gte: new Date(`${monthStart}T00:00:00Z`) } }, _sum: { amount: true }, _count: true }),
+    db.expense.groupBy({ by: ["categoryId"], where: { ...forCards, status: "APPROVED" }, _sum: { amount: true }, _count: true }),
     db.expense.aggregate({ where: { ...mine, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.expense.findMany({ where: { ...mine, status: "PENDING" }, orderBy: { requestedAt: "asc" }, take: 12, include }),
+    // what the owner took out in the same period (withdrawals are not expenses, but they leave the accounts just the same)
+    can(user, "cash.view") ? getMoneySummary(db, locationId, { from, to }) : Promise.resolve(null),
   ]);
 
   // totals per day for the days shown (a day can run over two pages)
@@ -98,31 +109,37 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
     perDay.set(key, cur);
   }
 
-  const paidToday = new Prisma.Decimal(spentToday._sum.amount ?? 0);
-  const paidYesterday = new Prisma.Decimal(spentYesterday._sum.amount ?? 0);
-  const vsYesterday = paidYesterday.gt(0) ? Math.round(paidToday.minus(paidYesterday).div(paidYesterday).mul(100).toNumber()) : null;
+  const spentTotal = byCategory.reduce((t, r) => t.plus(r._sum.amount ?? 0), new Prisma.Decimal(0));
+  const spentCount = byCategory.reduce((t, r) => t + r._count, 0);
+  const spread = categories
+    .map((c) => ({ id: c.id, name: c.name, n: byCategory.find((x) => x.categoryId === c.id)?._count ?? 0, value: new Prisma.Decimal(byCategory.find((x) => x.categoryId === c.id)?._sum.amount ?? 0) }))
+    .filter((c) => c.value.gt(0))
+    .sort((a, b) => b.value.comparedTo(a.value));
+  const biggest = spread[0];
   const pendingCount = pendingAgg._count;
   const pendingSum = new Prisma.Decimal(pendingAgg._sum.amount ?? 0);
   const countOf = (s?: ExpenseStatus) => statusCounts.filter((r) => !s || r.status === s).reduce((t, r) => t + r._count, 0);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const hasFilters = Boolean(q || status || sp.category || sp.from || sp.to);
+  const hasFilters = Boolean(q || status || sp.category);
   const from1 = (page - 1) * PAGE_SIZE + 1;
 
   const link = (over: Partial<Search>) => {
-    const m = { q: q || undefined, status, category: sp.category, from: sp.from, to: sp.to, ...over } as Record<string, string | undefined>;
+    const m = { q: q || undefined, status, category: sp.category, from: sp.from, to: sp.to, all: sp.all, ...over } as Record<string, string | undefined>;
     const qs = new URLSearchParams(Object.entries(m).filter(([, v]) => v) as [string, string][]).toString();
     return `/expenses${qs ? `?${qs}` : ""}`;
   };
   const periods = [
+    { label: "All time", from: undefined, to: undefined, all: "1" },
     { label: "Today", from: today, to: today },
     { label: "Yesterday", from: yesterday, to: yesterday },
-    { label: "Last 7 days", from: weekStart, to: today },
+    { label: "This week", from: weekStart, to: today },
     { label: "This month", from: monthStart, to: today },
-  ];
-  const activePeriod = periods.find((p) => p.from === sp.from && p.to === sp.to);
+    { label: "This year", from: yearStart, to: today },
+  ] as { label: string; from?: string; to?: string; all?: string }[];
+  const activePeriod = periods.find((p) => (p.all ? allTime && !sp.from && !sp.to : !allTime && p.from === from && p.to === to));
   const limitText = settings.expenseApprovalLimit.gt(0)
     ? `Up to ${formatMoney(settings.expenseApprovalLimit, currency)} is recorded straight away. Anything above needs the owner to approve it first.`
-    : "Every expense needs the owner's approval before the money is paid out.";
+    : "An expense is recorded and paid straight away.";
 
   return (
     <>
@@ -142,12 +159,39 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <KpiCard icon={TrendingDown} tone="navy" label="Spent today" value={money(paidToday)} hint={`${spentToday._count} expense${spentToday._count === 1 ? "" : "s"}${vsYesterday !== null ? ` · ${vsYesterday >= 0 ? "+" : ""}${vsYesterday}% vs yesterday` : paidYesterday.isZero() ? "" : ` · yesterday ${money(paidYesterday)}`}`} href={link({ from: today, to: today, status: "APPROVED", page: undefined })} />
-        <KpiCard icon={CalendarDays} tone="blue" label="Spent this month" value={money(spentMonth._sum.amount ?? 0)} hint={`${spentMonth._count} expense${spentMonth._count === 1 ? "" : "s"} paid`} href={link({ from: monthStart, to: today, status: "APPROVED", page: undefined })} />
-        <KpiCard icon={Clock} tone={pendingCount > 0 ? "yellow" : "slate"} label="Waiting for owner's OK" value={pendingCount} hint={pendingCount > 0 ? `${money(pendingSum)} not paid out yet` : "Nothing is waiting"} href={pendingCount > 0 ? link({ status: "PENDING", from: undefined, to: undefined, page: undefined }) : undefined} />
-        <KpiCard icon={ReceiptText} tone="slate" label="All expenses" value={countOf()} hint={hasFilters ? "With these filters" : "Since the shop started"} />
+      <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
+        <KpiCard icon={ReceiptText} tone="red" label="Spent on expenses" value={money(spentTotal)} hint={`${spentCount} paid expense${spentCount === 1 ? "" : "s"}${activePeriod ? ` · ${activePeriod.label.toLowerCase()}` : ""}`} />
+        {biggest && <KpiCard icon={Tag} tone="navy" label="Biggest category" value={money(biggest.value)} hint={`${biggest.name} · ${spentTotal.gt(0) ? Math.round(biggest.value.div(spentTotal).mul(100).toNumber()) : 0}% of the spending`} href={link({ category: biggest.id, page: undefined })} />}
+        {summary && <KpiCard icon={Wallet} tone="slate" label="Taken out by the owner" value={money(summary.withdrawals)} hint="Withdrawals, shown in the ledger" href={`/ledger?type=WITHDRAWAL${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`} />}
+        {pendingCount > 0 && <KpiCard icon={Clock} tone="yellow" label="Waiting for owner's OK" value={money(pendingSum)} hint={`${pendingCount} expense${pendingCount === 1 ? "" : "s"} · not paid out yet`} href={link({ status: "PENDING", page: undefined })} active={status === "PENDING"} />}
       </div>
+
+      {spread.length > 0 && (
+        <section className="card mb-5 px-4 py-4 sm:px-5" aria-label="Where the money went">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">Where the money went</h2>
+            <p className="text-xs text-slate-500">Press a category to see its expenses</p>
+          </div>
+          <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-slate-100" role="img" aria-label="Share of the spending by category">
+            {spread.map((c, i) => (
+              <Link key={c.id} href={link({ category: c.id, page: undefined })} title={`${c.name}: ${money(c.value)}`} className={cn("h-full transition hover:opacity-80", DOTS[i % DOTS.length])} style={{ width: `${Math.max(spentTotal.gt(0) ? c.value.div(spentTotal).mul(100).toNumber() : 0, 1.5)}%` }} />
+            ))}
+          </div>
+          <ul className="mt-3 grid gap-x-4 gap-y-2 [grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
+            {spread.map((c, i) => (
+              <li key={c.id}>
+                <Link href={link({ category: sp.category === c.id ? undefined : c.id, page: undefined })} className={cn("flex items-start gap-2 rounded-lg px-1.5 py-1 transition hover:bg-slate-50", sp.category === c.id && "bg-slate-100")}>
+                  <span className={cn("mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full", DOTS[i % DOTS.length])} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs text-slate-500">{c.name} · {c.n}</span>
+                    <span className="block text-sm font-semibold text-slate-900">{money(c.value)}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {pendingCount > 0 && (
         <section className="card mb-5 overflow-hidden border-oil-400/60">
@@ -219,20 +263,20 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
             );
           })}
         </nav>
-        <nav className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Period">
-          {periods.map((p) => {
-            const active = activePeriod === p;
-            return (
-              <Link key={p.label} href={link({ from: p.from, to: p.to, page: undefined })} aria-current={active ? "page" : undefined} className={cn("inline-flex shrink-0 items-center rounded-full border px-3.5 py-1.5 text-sm font-medium transition", active ? "border-navy-700 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900")}>
-                {p.label}
-              </Link>
-            );
-          })}
+        <nav className="-mx-1 flex flex-wrap gap-1.5 px-1 pb-1" aria-label="Period">
+          {periods.map((p) => (
+            <Link key={p.label} href={link({ from: p.from, to: p.to, all: p.all, page: undefined })} aria-current={activePeriod === p ? "page" : undefined} className={cn("inline-flex shrink-0 items-center rounded-full border px-3.5 py-1.5 text-sm font-medium transition", activePeriod === p ? "border-navy-700 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900")}>
+              {p.label}
+            </Link>
+          ))}
         </nav>
       </div>
 
-      <form method="get" action="/expenses" className="card card-pad mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.6fr_1.1fr_auto_auto_auto_auto]">
+      <form method="get" action="/expenses" className="card card-pad mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.6fr_1.1fr_auto_auto]">
         {status && <input type="hidden" name="status" value={status} />}
+        {sp.from && <input type="hidden" name="from" value={sp.from} />}
+        {sp.to && <input type="hidden" name="to" value={sp.to} />}
+        {allTime && <input type="hidden" name="all" value="1" />}
         <div className="relative">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input name="q" defaultValue={q} placeholder="Expense no., description or person" className="input pl-9" aria-label="Search expenses" />
@@ -245,13 +289,11 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
             </option>
           ))}
         </select>
-        <input type="date" name="from" defaultValue={sp.from ?? ""} className="input" aria-label="From date" />
-        <input type="date" name="to" defaultValue={sp.to ?? ""} className="input" aria-label="To date" />
         <button className="btn-primary" type="submit">
           Apply
         </button>
         {hasFilters ? (
-          <Link href="/expenses" className="btn-secondary">
+          <Link href={link({ q: undefined, category: undefined, status: undefined, page: undefined })} className="btn-secondary">
             Clear
           </Link>
         ) : (

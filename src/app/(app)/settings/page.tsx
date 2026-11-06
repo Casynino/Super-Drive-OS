@@ -111,7 +111,7 @@ export default async function SettingsPage() {
               submitLabel="Save"
               disabled={!canSettings}
               fields={[
-                { name: "expenseApprovalLimit", label: `Expense limit without approval (${currency.symbol})`, value: cashSettings.expenseApprovalLimit.toString(), hint: "An expense up to this amount is recorded straight away. Above it, the owner must approve first. 0 means every expense needs approval." },
+                { name: "expenseApprovalLimit", label: `Expense limit without approval (${currency.symbol})`, value: cashSettings.expenseApprovalLimit.toString(), hint: "0 means no approval is needed: every expense is recorded and paid straight away. Type an amount only if you want expenses above it to wait for your OK." },
                 { name: "closingTolerance", label: `Allowed cash difference at closing (${currency.symbol})`, value: cashSettings.closingTolerance.toString(), hint: "If the counted cash is off by more than this, the closing is sent to you to review. 0 means any difference." },
               ]}
             />

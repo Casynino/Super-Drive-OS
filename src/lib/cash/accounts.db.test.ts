@@ -9,7 +9,8 @@ import { postSale, type SaleInput } from "@/lib/sales/post-sale";
 import { completeReversal, createReversalRequest } from "@/lib/sales/reversals";
 import { postDeposit, postManualCash } from "./deposits";
 import { recordExpense, reverseExpense } from "./expenses";
-import { accountBalance, getAccountBalances, listAccounts } from "./ledger";
+import { accountBalance, businessDay, getAccountBalances, listAccounts } from "./ledger";
+import { getMoneySummary, getTillToday } from "./summary";
 
 const D = (v: string | number) => new Prisma.Decimal(v);
 let userId: string;
@@ -158,5 +159,43 @@ describe("the database keeps the account rules", () => {
     await expect(db.cashAccount.create({ data: { locationId: s.location.id, method: "BANK", name: "Another main bank", isDefault: true } })).rejects.toThrow();
     await db.cashAccount.create({ data: { locationId: s.location.id, method: "BANK", name: "Equity Bank" } }); // not the main one: fine
     expect((await listAccounts(db, s.location.id)).filter((a) => a.method === "BANK")).toHaveLength(3);
+  });
+});
+
+describe("expenses need no approval unless the owner sets a limit", () => {
+  const spend = (s: S, amount: string, over: { approvalLimit?: Prisma.Decimal; canApprove?: boolean } = {}) =>
+    db.$transaction((tx) => recordExpense(tx, { user: { id: userId }, categoryId: expenseCategoryId, description: "Packing tape", amount, method: "CASH", accountId: s.till.id, expenseDate: "", notes: null, receiptId: null, submissionKey: randomUUID(), currencyDecimals: 0, approvalLimit: over.approvalLimit ?? D(0), canApprove: over.canApprove ?? false, locationId: s.location.id }));
+
+  it("with no limit (0) an expense recorded by staff is paid at once", async () => {
+    const s = await shop();
+    await db.$transaction((tx) => postManualCash(tx, { user: { id: userId }, locationId: s.location.id, method: "CASH", kind: "OPENING", amount: "100000", reason: "", submissionKey: randomUUID(), currencyDecimals: 0 }));
+    const r = await spend(s, "30000");
+    expect([r.approvedNow, r.expense.status]).toEqual([true, "APPROVED"]);
+    expect(await bal(s.till.id)).toBe("70000");
+  });
+
+  it("with a limit set, only the amount above it waits and nothing moves until it is approved", async () => {
+    const s = await shop();
+    await db.$transaction((tx) => postManualCash(tx, { user: { id: userId }, locationId: s.location.id, method: "CASH", kind: "OPENING", amount: "100000", reason: "", submissionKey: randomUUID(), currencyDecimals: 0 }));
+    expect((await spend(s, "5000", { approvalLimit: D(10000) })).approvedNow).toBe(true);
+    const big = await spend(s, "30000", { approvalLimit: D(10000) });
+    expect([big.approvedNow, big.expense.status]).toEqual([false, "PENDING"]);
+    expect(await bal(s.till.id)).toBe("95000"); // only the small one left the till
+  });
+});
+
+describe("the shop's cash for the day and the owner's summary come from the same ledger", () => {
+  it("cash received, used, taken to the bank and still at the shop add up, and the owner's numbers agree", async () => {
+    const s = await shop();
+    await sell(s, 4, { method: "CASH" }); // 100,000 received in cash
+    await db.$transaction((tx) => recordExpense(tx, { user: { id: userId }, categoryId: expenseCategoryId, description: "Fuel", amount: "30000", method: "CASH", accountId: s.till.id, expenseDate: "", notes: null, receiptId: null, submissionKey: randomUUID(), currencyDecimals: 0, approvalLimit: D(0), canApprove: false, locationId: s.location.id }));
+    await db.$transaction((tx) => postDeposit(tx, { user: { id: userId }, locationId: s.location.id, amount: "40000", bankReference: "SLIP-9", notes: null, slipId: null, bankAccountId: s.nmb.id, submissionKey: randomUUID(), currencyDecimals: 0 }));
+
+    const till = await getTillToday(db, s.location.id, businessDay());
+    expect([till.received, till.expenses, till.deposited, till.balance].map((v) => v.toString())).toEqual(["100000", "30000", "40000", "30000"]); // 100,000 − 30,000 − 40,000 still at the shop
+
+    const m = await getMoneySummary(db, s.location.id, { from: businessDay(), to: businessDay() });
+    expect([m.income, m.expenses, m.left, m.moved].map((v) => v.toString())).toEqual(["100000", "30000", "70000", "40000"]); // the deposit only moved money: it is not spending
+    expect(m.byAccount.find((a) => a.id === s.till.id)?.income.toString()).toBe("100000");
   });
 });

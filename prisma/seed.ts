@@ -74,7 +74,7 @@ async function main() {
       { key: "paymentAccounts", value: `CRDB BANK\nJina: ABEL JACOB KIJYOMBO\nAkaunti: 0152841983800\n\nNMB BANK\nJina: ABEL JACOB KIJYOMBO\nAkaunti: 20410052450\n\nM-PESA\nJina: Abely Jacob\nNamba: 37453908` }, // where customers pay; copied into payment reminders (editable in Settings → Business)
       { key: "currency", value: { code: "TZS", symbol: "TSh", decimals: 0 } },
       { key: "creditTermsDays", value: 30 },
-      { key: "expenseApprovalLimit", value: 0 }, // 0 = every expense needs the owner's approval until the owner sets a limit
+      { key: "expenseApprovalLimit", value: 0 }, // 0 = no approval needed: expenses are recorded and paid at once (the owner may set a limit later)
       { key: "closingTolerance", value: 0 }, // 0 = any cash difference at closing goes to the owner
     ],
     skipDuplicates: true,

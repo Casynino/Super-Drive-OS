@@ -1,6 +1,7 @@
 import { qtyText } from "@/lib/qty";
 import { getUnitMode } from "@/lib/unit-mode";
 import Link from "next/link";
+import { getTillToday } from "@/lib/cash/summary";
 import { CalendarCheck, Handshake, Banknote, Boxes, HandCoins, Package, PackageCheck, Receipt, ReceiptText, ShoppingCart, Undo2, Users, Wallet } from "lucide-react";
 import StatTile from "@/components/dashboard/StatTile";
 import { SaleStatusBadge } from "../sales/StatusBadge";
@@ -56,6 +57,8 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
     can(user, "expenses.create") ? db.expense.findMany({ where: { requestedById: user.id, requestedAt: { gte: from, lte: to } }, orderBy: { requestedAt: "desc" }, take: 4, select: { id: true, expenseNo: true, amount: true, requestedAt: true, status: true, category: { select: { name: true } } } }) : [],
     can(user, "closing.submit") ? unclosedDays(db, await defaultLocationId(db), today) : [],
   ]);
+  const tillLocation = can(user, "closing.submit") || can(user, "deposits.record") ? await defaultLocationId(db) : null;
+  const till = tillLocation ? await getTillToday(db, tillLocation, today) : null;
   const [mySales, myPayments, pendingMine, alerts] = await Promise.all([
     sells ? db.sale.findMany({ where: { salespersonId: user.id, createdAt: { gte: from, lte: to } }, orderBy: { createdAt: "desc" }, include: { customer: { select: { name: true } } } }) : [],
     can(user, "payments.record") || sells ? db.payment.groupBy({ by: ["method"], where: { receivedById: user.id, receivedAt: { gte: from, lte: to } }, _sum: { amount: true } }) : [],
@@ -132,6 +135,48 @@ async function ShopDashboard({ user }: { user: SessionUser }) {
           {spentToday ? <StatTile icon={ReceiptText} tone="yellow" label="Expenses today" value={m(spentToday._sum.amount ?? 0)} href="/expenses" /> : <StatTile icon={Undo2} tone="yellow" label="Requests waiting" value={pendingMine} hint="Returns waiting for the manager" />}
           {shelf ? <StatTile icon={Boxes} tone="slate" label="Stock on the shelf" value={`${Number(shelf._sum.quantity ?? 0).toFixed(0)} items`} href="/inventory" /> : <StatTile icon={Undo2} tone="slate" label="Requests waiting" value={pendingMine} />}
         </div>
+      )}
+
+      {till && (
+        <section className="card mb-6 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Cash at the shop</h2>
+              <p className="text-xs text-slate-500">The cash stays here until you take it to the bank. A deposit takes it out of the cash below and into the bank.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {can(user, "deposits.record") && (
+                <Link href="/deposits" className="btn-secondary btn-sm">
+                  Deposit to the bank
+                </Link>
+              )}
+              {can(user, "closing.submit") && (
+                <Link href="/closing" className="btn-secondary btn-sm">
+                  Close the day
+                </Link>
+              )}
+            </div>
+          </div>
+          <dl className="grid grid-cols-2 divide-line md:grid-cols-4 md:divide-x">
+            <div className="px-5 py-4">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cash received today</dt>
+              <dd className="mt-1 text-xl font-bold tabular-nums text-emerald-700">+ {m(till.received)}</dd>
+            </div>
+            <div className="px-5 py-4">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Used for expenses</dt>
+              <dd className="mt-1 text-xl font-bold tabular-nums text-slate-900">− {m(till.expenses)}</dd>
+              {till.otherOut.gt(0) && <p className="text-[11px] text-slate-500">and {m(till.otherOut)} for refunds, suppliers or the owner</p>}
+            </div>
+            <div className="px-5 py-4">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Taken to the bank today</dt>
+              <dd className="mt-1 text-xl font-bold tabular-nums text-slate-900">− {m(till.deposited)}</dd>
+            </div>
+            <div className="bg-sky-500/[0.07] px-5 py-4">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Still at the shop</dt>
+              <dd className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{m(till.balance)}</dd>
+            </div>
+          </dl>
+        </section>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">

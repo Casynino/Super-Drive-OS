@@ -1,6 +1,6 @@
-// Expenses. Money only leaves an account when an expense is APPROVED:
-//   within the limit (or recorded by someone who may approve)  → APPROVED at once, ledger row written
-//   above the limit                                              → PENDING, nothing moves until the owner approves
+// Expenses. By default NO approval is needed (Nino, 2026-11-07): an expense is recorded and paid at once, and its ledger row is written.
+// Only when the owner sets a limit (Settings, or a category's own limit, above 0) does an expense ABOVE that limit wait:
+//   PENDING, nothing moves until the owner approves it
 // An approved expense is never edited or deleted. It can be REVERSED (money put back) with a reason.
 // Lock order: document counter → expense row → cash account row.
 import { Prisma, type PaymentMethod } from "@/generated/prisma/client";
@@ -49,7 +49,7 @@ export async function recordExpense(tx: Tx, input: RecordExpenseInput) {
   if (Object.keys(fe).length || !amount || !category) throw new CashError("Please fix the highlighted fields.", fe);
 
   const limit = category.approvalLimit ?? input.approvalLimit;
-  const approvedNow = input.canApprove || amount.lte(limit);
+  const approvedNow = input.canApprove || !limit.gt(0) || amount.lte(limit); // a limit of 0 means "no approval needed"
   const locationId = input.locationId ?? (await defaultLocationId(tx));
   const account = await resolveAccount(tx, { locationId, method: input.method, accountId: input.accountId, field: "accountId" });
   const expenseNo = await nextDocumentNo(tx, "EXP");
