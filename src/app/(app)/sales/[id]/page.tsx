@@ -30,6 +30,7 @@ export default async function SalePage({ params, searchParams }: { params: Promi
       location: { select: { name: true } },
       salesperson: { select: { name: true } },
       creditApprovedBy: { select: { name: true } },
+      pickupNote: { select: { id: true, noteNo: true, status: true } },
       items: { orderBy: { id: "asc" }, include: { product: { select: { name: true, sku: true } }, enteredUnit: { select: { symbol: true } } } },
       allocations: { include: { payment: true }, orderBy: { id: "asc" } },
       reversals: { orderBy: { requestedAt: "desc" }, include: { requestedBy: { select: { name: true } }, decidedBy: { select: { name: true } }, items: { include: { product: { select: { name: true } } } } } },
@@ -76,8 +77,33 @@ export default async function SalePage({ params, searchParams }: { params: Promi
       )}
       {sp.created && (
         <div className="mb-4 print:hidden">
-          <Alert kind="success">Sale completed. Stock has been updated{sale.amountPaid.gt(0) ? " and the payment recorded" : ""}.</Alert>
+          <Alert kind="success">
+            {sale.pickupNote ? `Sale completed${sale.amountPaid.gt(0) ? " and the payment recorded" : ""}. The goods are reserved at the warehouse: the pickup note is how they are collected.` : `Sale completed. Stock has been updated${sale.amountPaid.gt(0) ? " and the payment recorded" : ""}.`}
+          </Alert>
         </div>
+      )}
+      {sale.pickupNote && (
+        <section className="card mb-4 flex flex-wrap items-center justify-between gap-3 px-4 py-4 print:hidden sm:px-5" aria-label="Pickup note">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Pickup note</p>
+            <p className="font-mono text-lg font-semibold text-slate-900">{sale.pickupNote.noteNo}</p>
+            <p className="text-sm text-slate-600">
+              {sale.pickupNote.status === "COMPLETED" ? "Collected" : sale.pickupNote.status === "CANCELLED" ? "Cancelled" : sale.pickupNote.status === "PARTIAL" ? "Partly collected" : sale.pickupNote.status === "READY" ? "Ready for collection" : "Waiting at the warehouse"}
+              . Take it to the Store Warehouse to collect the goods.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/print/pickup/${sale.pickupNote.id}`} target="_blank" className="btn-primary">
+              Open the note
+            </Link>
+            <Link href={`/print/pickup/${sale.pickupNote.id}?print=1&save=1`} target="_blank" className="btn-secondary">
+              Download PDF
+            </Link>
+            <Link href={`/print/pickup/${sale.pickupNote.id}?print=1`} target="_blank" className="btn-secondary">
+              Print
+            </Link>
+          </div>
+        </section>
       )}
 
       <article className="card mx-auto max-w-3xl p-5 sm:p-8 print:max-w-none print:border-0 print:p-0">

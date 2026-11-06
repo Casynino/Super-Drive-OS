@@ -53,7 +53,7 @@ export default function ReleaseForm({ noteId, noteNo, submissionKey, lines }: { 
             <label key={l.id} className="grid items-center gap-3 sm:grid-cols-[1fr_9rem]">
               <span className="min-w-0 text-sm">
                 <span className="font-medium text-slate-900">{l.name}</span>
-                <span className="ml-2 text-xs text-slate-500">waiting {l.waitingText}</span>
+                <span className="ml-2 text-xs text-slate-500">waiting {l.waitingText}{l.waitingText.endsWith(l.symbol) ? "" : ` (${l.waiting} ${l.symbol})`}</span>
               </span>
               <span className="flex items-center gap-2">
                 <input name={`qty.${l.id}`} inputMode="numeric" autoComplete="off" placeholder="0" className="input h-10 text-right tabular-nums" aria-label={`${l.name}: pieces handed over`} />

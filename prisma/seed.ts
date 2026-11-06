@@ -64,7 +64,7 @@ async function main() {
   await db.unit.createMany({ data: BASE_UNITS, skipDuplicates: true });
 
   if ((await db.location.count()) === 0) {
-    await db.location.create({ data: { code: "MAIN", name: "Main Store", type: "WAREHOUSE", isDefault: true } });
+    await db.location.create({ data: { code: "STORE", name: "Store Warehouse – Dar es Salaam", type: "WAREHOUSE", isDefault: true, pickupRequired: true } });
   }
 
   await db.setting.createMany({

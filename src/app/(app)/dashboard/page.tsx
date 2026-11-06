@@ -1,6 +1,7 @@
 import { qtyText } from "@/lib/qty";
 import { getUnitMode } from "@/lib/unit-mode";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getTillToday } from "@/lib/cash/summary";
 import { CalendarCheck, Handshake, Banknote, Boxes, HandCoins, Package, PackageCheck, Receipt, ReceiptText, ShoppingCart, Undo2, Users, Wallet } from "lucide-react";
 import StatTile from "@/components/dashboard/StatTile";
@@ -29,6 +30,8 @@ const greeting = () => {
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const user = await requireUser();
   const sp = await searchParams;
+  // The warehouse attendant has his own home: the warehouse
+  if (can(user, "warehouse.operate") && !can(user, "dashboard.view") && !can(user, "sales.pos")) redirect("/warehouse");
   // The people who run the business see the management dashboard; shop staff get the shop dashboard.
   return can(user, "dashboard.view") ? <OwnerHome user={user} /> : <ShopDashboard user={user} />;
 }

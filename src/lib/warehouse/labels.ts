@@ -19,3 +19,12 @@ export const STATUS_TEXT: Record<PickupStatus, string> = {
 };
 export const AUTH_LABEL: Record<PickupAuth, string> = { PAID: "Paid", PART_PAID: "Part paid, rest on approved credit", CREDIT_APPROVED: "Credit · approved" };
 export const OPEN_STATUSES: PickupStatus[] = ["NEW", "PREPARING", "READY", "PARTIAL"];
+
+export const EVENT_LABEL = {
+  RESERVED: "Goods reserved",
+  PREPARING: "Preparing started",
+  READY: "Marked ready",
+  RELEASED: "Goods released",
+  RESERVATION_FREED: "Reservation given back",
+  SCAN_REJECTED: "Scan refused",
+} as const;

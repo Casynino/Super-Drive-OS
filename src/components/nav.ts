@@ -23,6 +23,8 @@ import {
   UserCog,
   Users,
   Wallet,
+  Warehouse,
+  ScanLine,
   type LucideIcon,
 } from "lucide-react";
 import type { PermissionKey } from "@/lib/permissions";
@@ -70,8 +72,8 @@ export const NAV: NavGroup[] = [
     label: "Stock",
     icon: Boxes,
     items: [
-      { label: "Overview", href: "/inventory", icon: Boxes, permissions: ["inventory.view"], ready: true },
-      { label: "Orders", href: "/shipments", icon: Truck, permissions: ["shipments.manage", "shipments.receive"], ready: true, badge: "incoming", also: ["/inventory/receiving"] },
+      { label: "Overview", href: "/inventory", icon: Boxes, permissions: ["inventory.view"], ready: true, hideIfAny: ["warehouse.operate"] },
+      { label: "Orders", href: "/shipments", icon: Truck, permissions: ["shipments.manage", "shipments.receive"], ready: true, badge: "incoming", also: ["/inventory/receiving"], hideIfAny: ["warehouse.operate"] },
       { label: "Scan", href: "/scan", icon: ScanBarcode, permissions: ["inventory.view", "sales.pos"], ready: LABELS_ENABLED },
       { label: "Deliveries", href: "/inventory/receiving", icon: PackageCheck, permissions: ["inventory.receive", "inventory.movements", "purchasing.view"], ready: true, hideIfAny: ["shipments.manage", "shipments.receive"] },
       { label: "Products", href: "/products", icon: Package, permissions: ["products.view"], ready: true, also: ["/items"] },
@@ -79,6 +81,20 @@ export const NAV: NavGroup[] = [
       { label: "Transfers", href: "/inventory/transfers", icon: ArrowLeftRight, permissions: ["inventory.transfer", "inventory.movements"], ready: true },
       { label: "Movements", href: "/inventory/movements", icon: ArrowDownUp, permissions: ["inventory.movements"], ready: true },
       { label: "Adjustments", href: "/inventory/adjustments", icon: ClipboardCheck, permissions: ["inventory.adjust", "inventory.count", "inventory.report_damage", "inventory.movements"], ready: true },
+    ],
+  },
+  {
+    label: "Warehouse",
+    icon: Warehouse,
+    items: [
+      { label: "Overview", href: "/warehouse/overview", icon: Warehouse, permissions: ["warehouse.view"], ready: true },
+      { label: "Today", href: "/warehouse", icon: Warehouse, permissions: ["warehouse.operate"], ready: true },
+      { label: "Receiving", href: "/shipments", icon: Truck, permissions: ["shipments.receive"], ready: true, badge: "incoming", hideIfAny: ["shipments.manage"], also: ["/inventory/receiving"] },
+      { label: "Pickups", href: "/warehouse/orders", icon: ClipboardCheck, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
+      { label: "Scan", href: "/warehouse/scan", icon: ScanLine, permissions: ["warehouse.operate"], ready: true },
+      { label: "Stock", href: "/warehouse/stock", icon: Boxes, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
+      { label: "Collected", href: "/warehouse/history", icon: PackageCheck, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
+      { label: "Issues", href: "/warehouse/discrepancies", icon: ScrollText, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
     ],
   },
   {

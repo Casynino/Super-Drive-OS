@@ -149,11 +149,11 @@ async function setup(d: number) {
     accounts.push({ name, username, password, role: roleKey });
     return { id: u.id, name };
   };
-  manager = await mk("Juma Mwangi", "juma", "MANAGER", "0713 555 201");
+  manager = await mk("Juma Mwangi", "juma", "SALESPERSON", "0713 555 201");
   amina = await mk("Amina Hassan", "amina", "SALESPERSON", "0754 555 202");
   salim = await mk("Salim Bakari", "salim", "SALESPERSON", "0765 555 203");
-  baraka = await mk("Baraka Said", "baraka", "STOREKEEPER", "0782 555 204");
-  await mk("Neema Joseph", "neema", "ACCOUNTANT", "0716 555 205");
+  baraka = await mk("Baraka Said", "baraka", "WAREHOUSE", "0782 555 204");
+  await mk("Neema Joseph", "neema", "SALESPERSON", "0716 555 205");
 
   // settings the cash screens use
   // no approval limit: expenses are recorded and paid at once (the shop rule since 2026-11-07)
@@ -375,10 +375,18 @@ async function returnOne(d: number, leavePending: boolean) {
 }
 
 // ───────────── the whole story ─────────────
+let pickupSwitch: string | null = null;
 async function main() {
   if ((await db.sale.count()) > 0 || (await db.stockReceipt.count()) > 0 || (await db.shipment.count()) > 0) {
     console.error("This database already has sales, receipts or purchase orders. Sample data is only added to an empty one.");
     process.exit(1);
+  }
+  // The sample is a finished history: every sale was collected long ago, so the warehouse pickup step is switched off while the story is played
+  // (and back on at the end). Real sales from now on reserve stock and make pickup notes.
+  const dflt = await db.location.findFirst({ where: { isDefault: true, pickupRequired: true }, select: { id: true } });
+  if (dflt) {
+    pickupSwitch = dflt.id;
+    await db.location.update({ where: { id: dflt.id }, data: { pickupRequired: false } });
   }
   await loadColumns();
   console.log("Setting up people, prices, suppliers, customers and opening balances…");
@@ -550,4 +558,7 @@ main()
     console.error(e);
     process.exitCode = 1;
   })
-  .finally(() => db.$disconnect());
+  .finally(async () => {
+    if (pickupSwitch) await db.location.update({ where: { id: pickupSwitch }, data: { pickupRequired: true } });
+    await db.$disconnect();
+  });

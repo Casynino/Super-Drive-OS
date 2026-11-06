@@ -18,6 +18,10 @@ export type StockCardProps = {
   qtyBase: number;
   minBase: number | null;
   awayBase: number | null;
+  /** sold and waiting to be collected from the warehouse (still physically here); shown under the level bar */
+  reservedBase?: number | null;
+  /** the heading above the big number: "On the shelf" by default */
+  label?: string;
   pack: Pack | null;
   baseSymbol: string;
   /** 0-100: how full the shelf is against 3x the minimum (the minimum sits at one third); null when no minimum is set */
@@ -58,7 +62,7 @@ export default function StockCard(p: StockCardProps) {
       <div className="mt-auto border-t border-line px-4 py-3">
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">On the shelf</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{p.label ?? "On the shelf"}</p>
             <p className="mt-0.5 truncate text-2xl font-bold leading-none tracking-tight text-slate-900">{f(p.qtyBase)}</p>
             {p.pack && <p className="mt-1 text-xs text-slate-500">{packNote(p.pack, p.baseSymbol)}</p>}
           </div>
@@ -80,9 +84,9 @@ export default function StockCard(p: StockCardProps) {
           <p className="mt-3 text-[11px] text-slate-400">No minimum set, so no low-stock alert</p>
         )}
 
-        {((p.awayBase ?? 0) > 0 || p.value) && (
+        {((p.awayBase ?? 0) > 0 || (p.reservedBase ?? 0) > 0 || p.value) && (
           <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
-            <span>{(p.awayBase ?? 0) > 0 ? `${f(p.awayBase!)} with winga` : ""}</span>
+            <span>{(p.reservedBase ?? 0) > 0 ? `${f(p.reservedBase!)} reserved, waiting to be collected` : (p.awayBase ?? 0) > 0 ? `${f(p.awayBase!)} with winga` : ""}</span>
             {p.value && <span className="font-medium text-slate-700">{p.value}</span>}
           </div>
         )}

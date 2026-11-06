@@ -214,6 +214,9 @@ body {
   /* white plates for pictures and the logo stay light */
   html.dark .to-slate-100 { --tw-gradient-to: #e6ecf5; }
   html.dark .brand-logo { background: #fff; padding: 4px 10px; border-radius: 10px; }
+  /* in the menu the logo sits on a clean white brand bar across the top (with the oil-yellow line), not on a white sticker */
+  html.dark .brand-header { background: #ffffff; border-bottom: 3px solid #fdc400; }
+  html.dark .brand-header .brand-logo { background: transparent; padding: 0; border-radius: 0; }
   /* charts */
   html.dark .recharts-tooltip-wrapper .recharts-default-tooltip { background-color: var(--card) !important; border-color: var(--chart-grid) !important; }
   html.dark .recharts-default-tooltip .recharts-tooltip-label, html.dark .recharts-default-tooltip .recharts-tooltip-item { color: var(--chart-label) !important; }
