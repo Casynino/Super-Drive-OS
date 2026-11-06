@@ -52,7 +52,7 @@ export default async function EmployeePage({
       )}
       {locked && (
         <div className="mb-4">
-          <Alert kind="info">This is a Super Admin account. Only a Super Admin can change it.</Alert>
+          <Alert kind="info">This is an Admin account. Only an Admin can change it.</Alert>
         </div>
       )}
 

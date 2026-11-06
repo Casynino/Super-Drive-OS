@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { AlertTriangle, Download, ExternalLink, FileText, Info, Printer, TrendingUp } from "lucide-react";
 import StatTile from "@/components/dashboard/StatTile";
 import { DonutChart, SalesTrendChart, TopProductsChart } from "@/components/dashboard/Charts";
-import { EmptyState, PageHeader } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
+import HealthPanel, { HealthGauge } from "@/components/reports/HealthPanel";
+import { computeHealth, healthInputFrom } from "@/lib/reports/health";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
@@ -53,10 +55,42 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const change = (a: number, b: number) => (b > 0 ? ((a - b) / b) * 100 : null);
   const t = sales.totals;
   const net = financials && t.profit !== null ? t.profit - fin.expenseTotal : null;
+  const health = computeHealth(healthInputFrom(sales, inv, fin), m);
+  const periodHref = (extra = "") => `/print/report?from=${r.fromYmd}&to=${r.toYmd}${extra}`;
 
   return (
     <>
-      <PageHeader title="Reports" description={`How the business is doing · ${r.label}`} />
+      {/* The cover of the report book: the period, the health of the business and the report as a document */}
+      <section className="relative mb-5 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(800px_320px_at_85%_30%,rgba(47,111,208,0.4),transparent_62%)]" aria-hidden />
+        <div className="relative flex flex-wrap items-center justify-between gap-6 px-5 py-6 sm:px-8">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-oil-400">Management · Reports</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Business report</h1>
+            <p className="mt-1 text-sm text-white/65">
+              {r.label} · {formatDate(new Date(`${r.fromYmd}T12:00:00Z`))} to {formatDate(new Date(`${r.toYmd}T12:00:00Z`))}
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <Link href={periodHref()} target="_blank" className="inline-flex items-center gap-2 rounded-lg bg-oil-400 px-3.5 py-2 text-sm font-semibold text-[#0a1424] hover:brightness-95">
+                <ExternalLink size={15} /> Open the report
+              </Link>
+              <Link href={periodHref("&print=1&save=1")} target="_blank" className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-medium text-white ring-1 ring-white/25 hover:bg-white/15">
+                <Download size={15} /> Download PDF
+              </Link>
+              <Link href={periodHref("&print=1")} target="_blank" className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-medium text-white ring-1 ring-white/25 hover:bg-white/15">
+                <Printer size={15} /> Print
+              </Link>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <HealthGauge health={health} size={200} onDark />
+            <div className="hidden text-sm text-white/70 sm:block">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Business health</p>
+              <p className="mt-1 max-w-[11rem] leading-snug">{health.advice[0]}</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {(() => {
         // ready-made reports as paper documents: open them, download them as PDF or print them
@@ -164,6 +198,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <StatTile icon={Banknote} tone={net !== null && net < 0 ? "red" : "slate"} label={net !== null ? "After expenses" : "Cash in the period"} value={m(net !== null ? net : fin.flowIn)} hint={net !== null ? "Gross profit minus expenses" : `Out ${m(fin.flowOut)}`} />
           </div>
 
+          <HealthPanel health={health} />
+
           <section className="card card-pad mb-5">
             <h2 className="mb-3 text-base font-semibold text-slate-900">What stands out</h2>
             <ul className="space-y-2.5 text-sm">
@@ -194,6 +230,64 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </div>
             </section>
           </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <section className="card card-pad">
+              <h2 className="mb-3 text-base font-semibold text-slate-900">Best-selling products</h2>
+              <div className="h-64">
+                <TopProductsChart data={sales.byProduct.slice(0, 6).map((p) => ({ name: p.name, value: p.revenue }))} money={money} empty="No sales in this period yet" />
+              </div>
+            </section>
+            <section className="card card-pad">
+              <h2 className="mb-3 text-base font-semibold text-slate-900">Busiest days of the week</h2>
+              <div className="h-64">
+                <TopProductsChart data={sales.weekday} money={money} empty="No sales in this period yet" />
+              </div>
+            </section>
+            <section className="card card-pad">
+              <h2 className="mb-3 text-base font-semibold text-slate-900">Where the money went</h2>
+              <div className="h-64">
+                <DonutChart data={fin.expenses} money={money} centre={m(fin.expenseTotal)} />
+              </div>
+            </section>
+          </div>
+
+          <section className="card mt-4 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
+              <h2 className="text-base font-semibold text-slate-900">Products at a glance</h2>
+              <Link href={q({ tab: "sales" })} className="text-sm font-medium text-navy-700 hover:underline">
+                All products
+              </Link>
+            </div>
+            {sales.byProduct.length === 0 ? (
+              <EmptyState icon={<Receipt size={22} />} title="No sales in this period" />
+            ) : (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th className="text-right">Units</th>
+                      <th className="text-right">Sales</th>
+                      <th className="hidden text-right sm:table-cell">Share</th>
+                      {financials && <th className="text-right">Profit</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sales.byProduct.slice(0, 8).map((p) => (
+                      <tr key={p.id}>
+                        <td className="font-medium">{p.name}</td>
+                        <td className="text-right tabular-nums">{p.qty.toFixed(0)}</td>
+                        <td className="text-right tabular-nums">{m(p.revenue)}</td>
+                        <td className="hidden text-right tabular-nums text-slate-500 sm:table-cell">{t.sales > 0 ? `${((p.revenue / t.sales) * 100).toFixed(0)}%` : "—"}</td>
+                        {financials && <td className="text-right tabular-nums">{m(p.profit ?? 0)}</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         </>
       )}
 

@@ -11,6 +11,8 @@ import { largestPack, qtyText } from "@/lib/qty";
 import { outstandingByCustomer } from "@/lib/sales/outstanding";
 import { owedSql } from "@/lib/sales/owed";
 import { getBusinessProfile, getCurrency } from "@/lib/settings";
+import { financeAnalytics, insights, inventoryAnalytics, reportRange, salesAnalytics } from "./analytics";
+import { computeHealth, healthInputFrom } from "./health";
 import { getPeriodStats, getProductsSold, getSalesPerDay, shiftDay } from "./period";
 
 const D = Prisma.Decimal;
@@ -42,11 +44,13 @@ export async function loadPeriodSheet(db: Db, locationId: string, o: { from: str
   const [currency, profile] = await Promise.all([getCurrency(), getBusinessProfile()]);
   const money = (v: Dec | string | number) => formatMoney(v, currency);
 
-  const [cur, prev, products, perDay, alerts, customersTop, owedMap, balances, overdueRow, owner] = await Promise.all([
+  const rng = reportRange({ from, to });
+  const [cur, prev, products, perDay, prevPerDay, alerts, customersTop, owedMap, balances, overdueRow, owner, analytics] = await Promise.all([
     getPeriodStats(db, locationId, from, to),
     getPeriodStats(db, locationId, prevFrom, prevTo),
     getProductsSold(db, locationId, from, to),
     getSalesPerDay(db, locationId, from, to),
+    getSalesPerDay(db, locationId, prevFrom, prevTo),
     getStockAlerts(db),
     db.$queryRaw<{ id: string; name: string; n: bigint; v: Dec | null }[]>`
       SELECT c."id", c."name", COUNT(*) AS n, SUM(s."total" - s."returnedTotal") AS v
@@ -60,7 +64,11 @@ export async function loadPeriodSheet(db: Db, locationId: string, o: { from: str
        WHERE a."locationId" = ${locationId} AND a."status" = 'ACTIVE' GROUP BY a."id" ORDER BY a."method", a."name"`,
     db.$queryRaw<{ v: Dec | null }[]>`SELECT SUM(${owedSql()}) AS v FROM "Sale" WHERE "status" = 'COMPLETED' AND "dueDate" < ${businessDay()}::date AND ${owedSql()} > 0`,
     db.user.findFirst({ where: { status: "ACTIVE", role: { isSuperAdmin: true } }, orderBy: { createdAt: "asc" }, select: { name: true } }),
+    Promise.all([salesAnalytics(db, rng, "day", o.seeProfit), inventoryAnalytics(db, o.seeProfit), financeAnalytics(db, rng)]),
   ]);
+  const [sa, ia, fa] = analytics;
+  const notes = (await insights(db, sa, ia, fa, rng)).slice(0, 9);
+  const health = computeHealth(healthInputFrom(sa, ia, fa), (v) => money(v));
   const packs = products.length ? await db.product.findMany({ where: { id: { in: products.map((p) => p.id) } }, select: { id: true, baseUnit: { select: { symbol: true } }, units: { select: { factor: true, unit: { select: { symbol: true } } } } } }) : [];
 
   const spent = cur.expensesByCategory.reduce((t, e) => t.plus(e.value), new D(0));
@@ -122,15 +130,28 @@ export async function loadPeriodSheet(db: Db, locationId: string, o: { from: str
     }
     for (const [k, v] of m) buckets.push({ label: new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" }).format(new Date(`${k}-15T12:00:00Z`)), total: v });
   }
-  const peak = buckets.reduce((m, b) => (b.total.gt(m) ? b.total : m), new D(0));
   const trading = perDay.filter((d) => d.total.gt(0));
   const best = trading.reduce<{ day: string; total: Dec } | null>((m, d) => (!m || d.total.gt(m.total) ? d : m), null);
   const quiet = trading.reduce<{ day: string; total: Dec } | null>((m, d) => (!m || d.total.lt(m.total) ? d : m), null);
+  const prevByDay = new Map(prevPerDay.map((d) => [d.day, d.total]));
+  const prevTotals: number[] | null =
+    days > 120
+      ? null // months do not line up one for one with the months before
+      : buckets.map((_, bi) => {
+          if (days <= 31) return (prevByDay.get(shiftDay(prevFrom, bi)) ?? new D(0)).toNumber();
+          let t = new D(0);
+          for (let k = bi * 7; k < Math.min(bi * 7 + 7, days); k++) t = t.plus(prevByDay.get(shiftDay(prevFrom, k)) ?? 0);
+          return t.toNumber();
+        });
   const sales: ReportSection = {
-    kind: "chart",
+    kind: "line",
     title: "Sales over time",
-    sub: days <= 31 ? "Each day, the best one in yellow" : days <= 120 ? "Each week, the best one in yellow" : "Each month, the best one in yellow",
-    bars: buckets.map((b) => ({ label: b.label, pct: peak.gt(0) ? Math.max(b.total.div(peak).mul(100).toNumber(), b.total.gt(0) ? 3 : 0) : 0, highlight: peak.gt(0) && b.total.eq(peak) })),
+    sub: `${days <= 31 ? "Each day" : days <= 120 ? "Each week" : "Each month"}, against the period before`,
+    labels: buckets.map((b) => b.label),
+    current: buckets.map((b) => b.total.toNumber()),
+    previous: prevTotals,
+    currentName: "This period",
+    previousName: "The period before",
     tiles: [
       { label: "Best day", value: best ? money(best.total) : "—", note: best ? dayText(best.day) : "No sales" },
       { label: "Quietest trading day", value: quiet ? money(quiet.total) : "—", note: quiet ? dayText(quiet.day) : "No sales" },
@@ -152,10 +173,12 @@ export async function loadPeriodSheet(db: Db, locationId: string, o: { from: str
   const endTotal = balances.reduce((t, b) => t.plus(b.bal ?? 0), new D(0));
 
   const sections: ReportSection[] = [
-    { kind: "table", title: "What was sold", sub: "Each product, after returns", table: productsTable, empty: "Nothing was sold." },
+    { kind: "health", title: "How healthy is the business?", sub: "One score from growth, profit, spending, collections, debts and stock", health },
+    { kind: "notes", title: "What stands out", sub: "Calculated from your records", items: notes },
     sales,
-    { kind: "table", title: "Where the money came in", sub: "By account, paid at the sale and on debts", table: { columns: [{ label: "Account" }, { label: "Amount", right: true }, { label: "Share", right: true }], rows: inAccounts.map((a) => [a.name, money(a.income), share(a.income, inTotal)]), total: inAccounts.length ? ["Total", money(inTotal), "100%"] : undefined }, empty: "No money came in." },
-    { kind: "table", title: "Expenses", sub: "What the shop spent, against the period before", table: { columns: [{ label: "Category" }, { label: "Amount", right: true }, { label: "Before", right: true }, { label: "Change", right: true }], rows: cur.expensesByCategory.map((e) => [e.name, money(e.value), money(prevByName.get(e.name) ?? 0), expenseChange(e.name, e.value)]), total: cur.expensesByCategory.length ? ["Total", money(spent), money(prevSpent), pct(spent, prevSpent) === null ? "—" : pct(spent, prevSpent) === 0 ? "same" : `${pct(spent, prevSpent)! > 0 ? "+" : "−"}${Math.abs(pct(spent, prevSpent)!)}%`] : undefined }, empty: "Nothing was spent." },
+    { kind: "hbars", title: "What was sold", sub: "The best sellers first, after returns", rows: products.slice(0, 8).map((p) => ({ label: p.name, value: p.revenue.toNumber(), text: money(p.revenue), note: share(p.revenue, totalRev) })), empty: "Nothing was sold.", table: productsTable },
+    { kind: "donut", title: "Where the money came in", sub: "By account, paid at the sale and on debts", slices: inAccounts.map((a) => ({ label: a.name, value: a.income.toNumber(), text: money(a.income) })), centre: money(inTotal), centreSub: "money in", empty: "No money came in.", table: { columns: [{ label: "Account" }, { label: "Amount", right: true }, { label: "Share", right: true }], rows: inAccounts.map((a) => [a.name, money(a.income), share(a.income, inTotal)]), total: inAccounts.length ? ["Total", money(inTotal), "100%"] : undefined } },
+    { kind: "donut", title: "Expenses", sub: "What the shop spent, against the period before", slices: cur.expensesByCategory.map((e) => ({ label: e.name, value: e.value.toNumber(), text: money(e.value) })), centre: money(spent), centreSub: "spent", empty: "Nothing was spent.", table: { columns: [{ label: "Category" }, { label: "Amount", right: true }, { label: "Before", right: true }, { label: "Change", right: true }], rows: cur.expensesByCategory.map((e) => [e.name, money(e.value), money(prevByName.get(e.name) ?? 0), expenseChange(e.name, e.value)]), total: cur.expensesByCategory.length ? ["Total", money(spent), money(prevSpent), pct(spent, prevSpent) === null ? "—" : pct(spent, prevSpent) === 0 ? "same" : `${pct(spent, prevSpent)! > 0 ? "+" : "−"}${Math.abs(pct(spent, prevSpent)!)}%`] : undefined } },
     { kind: "table", title: "Customers", sub: "Who bought most, and what they owe now", table: { columns: [{ label: "Customer" }, { label: "Orders", right: true }, { label: "Bought", right: true }, { label: "Owes now", right: true }], rows: customersTop.map((c) => [c.name, String(Number(c.n)), money(c.v ?? 0), owedMap.get(c.id)?.gt(0) ? money(owedMap.get(c.id)!) : "—"]) }, empty: "No sales to named customers." },
     { kind: "tiles", title: "Credit and the cash count", sub: "Debts today, and how the days closed", cols: 4, tiles: [
       { label: "Owed by customers", value: money(owedNow), note: "now" },
@@ -169,7 +192,7 @@ export async function loadPeriodSheet(db: Db, locationId: string, o: { from: str
 
   const data: ReportSheetData = {
     title,
-    intro: "Sales and growth, products, money in, expenses, customers and cash.",
+    intro: "Business health, sales and growth, products, money in, expenses, customers and cash.",
     number: `RPT-${from.replaceAll("-", "")}-${to.replaceAll("-", "")}`,
     preparedAt: stamp(new Date()),
     rangeText: from === to ? dayText(from) : `${dayText(from)} to ${dayText(to)}`,

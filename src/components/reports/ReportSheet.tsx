@@ -1,4 +1,6 @@
 import type { CSSProperties } from "react";
+import type { Health } from "@/lib/reports/health";
+import { Donut, HBars, HealthBlock, LineChart, Notes } from "./charts";
 import { Change, CREAM, CREAM_LINE, DataTable, GOLD, INK, Keep, LINE, MUTED, NAVY, NAVY2, SectionTitle, SERIF, Tiles, fit, small, toneColor, type Table, type Tile } from "./EndOfDaySheet";
 
 /**
@@ -9,7 +11,12 @@ import { Change, CREAM, CREAM_LINE, DataTable, GOLD, INK, Keep, LINE, MUTED, NAV
 export type ReportSection =
   | { kind: "table"; title: string; sub?: string; table: Table; empty: string }
   | { kind: "tiles"; title: string; sub?: string; tiles: Tile[]; cols: number }
-  | { kind: "chart"; title: string; sub?: string; bars: { label: string; pct: number; highlight: boolean }[]; tiles?: Tile[] };
+  | { kind: "chart"; title: string; sub?: string; bars: { label: string; pct: number; highlight: boolean }[]; tiles?: Tile[] }
+  | { kind: "health"; title: string; sub?: string; health: Health }
+  | { kind: "notes"; title: string; sub?: string; items: { tone: "good" | "warn" | "info"; text: string; estimate?: boolean }[] }
+  | { kind: "line"; title: string; sub?: string; labels: string[]; current: number[]; previous: number[] | null; currentName: string; previousName: string; tiles?: Tile[] }
+  | { kind: "hbars"; title: string; sub?: string; rows: { label: string; value: number; text: string; note?: string }[]; empty: string; table?: Table }
+  | { kind: "donut"; title: string; sub?: string; slices: { label: string; value: number; text: string }[]; centre: string; centreSub: string; empty: string; table?: Table };
 
 export type ReportSheetData = {
   title: string;
@@ -90,6 +97,55 @@ export default function ReportSheet({ data: d }: { data: ReportSheetData }) {
                 <SectionTitle n={n} title={sec.title} sub={sec.sub} />
                 <Tiles tiles={sec.tiles} cols={sec.cols} />
               </Keep>
+            );
+          if (sec.kind === "health")
+            return (
+              <Keep key={sec.title}>
+                <SectionTitle n={n} title={sec.title} sub={sec.sub} />
+                <HealthBlock health={sec.health} />
+                <div style={{ marginTop: 12, background: CREAM, border: `1px solid ${CREAM_LINE}`, borderRadius: 6, padding: "10px 14px" }}>
+                  <div style={{ ...small, marginBottom: 5 }}>What to do next</div>
+                  {sec.health.advice.map((a, k) => (
+                    <div key={k} style={{ display: "grid", gridTemplateColumns: "20px 1fr", fontSize: 11.5, color: INK, lineHeight: 1.45, padding: "2px 0" }}>
+                      <span style={{ fontWeight: 700, color: GOLD }}>{k + 1}.</span>
+                      <span>{a}</span>
+                    </div>
+                  ))}
+                </div>
+              </Keep>
+            );
+          if (sec.kind === "notes")
+            return (
+              <div key={sec.title}>
+                <SectionTitle n={n} title={sec.title} sub={sec.sub} />
+                <Notes items={sec.items} />
+              </div>
+            );
+          if (sec.kind === "line")
+            return (
+              <Keep key={sec.title}>
+                <SectionTitle n={n} title={sec.title} sub={sec.sub} />
+                <div style={{ marginTop: 10 }}>
+                  <LineChart labels={sec.labels} current={sec.current} previous={sec.previous} currentName={sec.currentName} previousName={sec.previousName} />
+                </div>
+                {sec.tiles && <Tiles tiles={sec.tiles} cols={sec.tiles.length} />}
+              </Keep>
+            );
+          if (sec.kind === "hbars")
+            return (
+              <div key={sec.title} style={{ breakInside: "avoid" }}>
+                <SectionTitle n={n} title={sec.title} sub={sec.sub} />
+                {sec.rows.length === 0 ? <div style={{ marginTop: 10, fontSize: 12, color: MUTED }}>{sec.empty}</div> : <HBars rows={sec.rows} />}
+                {sec.table && sec.rows.length > 0 && <DataTable t={sec.table} empty={sec.empty} />}
+              </div>
+            );
+          if (sec.kind === "donut")
+            return (
+              <div key={sec.title} style={{ breakInside: "avoid" }}>
+                <SectionTitle n={n} title={sec.title} sub={sec.sub} />
+                {sec.slices.length === 0 ? <div style={{ marginTop: 10, fontSize: 12, color: MUTED }}>{sec.empty}</div> : <Donut slices={sec.slices} centre={sec.centre} centreSub={sec.centreSub} />}
+                {sec.table && sec.slices.length > 0 && <DataTable t={sec.table} empty={sec.empty} />}
+              </div>
             );
           return (
             <Keep key={sec.title}>

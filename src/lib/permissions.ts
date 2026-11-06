@@ -134,15 +134,15 @@ export type DefaultRole = {
   permissions: PermissionKey[];
 };
 
-/** The positions from the lowest to the highest, the way they are listed on screen. Anything not listed comes first. */
-export const POSITION_RANK = ["SALESPERSON", "WAREHOUSE", "SUPER_ADMIN"] as const;
+/** The three roles in the order they are listed on screen: Admin on top, then the warehouse, then the shop. */
+export const POSITION_RANK = ["SUPER_ADMIN", "WAREHOUSE", "SALESPERSON"] as const;
 export const byPositionRank = (a: { key: string }, b: { key: string }) => POSITION_RANK.indexOf(a.key as never) - POSITION_RANK.indexOf(b.key as never);
 
 export const DEFAULT_ROLES: DefaultRole[] = [
   {
     key: "SUPER_ADMIN",
-    name: "Super Admin / Owner",
-    description: "Full access to the entire system. Watches the warehouse and the shop without doing their daily jobs.",
+    name: "Admin",
+    description: "The boss. Full access to the entire system, watches the warehouse and the shop and tracks everything people do.",
     isSuperAdmin: true,
     permissions: [], // implicit: a super admin role always has every permission
   },
