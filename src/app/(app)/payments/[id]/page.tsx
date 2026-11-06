@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { notFound, redirect } from "next/navigation";
 import { Alert } from "@/components/ui";
 import PrintButton from "@/components/PrintButton";
@@ -37,9 +38,9 @@ export default async function PaymentPage({ params, searchParams }: { params: Pr
   return (
     <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link href={p.customerId ? `/customers/${p.customerId}` : "/payments"} className="text-sm text-slate-500 hover:text-navy-700">
+        <BackLink href={p.customerId ? `/customers/${p.customerId}` : "/payments"} className="py-1 text-sm text-slate-500 hover:text-navy-700">
           ← {p.customer ? p.customer.name : "Payments"}
-        </Link>
+        </BackLink>
         <PrintButton label="Print receipt" />
       </div>
       {sp.created && (

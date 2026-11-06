@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { cn } from "@/lib/utils";
 
 export function PageHeader({
@@ -15,9 +16,9 @@ export function PageHeader({
   return (
     <div className="mb-6">
       {back && (
-        <Link href={back.href} className="mb-2 inline-block text-sm text-slate-500 hover:text-navy-700">
+        <BackLink href={back.href} className="mb-2 inline-block py-1 text-sm text-slate-500 hover:text-navy-700">
           ← {back.label}
-        </Link>
+        </BackLink>
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">

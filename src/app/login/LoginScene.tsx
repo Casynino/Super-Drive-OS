@@ -27,6 +27,8 @@ const LANES = [
 export default function LoginScene() {
   return (
     <div className="ls" aria-hidden="true">
+      <span className="ls-aurora a" />
+      <span className="ls-aurora b" />
       <Powertrain />
       {DOTS.map(([l, d, s], i) => (
         <span key={i} className="ls-dot" style={vars({ "--l": l, "--d": d, "--s": s })} />

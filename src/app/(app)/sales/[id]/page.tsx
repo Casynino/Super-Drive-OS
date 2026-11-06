@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { notFound, redirect } from "next/navigation";
 import { Alert } from "@/components/ui";
 import { Prisma } from "@/generated/prisma/client";
@@ -50,9 +51,9 @@ export default async function SalePage({ params, searchParams }: { params: Promi
   return (
     <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link href="/sales" className="text-sm text-slate-500 hover:text-navy-700">
+        <BackLink href="/sales" className="py-1 text-sm text-slate-500 hover:text-navy-700">
           ← Sales history
-        </Link>
+        </BackLink>
         <div className="flex gap-2">
           {can(user, "sales.pos") && (
             <Link href="/pos" className="btn-primary">

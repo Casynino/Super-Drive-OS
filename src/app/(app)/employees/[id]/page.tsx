@@ -236,7 +236,7 @@ export default async function EmployeePage({
               {groups.length === 0 ? (
                 <p className="px-5 py-8 text-center text-sm text-slate-500">Nothing recorded yet. Signing in, opening pages and changes will show here.</p>
               ) : (
-                <div className="max-h-[40rem] overflow-y-auto">
+                <div className="md:max-h-[40rem] md:overflow-y-auto">
                   {groups.map((g) => (
                     <div key={g.day}>
                       <p className="sticky top-0 z-10 border-b border-line bg-slate-50 px-5 py-1.5 text-xs font-semibold text-slate-600">{g.label}</p>

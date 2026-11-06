@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { Printer, Search } from "lucide-react";
 import { Alert, EmptyState } from "@/components/ui";
@@ -134,9 +135,9 @@ export default async function EditProductPage({ params, searchParams }: { params
 
   return (
     <>
-      <Link href="/products" className="mb-2 inline-block text-sm text-slate-500 hover:text-navy-700">
+      <BackLink href="/products" className="mb-2 inline-block py-1 text-sm text-slate-500 hover:text-navy-700">
         ← Products
-      </Link>
+      </BackLink>
       <ProductHero
         id={product.id}
         name={product.name}

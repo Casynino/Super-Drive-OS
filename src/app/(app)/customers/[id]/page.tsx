@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Calendar, FileText, HandCoins, MapPin, MessageCircle, Pencil, Phone, ShoppingBag, Wallet } from "lucide-react";
 import { Alert } from "@/components/ui";
@@ -77,9 +78,9 @@ export default async function CustomerPage({ params, searchParams }: { params: P
 
   return (
     <>
-      <Link href="/customers" className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-900">
-        <ArrowLeft size={15} /> All customers
-      </Link>
+      <BackLink href="/customers" className="mb-3 inline-flex items-center gap-1.5 py-1 text-sm font-medium text-slate-500 hover:text-slate-900">
+        <ArrowLeft size={15} /> Back
+      </BackLink>
       <section className="card mb-5 p-4 sm:p-5">
         <div className="flex flex-wrap items-start gap-4">
           <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-navy-700 text-2xl font-bold text-white" aria-hidden>

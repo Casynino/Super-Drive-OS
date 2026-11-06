@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import BrandLogo from "@/components/BrandLogo";
 import { redirect } from "next/navigation";
-import { Boxes, HandCoins, ShieldCheck, Wallet } from "lucide-react";
+import { Boxes, HandCoins, Wallet } from "lucide-react";
 import { getSessionUser } from "@/lib/auth/session";
 import LoginForm from "./LoginForm";
 import LoginScene from "./LoginScene";
@@ -62,13 +62,8 @@ export default async function LoginPage() {
             <Logo className="h-10" />
           </div>
           <div className="ls-card ls-up w-full max-w-sm p-7 sm:p-8" style={delay(0.2)}>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Welcome back</h1>
-            <p className="mt-1.5 text-sm text-slate-500">Sign in with the username your manager gave you.</p>
+            <h1 className="ls-title text-2xl font-semibold tracking-tight text-slate-900">Sign in</h1>
             <LoginForm />
-            <p className="mt-7 flex items-start gap-2 text-xs text-slate-500">
-              <ShieldCheck size={14} className="mt-px shrink-0 text-emerald-600" />
-              Private system. Everything you do is recorded with your name.
-            </p>
           </div>
           <p className="mt-5 text-xs text-white/60">Super Drive Oil · Management System</p>
         </section>

@@ -172,7 +172,7 @@ export default async function CollectionPage({ params, searchParams }: { params:
           {events.length === 0 ? (
             <p className="px-5 py-6 text-sm text-slate-500">No activity yet.</p>
           ) : (
-            <ul className="max-h-96 divide-y divide-line overflow-y-auto">
+            <ul className="divide-y divide-line md:max-h-96 md:overflow-y-auto">
               {events.map((e) => (
                 <li key={e.id} className="px-4 py-2.5 text-sm sm:px-5">
                   <p className="flex flex-wrap items-baseline justify-between gap-2">

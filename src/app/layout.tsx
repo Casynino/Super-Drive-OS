@@ -9,12 +9,16 @@ export const metadata: Metadata = {
   title: { default: "Super Drive Oil", template: "%s · Super Drive Oil" },
   description: "Sales, inventory and distribution management for Super Drive Oil.",
   robots: { index: false, follow: false },
+  // on an iPhone or iPad "Add to Home Screen" opens it full screen, like an app
+  appleWebApp: { capable: true, title: "Super Drive", statusBarStyle: "black-translucent" },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0e3d6e",
+  viewportFit: "cover", // use the whole screen, including behind the notch; the pages keep their own safe margins
+  themeColor: "#0a1a33",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

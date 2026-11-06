@@ -38,6 +38,19 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
 
   useEffect(() => setOpen(false), [pathname]);
 
+  // Back works like in an app: remember the page you came from (see BackLink)
+  useEffect(() => {
+    try {
+      const cur = sessionStorage.getItem("sdoCur");
+      if (cur !== pathname) {
+        if (cur) sessionStorage.setItem("sdoPrev", cur);
+        sessionStorage.setItem("sdoCur", pathname);
+      }
+    } catch {
+      /* private mode: Back falls back to the parent page */
+    }
+  }, [pathname]);
+
   // The Admin can follow what everyone opens: one activity row per page (after the page has its title)
   useEffect(() => {
     const t = setTimeout(() => void trackPage(pathname, document.title.replace(/\s*·\s*Super Drive Oil$/, "")), 700);

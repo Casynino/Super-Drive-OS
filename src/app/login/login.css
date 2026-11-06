@@ -229,9 +229,65 @@
     transform: translateY(-8px);
   }
 }
+/* tablets and phones: the engine runs behind the frosted card instead of beside it */
 @container (max-width: 1179px) {
   .ls-power {
+    left: 50%;
+    top: 46%;
+    translate: -50% -50%;
+    width: min(74cqw, 60vh);
+    opacity: 0.55;
+    animation: ls-float-c 7s ease-in-out infinite;
+  }
+}
+@container (max-width: 639px) {
+  .ls-power {
+    width: min(112cqw, 54vh);
+    opacity: 0.4;
+  }
+}
+/* the in-between width has words on the left and the card on the right: no room for the engine there */
+@container (min-width: 1024px) and (max-width: 1179px) {
+  .ls-power {
     display: none;
+  }
+}
+@keyframes ls-float-c {
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* slow coloured light drifting in the sky */
+.ls-aurora {
+  position: absolute;
+  width: 62cqw;
+  height: 38cqw;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.ls-aurora.a {
+  left: -12cqw;
+  top: -14cqw;
+  background: radial-gradient(closest-side, rgba(70, 140, 230, 0.55), transparent);
+  animation: ls-aurora-a 17s ease-in-out infinite alternate;
+}
+.ls-aurora.b {
+  right: -14cqw;
+  top: 2cqw;
+  background: radial-gradient(closest-side, rgba(237, 28, 36, 0.32), rgba(253, 196, 0, 0.12) 55%, transparent);
+  animation: ls-aurora-b 21s ease-in-out infinite alternate;
+}
+@keyframes ls-aurora-a {
+  to {
+    transform: translate(16cqw, 7cqw) scale(1.15);
+  }
+}
+@keyframes ls-aurora-b {
+  to {
+    transform: translate(-14cqw, 5cqw) scale(1.2);
   }
 }
 .ls-drip {
@@ -260,17 +316,86 @@
 }
 
 /* the sign-in card floats over the scene */
+@property --ls-a {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
 .ls-card {
+  position: relative;
   border-radius: 1.25rem;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.65);
 }
 html.dark .ls-card {
-  background: rgba(7, 21, 40, 0.86);
-  border-color: rgba(255, 255, 255, 0.13);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  /* lighter and clearer, so the scene behind it shows through */
+  background: rgba(7, 21, 40, 0.58);
+  border-color: rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7), 0 0 60px -10px rgba(70, 140, 230, 0.28);
+}
+/* a thin light (oil yellow into red) travelling round the edge of the card */
+.ls-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(from var(--ls-a), transparent 0 62%, rgba(253, 196, 0, 0.95) 78%, rgba(237, 28, 36, 0.95) 90%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: ls-edge 7s linear infinite;
+  pointer-events: none;
+}
+@keyframes ls-edge {
+  to {
+    --ls-a: 360deg;
+  }
+}
+/* the Sign in button catches the light every few seconds */
+.ls-card button[type="submit"] {
+  position: relative;
+  overflow: hidden;
+}
+.ls-card button[type="submit"]::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: skewX(-20deg);
+  animation: ls-shine-btn 4.5s ease-in-out infinite 1.2s;
+  pointer-events: none;
+}
+@keyframes ls-shine-btn {
+  0% {
+    left: -60%;
+  }
+  35%,
+  100% {
+    left: 130%;
+  }
+}
+/* the title glints */
+html.dark .ls-title {
+  background: linear-gradient(90deg, #fff 0%, #fff 38%, #ffd45a 50%, #fff 62%, #fff 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ls-title 6s ease-in-out infinite;
+}
+@keyframes ls-title {
+  0% {
+    background-position: 100% 0;
+  }
+  45%,
+  100% {
+    background-position: 0 0;
+  }
 }
 
 /* content entrance */
@@ -287,8 +412,14 @@ html.dark .ls-card {
 
 @media (prefers-reduced-motion: reduce) {
   .ls *,
-  .ls-up {
+  .ls-up,
+  .ls-card::before,
+  .ls-card button[type="submit"]::after,
+  .ls-title {
     animation: none !important;
+  }
+  .ls-aurora {
+    display: none;
   }
   .ls-streak,
   .ls-dot {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import PrintButton from "@/components/PrintButton";
 import { requirePagePermission } from "@/lib/auth/guard";
@@ -30,9 +31,9 @@ export default async function StatementPage({ params, searchParams }: { params: 
     <>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3 print:hidden">
         <div>
-          <Link href={`/customers/${id}`} className="text-sm text-slate-500 hover:text-navy-700">
+          <BackLink href={`/customers/${id}`} className="py-1 text-sm text-slate-500 hover:text-navy-700">
             ← {customer.name}
-          </Link>
+          </BackLink>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Customer statement</h1>
         </div>
         <div className="flex flex-wrap items-end gap-2">

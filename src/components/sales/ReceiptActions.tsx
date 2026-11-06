@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import BackLink from "@/components/BackLink";
 import Link from "next/link";
 import { Printer } from "lucide-react";
 import { logReceiptReprint } from "@/app/(app)/sales/[id]/receipt/actions";
@@ -16,9 +17,9 @@ export default function ReceiptActions({ saleId, paper, isCopy, backHref }: { sa
   }, [isCopy, saleId]);
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
-      <Link href={backHref} className="text-sm text-slate-500 hover:text-navy-700">
+      <BackLink href={backHref} className="py-1 text-sm text-slate-500 hover:text-navy-700">
         ← Back to the sale
-      </Link>
+      </BackLink>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-lg bg-white p-0.5 ring-1 ring-line" role="group" aria-label="Paper size">
           <Link href={`/sales/${saleId}/receipt?paper=80${isCopy ? "" : "&first=1"}`} className={`rounded-md px-3 py-1.5 text-sm ${paper === "80" ? "bg-navy-700 text-white" : "text-slate-600 hover:bg-slate-50"}`}>

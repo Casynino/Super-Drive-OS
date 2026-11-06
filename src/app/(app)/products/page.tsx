@@ -243,7 +243,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           />
         </div>
       ) : view === "cards" ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {levels.map((l) => (
             <ProductLevelCard key={l.id} p={l} href={`/products/${l.id}`} showStock={canStock} mode={mode} />
           ))}
