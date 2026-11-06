@@ -189,7 +189,6 @@ export async function submitClosing(tx: Tx, input: SubmitClosingInput) {
   if (input.deposit && input.deposit.amount.trim() !== "") {
     depositAmount = parseMoney(input.deposit.amount, input.currencyDecimals);
     if (!depositAmount || depositAmount.lte(0)) fe.depositAmount = "Enter an amount above zero, or leave it empty.";
-    else if (input.deposit.bankReference.trim().length < 2) fe.bankReference = "Enter the bank's reference number from the deposit slip.";
     else if (counted && depositAmount.gt(counted)) fe.depositAmount = "You cannot deposit more than the cash you counted.";
   }
   if (Object.keys(fe).length || !counted) throw new CashError("Please fix the highlighted fields.", fe);
@@ -242,7 +241,7 @@ export async function submitClosing(tx: Tx, input: SubmitClosingInput) {
   let depositNo: string | null = null;
   if (depositAmount && input.deposit) {
     const dep = await postDeposit(tx, {
-      user: input.user, locationId: input.locationId, amount: depositAmount.toString(), bankReference: input.deposit.bankReference, notes: input.deposit.notes, slipId: input.deposit.slipId, bankAccountId: input.deposit.bankAccountId,
+      user: input.user, locationId: input.locationId, amount: depositAmount.toString(), bankReference: input.deposit.bankReference.trim() || "No reference yet", notes: input.deposit.notes, slipId: input.deposit.slipId, bankAccountId: input.deposit.bankAccountId,
       submissionKey: `${input.submissionKey}:deposit`, currencyDecimals: input.currencyDecimals, closingId: closing.id,
     });
     depositNo = dep.depositNo;

@@ -66,18 +66,20 @@ export async function loadDaySheet(db: Db, closingId: string, o: { seeProfit: bo
   const balance = (m: "MOBILE_MONEY" | "BANK") => dec(summary.accounts.find((a) => a.method === m)?.balance);
   const mobile = balance("MOBILE_MONEY");
   const bank = balance("BANK").plus(banked);
-  const profit = o.seeProfit ? today.profit : null;
+  // what was spent that day (by the expense's own date): one figure for the strip, the table and the profit
+  const spent = today.expensesByCategory.reduce((t, e) => t.plus(e.value), new D(0));
+  const profit = o.seeProfit ? { gross: today.profit.gross, net: today.profit.gross.minus(spent), marginPct: today.profit.sales.gt(0) ? today.profit.gross.minus(spent).div(today.profit.sales).mul(100).toNumber() : 0 } : null;
   const diff = c.difference;
   const net = diff.plus(correctedBy);
 
   const strip: Tile[] = [
     { label: "Sold", value: money(today.sales.total), note: `${today.sales.count} sale${today.sales.count === 1 ? "" : "s"}${today.sales.creditGiven.gt(0) ? ` · ${money(today.sales.creditGiven)} on credit` : ""}`, change: pct(that, avg7) },
     { label: "Money received", value: money(today.money.income), note: `${today.money.payments} payment${today.money.payments === 1 ? "" : "s"}` },
-    { label: "Expenses", value: money(today.money.expenses), note: `${today.expensesByCategory.length} categor${today.expensesByCategory.length === 1 ? "y" : "ies"}` },
+    { label: "Expenses", value: money(spent), note: `${today.expensesByCategory.length} categor${today.expensesByCategory.length === 1 ? "y" : "ies"}` },
     profit
       ? { label: profit.net.lt(0) ? "Loss" : "Profit", value: money(profit.net.abs()), note: `${profit.marginPct.toFixed(1)}% of sales`, tone: profit.net.lt(0) ? "red" : "green" }
       : { label: "On credit", value: money(today.sales.creditGiven), note: "not paid yet" },
-    { label: "Cash count", value: net.isZero() ? (correctedBy.isZero() ? "Correct" : "Corrected") : `${net.lt(0) ? "Short" : "Extra"} ${money(net.abs())}`, note: correctedBy.isZero() ? `Counted ${money(c.countedCash)}` : `Was ${diff.lt(0) ? "short" : "extra"} ${money(diff.abs())} at closing`, tone: net.isZero() ? "green" : net.lt(0) ? "red" : "plain" },
+    { label: "Cash count", value: net.isZero() ? "OK" : `${net.lt(0) ? "−" : "+"} ${money(net.abs())}`, note: correctedBy.isZero() ? `Counted ${money(c.countedCash)}` : `Corrected: was ${diff.lt(0) ? "−" : "+"} ${money(diff.abs())}`, tone: net.isZero() ? "green" : net.lt(0) ? "red" : "plain" },
     { label: "Banked", value: money(banked), note: `${money(tillLeft)} stays in the till` },
   ];
 
@@ -109,7 +111,7 @@ export async function loadDaySheet(db: Db, closingId: string, o: { seeProfit: bo
     ...(n(sc.corrections).isZero() ? [] : [{ sign: (n(sc.corrections).lt(0) ? "−" : "+") as "+" | "−", label: "Corrections by the owner", value: money(n(sc.corrections).abs()) }]),
     { sign: "=", label: "Should be in the till", value: money(c.expectedCash), strong: true },
     { label: "Counted", value: money(c.countedCash), strong: true },
-    { label: "Difference", value: diff.isZero() ? "None" : `${diff.lt(0) ? "Short" : "Extra"} ${money(diff.abs())}`, strong: true, tone: diff.isZero() ? "green" : diff.lt(0) ? "red" : undefined },
+    { label: "Difference", value: diff.isZero() ? "OK" : `${diff.lt(0) ? "−" : "+"} ${money(diff.abs())}`, strong: true, tone: diff.isZero() ? "green" : diff.lt(0) ? "red" : undefined },
     { label: "Taken to the bank", value: money(banked) },
     { label: "Left in the till (closing balance)", value: money(c.cashCarried), strong: true },
   ];
@@ -139,7 +141,7 @@ export async function loadDaySheet(db: Db, closingId: string, o: { seeProfit: bo
     strip,
     products: productsTable,
     accounts: { columns: [{ label: "Account" }, { label: "Amount", right: true }, { label: "Share", right: true }], rows: inAccounts.map((a) => [a.name, money(a.income), share(a.income, inTotal)]), total: inAccounts.length ? ["Total", money(inTotal), "100%"] : undefined },
-    expenses: { columns: [{ label: "Category" }, { label: "Amount", right: true }, { label: "Share", right: true }], rows: today.expensesByCategory.map((e) => [e.name, money(e.value), share(e.value, today.money.expenses)]), total: today.expensesByCategory.length ? ["Total", money(today.money.expenses), "100%"] : undefined },
+    expenses: { columns: [{ label: "Category" }, { label: "Amount", right: true }, { label: "Share", right: true }], rows: today.expensesByCategory.map((e) => [e.name, money(e.value), share(e.value, spent)]), total: today.expensesByCategory.length ? ["Total", money(spent), "100%"] : undefined },
     cash: cashRows,
     money: [
       { label: "In the till (cash)", value: money(tillLeft), note: banked.gt(0) ? `after ${money(banked)} went to the bank` : "nothing was banked" },

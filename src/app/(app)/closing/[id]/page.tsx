@@ -39,7 +39,8 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
   const [perDay, alerts] = await Promise.all([getSalesPerDay(db, c.locationId, shiftDay(day, -62), day), getStockAlerts(db)]);
   // the day's sales, money and profit come from the records of that day; the cash count, deposit and corrections below are the locked closing
   const today = await getPeriodStats(db, c.locationId, day, day);
-  const profit = seeProfit ? today.profit : null;
+  const spentDay = today.expensesByCategory.reduce((t, e) => t.plus(e.value), new D(0));
+  const profit = seeProfit ? { gross: today.profit.gross, net: today.profit.gross.minus(spentDay), marginPct: today.profit.sales.gt(0) ? today.profit.gross.minus(spentDay).div(today.profit.sales).mul(100).toNumber() : 0 } : null;
   const corrections = await db.cashTransaction.findMany({ where: { type: "ADJUSTMENT", referenceType: "Manual", referenceNo: c.closingNo, account: { locationId: c.locationId, method: "CASH" } }, orderBy: { createdAt: "asc" }, include: { user: { select: { name: true } } } });
   const correctedBy = corrections.reduce((t, x) => t.plus(x.amount), new D(0));
   const into = deposits.length ? await db.cashTransaction.findMany({ where: { type: "DEPOSIT_IN", referenceType: "BankDeposit", referenceId: { in: deposits.map((d) => d.id) } }, select: { referenceId: true, account: { select: { name: true, accountNumber: true } } } }) : [];
@@ -107,8 +108,8 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
       <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))]">
         <KpiCard icon={Receipt} tone="navy" label="Sold" value={money(today.sales.total)} hint={`${today.sales.count} sale${today.sales.count === 1 ? "" : "s"}${today.sales.creditGiven.gt(0) ? ` · ${money(today.sales.creditGiven)} on credit` : ""}`} />
         <KpiCard icon={Banknote} tone="green" label="Money received" value={money(today.money.income)} hint={`${today.money.payments} payment${today.money.payments === 1 ? "" : "s"} · at the sale and on debts`} />
-        <KpiCard icon={ReceiptText} tone="red" label="Spent on expenses" value={money(today.money.expenses)} hint={`${today.expensesByCategory.length} categor${today.expensesByCategory.length === 1 ? "y" : "ies"}`} />
-        {profit && <KpiCard icon={TrendingUp} tone={profit.net.lt(0) ? "red" : "green"} label={profit.net.lt(0) ? "Loss" : "Profit"} value={money(profit.net.abs())} badge={`${profit.marginPct.toFixed(1)}% of sales`} hint={`Sales profit ${money(profit.gross)} − expenses ${money(today.money.expenses)}`} />}
+        <KpiCard icon={ReceiptText} tone="red" label="Spent on expenses" value={money(spentDay)} hint={`${today.expensesByCategory.length} categor${today.expensesByCategory.length === 1 ? "y" : "ies"}`} />
+        {profit && <KpiCard icon={TrendingUp} tone={profit.net.lt(0) ? "red" : "green"} label={profit.net.lt(0) ? "Loss" : "Profit"} value={money(profit.net.abs())} badge={`${profit.marginPct.toFixed(1)}% of sales`} hint={`Sales profit ${money(profit.gross)} − expenses ${money(spentDay)}`} />}
         {(() => {
           const net = c.countedCash.plus(correctedBy).minus(c.expectedCash);
           const fixed = !correctedBy.isZero();

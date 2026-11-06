@@ -57,8 +57,9 @@ export default function ClosingForm({
   const v = state.values ?? {};
   const bankable = canDeposit && bankAccounts.length > 0;
   const [counted, setCounted] = useState(v.countedCash ?? "");
-  const [deposit, setDeposit] = useState(v.depositAmount ?? "");
-  const [bank, setBank] = useState(bankable);
+  // closing banks what was counted, all of it, by default; the person can keep some back or not bank today
+  const [mode, setMode] = useState<"all" | "some" | "none">(bankable ? "all" : "none");
+  const [keep, setKeep] = useState("");
   const [account, setAccount] = useState(v.bankAccountId ?? bankAccounts[0]?.id ?? "");
   const [sure, setSure] = useState(false);
 
@@ -66,9 +67,10 @@ export default function ClosingForm({
   const exp = Number(expected);
   const c = num(counted);
   const diff = c === null ? null : c - exp;
-  const dep = bank ? num(deposit) ?? 0 : 0;
+  const keepN = mode === "some" ? num(keep) ?? 0 : 0;
+  const dep = c === null || mode === "none" ? 0 : Math.max(c - keepN, 0);
   const left = c === null ? null : c - dep;
-  const tooMuch = c !== null && dep > c;
+  const tooMuch = mode === "some" && c !== null && keepN > c;
   const picked = bankAccounts.find((a) => a.id === account);
   const ready = c !== null && sure && !tooMuch;
 
@@ -99,31 +101,26 @@ export default function ClosingForm({
       </Step>
 
       {canDeposit && (
-        <Step n={2} title="Take cash to the bank">
+        <Step n={2} title="Bank the money">
           {bankAccounts.length === 0 ? (
             <p className="mt-1 text-sm text-slate-500">There is no bank account yet. The owner adds one in Accounts.</p>
           ) : (
             <>
-              <div className="mt-2 inline-flex rounded-xl border border-line bg-slate-50 p-1 text-sm font-medium" role="group" aria-label="Bank some cash?">
-                <button type="button" onClick={() => setBank(true)} aria-pressed={bank} className={cn("inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition", bank ? "bg-navy-700 text-white shadow-sm" : "text-slate-600 hover:text-slate-900")}>
-                  <Landmark size={15} /> Bank some cash
-                </button>
-                <button type="button" onClick={() => setBank(false)} aria-pressed={!bank} className={cn("inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition", !bank ? "bg-navy-700 text-white shadow-sm" : "text-slate-600 hover:text-slate-900")}>
-                  <Banknote size={15} /> Keep it all in the till
-                </button>
+              <div className="mt-2 inline-flex flex-wrap rounded-xl border border-line bg-slate-50 p-1 text-sm font-medium" role="group" aria-label="How much to bank">
+                {([["all", "Bank it all", Landmark], ["some", "Keep some", Banknote], ["none", "Don't bank", Banknote]] as const).map(([k, label, Icon]) => (
+                  <button key={k} type="button" onClick={() => setMode(k)} aria-pressed={mode === k} className={cn("inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition", mode === k ? "bg-navy-700 text-white shadow-sm" : "text-slate-600 hover:text-slate-900")}>
+                    <Icon size={15} /> {label}
+                  </button>
+                ))}
               </div>
-              {bank && (
+              {mode !== "none" && (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Field label="Amount to bank" name="depositAmount" id={id("dep")} error={fe.depositAmount}>
-                    <div className="flex gap-2">
-                      <input id={id("dep")} name="depositAmount" inputMode="numeric" autoComplete="off" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="0" className={cn(inputClass(fe.depositAmount), "h-11 text-lg font-semibold tabular-nums")} />
-                      {c !== null && c > 0 && (
-                        <button type="button" className="btn-secondary shrink-0" onClick={() => setDeposit(String(c))}>
-                          All
-                        </button>
-                      )}
-                    </div>
-                  </Field>
+                  {dep > 0 && <input type="hidden" name="depositAmount" value={String(dep)} />}
+                  {mode === "some" && (
+                    <Field label="Keep in the till" name="keep" id={id("keep")}>
+                      <input id={id("keep")} inputMode="numeric" autoComplete="off" value={keep} onChange={(e) => setKeep(e.target.value)} placeholder="0" className={cn(inputClass(), "h-11 text-lg font-semibold tabular-nums")} />
+                    </Field>
+                  )}
                   <Field label="Into which account" name="bankAccountId" id={id("bank")} error={fe.bankAccountId}>
                     <select id={id("bank")} name="bankAccountId" value={account} onChange={(e) => setAccount(e.target.value)} className={cn(inputClass(fe.bankAccountId), "h-11")}>
                       {bankAccounts.map((a) => (
@@ -134,30 +131,36 @@ export default function ClosingForm({
                       ))}
                     </select>
                   </Field>
-                  <Field label="Reference from the slip" name="bankReference" id={id("ref")} error={fe.bankReference}>
+                  <Field label="Slip reference (optional)" name="bankReference" id={id("ref")} error={fe.bankReference}>
                     <input id={id("ref")} name="bankReference" autoComplete="off" defaultValue={v.bankReference ?? ""} className={cn(inputClass(fe.bankReference), "h-11")} />
                   </Field>
-                  <Field label="Photo of the slip" name="slip" id={id("slip")} error={fe.slip}>
+                  <Field label="Photo of the slip (optional)" name="slip" id={id("slip")} error={fe.slip}>
                     <label htmlFor={id("slip")} className="flex h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 text-sm text-slate-600 hover:border-navy-300 hover:bg-navy-50">
                       <Camera size={16} className="shrink-0" />
                       <input id={id("slip")} type="file" name="slip" accept="image/*" className="w-full min-w-0 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1 file:text-sm file:font-medium" />
                     </label>
                   </Field>
-                  {tooMuch ? (
-                    <p className="rounded-lg bg-brand-red-soft px-3 py-2 text-sm font-medium text-brand-red-dark sm:col-span-2">You cannot bank more than you counted.</p>
-                  ) : (
-                    dep > 0 && (
-                      <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900 sm:col-span-2">
-                        <strong>{money(dep)}</strong> goes into {picked?.name ?? "the bank"}
-                        {left !== null && (
-                          <>
-                            {" "}· <strong>{money(left)}</strong> stays in the till
-                          </>
-                        )}
-                      </p>
-                    )
-                  )}
                 </div>
+              )}
+              {tooMuch ? (
+                <p className="mt-3 rounded-lg bg-brand-red-soft px-3 py-2 text-sm font-medium text-brand-red-dark">You cannot keep more than you counted.</p>
+              ) : (
+                <p className={cn("mt-3 rounded-lg px-3 py-2 text-sm", mode === "none" ? "bg-slate-50 text-slate-600" : "bg-emerald-50 text-emerald-900")}>
+                  {mode === "none" ? (
+                    "Nothing goes to the bank. The counted cash stays in the till."
+                  ) : c === null ? (
+                    "Count the cash first. All of it goes into the bank account you choose."
+                  ) : (
+                    <>
+                      <strong>{money(dep)}</strong> goes into {picked?.name ?? "the bank"}
+                      {left !== null && left > 0 && (
+                        <>
+                          {" "}· <strong>{money(left)}</strong> stays in the till
+                        </>
+                      )}
+                    </>
+                  )}
+                </p>
               )}
             </>
           )}

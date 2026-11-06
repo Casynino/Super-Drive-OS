@@ -47,6 +47,7 @@ const RED = "#c0141b";
 const SERIF = "Georgia, 'Times New Roman', serif";
 
 const toneColor = (t?: "red" | "green" | "plain") => (t === "red" ? RED : t === "green" ? GREEN : INK);
+const fit = (v: string, base: number) => (v.length > 15 ? base - 3 : v.length > 12 ? base - 1.5 : base);
 const small: CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED };
 
 function Change({ value }: { value?: number | null }) {
@@ -65,7 +66,7 @@ function Keep({ children }: { children: React.ReactNode }) {
 
 function SectionTitle({ n, title, sub }: { n: string; title: string; sub?: string }) {
   return (
-    <div style={{ marginTop: 22, paddingBottom: 7, borderBottom: `1px solid ${LINE}`, breakAfter: "avoid" }}>
+    <div style={{ marginTop: 18, paddingBottom: 6, borderBottom: `1px solid ${LINE}`, breakAfter: "avoid" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
         <span style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11, color: GOLD_TEXT, fontWeight: 700 }}>{n}</span>
         <span style={{ fontSize: 17, fontWeight: 700, color: INK }}>{title}</span>
@@ -77,7 +78,7 @@ function SectionTitle({ n, title, sub }: { n: string; title: string; sub?: strin
 
 function DataTable({ t, empty }: { t: Table; empty: string }) {
   if (t.rows.length === 0) return <p style={{ margin: "12px 0 0", fontSize: 13, color: MUTED }}>{empty}</p>;
-  const cell = (right?: boolean): CSSProperties => ({ padding: "7px 10px", fontSize: 12, textAlign: right ? "right" : "left", color: INK, fontVariantNumeric: "tabular-nums" });
+  const cell = (right?: boolean): CSSProperties => ({ padding: "6px 10px", fontSize: 12, textAlign: right ? "right" : "left", color: INK, fontVariantNumeric: "tabular-nums" });
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
       <thead>
@@ -117,9 +118,9 @@ function Tiles({ tiles, cols }: { tiles: Tile[]; cols: number }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 10, marginTop: 12 }}>
       {tiles.map((t) => (
-        <div key={t.label} style={{ background: CREAM, border: `1px solid ${CREAM_LINE}`, borderRadius: 14, padding: "11px 12px", breakInside: "avoid" }}>
+        <div key={t.label} style={{ background: CREAM, border: `1px solid ${CREAM_LINE}`, borderRadius: 14, padding: "10px 12px", breakInside: "avoid" }}>
           <div style={small}>{t.label}</div>
-          <div style={{ marginTop: 5, fontSize: 15, fontWeight: 700, whiteSpace: "nowrap", color: toneColor(t.tone), fontVariantNumeric: "tabular-nums" }}>
+          <div style={{ marginTop: 5, fontSize: fit(t.value, 15), fontWeight: 700, whiteSpace: "nowrap", color: toneColor(t.tone), fontVariantNumeric: "tabular-nums" }}>
             {t.value}
           </div>
           {t.change !== undefined && t.change !== null && (
@@ -174,7 +175,7 @@ export default function EndOfDaySheet({ data: d }: { data: DaySheetData }) {
         {d.strip.map((t, i) => (
           <div key={t.label} style={{ padding: "13px 12px", borderLeft: i === 0 ? "none" : `1px solid ${LINE}`, minWidth: 0 }}>
             <div style={small}>{t.label}</div>
-            <div style={{ marginTop: 5, fontSize: 14, fontWeight: 700, color: toneColor(t.tone), fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{t.value}</div>
+            <div style={{ marginTop: 5, fontSize: fit(t.value, 14), fontWeight: 700, color: toneColor(t.tone), fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{t.value}</div>
             {t.change !== undefined && t.change !== null && (
               <div style={{ marginTop: 3 }}>
                 <Change value={t.change} />
@@ -185,7 +186,7 @@ export default function EndOfDaySheet({ data: d }: { data: DaySheetData }) {
         ))}
       </div>
 
-      <div style={{ padding: "0 32px 30px" }}>
+      <div style={{ padding: "0 32px 22px" }}>
         <SectionTitle n="01" title="What was sold" sub="Each product, after returns" />
         <DataTable t={d.products} empty="Nothing was sold." />
 
@@ -221,16 +222,12 @@ export default function EndOfDaySheet({ data: d }: { data: DaySheetData }) {
         </Keep>
 
         <Keep>
-        <SectionTitle n="05" title="Where the money was when the day closed" />
+        <SectionTitle n="05" title="Where the money is" sub="When the day closed, and what went to the bank" />
         <Tiles tiles={d.money} cols={4} />
-        </Keep>
-
-        <Keep>
-        <SectionTitle n="06" title="Taken to the bank" />
         {d.deposit.empty ? (
-          <p style={{ margin: "12px 0 0", fontSize: 13, color: MUTED }}>{d.deposit.empty}</p>
+          <p style={{ margin: "12px 0 0", fontSize: 12.5, color: MUTED }}>{d.deposit.empty}</p>
         ) : (
-          <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginTop: 12, breakInside: "avoid" }}>
+          <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginTop: 14, breakInside: "avoid" }}>
             {d.deposit.slipSrc && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={d.deposit.slipSrc} alt="Deposit slip" style={{ height: 110, width: "auto", borderRadius: 8, border: `1px solid ${LINE}` }} />
@@ -249,8 +246,9 @@ export default function EndOfDaySheet({ data: d }: { data: DaySheetData }) {
         )}
         </Keep>
 
+
         <Keep>
-        <SectionTitle n="07" title="How this day compares" sub="Sales of the last 14 days, this day in yellow" />
+        <SectionTitle n="06" title="How this day compares" sub="Sales of the last 14 days, this day in yellow" />
         <div style={{ display: "flex", alignItems: "flex-end", gap: 5, height: 96, marginTop: 12, borderBottom: `1px solid ${LINE}` }}>
           {d.compare.bars.map((b) => (
             <div key={b.label} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%" }}>
@@ -269,13 +267,13 @@ export default function EndOfDaySheet({ data: d }: { data: DaySheetData }) {
         </Keep>
 
         <Keep>
-        <SectionTitle n="08" title="Stock to watch" sub="Products that are out or below their minimum" />
+        <SectionTitle n="07" title="Stock to watch" sub="Products that are out or below their minimum" />
         <DataTable t={d.stock} empty="Every product is above its minimum." />
         </Keep>
 
         {d.corrections && (
           <>
-            <SectionTitle n="09" title="Corrections after closing" sub="Made by the owner, with the reason" />
+            <SectionTitle n="08" title="Corrections after closing" sub="Made by the owner, with the reason" />
             <DataTable t={d.corrections} empty="" />
           </>
         )}
@@ -288,7 +286,7 @@ export default function EndOfDaySheet({ data: d }: { data: DaySheetData }) {
       </div>
 
       {/* signatures */}
-      <div style={{ background: CREAM, borderTop: `1px solid ${CREAM_LINE}`, padding: "20px 32px 16px", breakInside: "avoid" }}>
+      <div style={{ background: CREAM, borderTop: `1px solid ${CREAM_LINE}`, padding: "16px 32px 12px", breakInside: "avoid" }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: INK }}>
           {d.signatures.preparedBy} <span style={{ fontWeight: 400, color: MUTED }}>· {d.signatures.preparedRole}</span>
         </div>

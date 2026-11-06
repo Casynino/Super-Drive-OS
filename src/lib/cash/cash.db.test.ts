@@ -353,6 +353,18 @@ describe("daily closing", () => {
     expect(await balance(s, "CASH")).toBe("150000");
   });
 
+  it("closing can bank everything that was counted, even when it is short, with no slip reference yet", async () => {
+    const s = await shop();
+    await manual(s, "CASH", "OPENING", "300000");
+    const r = await close(s, "295000", { deposit: { amount: "295000", bankReference: "", notes: null, slipId: null } }); // 5,000 short
+    expect(r.difference.toString()).toBe("-5000");
+    expect([r.closing.depositedNow.toString(), r.closing.cashCarried.toString()]).toEqual(["295000", "0"]);
+    expect(await balance(s, "CASH")).toBe("0"); // the whole count went to the bank: tomorrow starts at zero
+    expect(await balance(s, "BANK")).toBe("295000");
+    const dep = await db.bankDeposit.findFirstOrThrow({ where: { closingId: r.closing.id } });
+    expect(dep.bankReference).toBe("No reference yet");
+  });
+
   it("part of the counted cash can be deposited as part of the closing; the rest stays as cash on hand", async () => {
     const s = await shop();
     await manual(s, "CASH", "OPENING", "300000");

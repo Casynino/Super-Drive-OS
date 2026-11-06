@@ -222,7 +222,6 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                     <th className="hidden 2xl:table-cell">Closing</th>
                     <th className="hidden text-right md:table-cell">Sold</th>
                     <th className="text-right">Expected</th>
-                    <th className="text-right">Counted</th>
                     <th>Difference</th>
                     <th className="hidden text-right xl:table-cell">Banked</th>
                     <th className="hidden 2xl:table-cell">By</th>
@@ -241,7 +240,6 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                       <td className="hidden whitespace-nowrap text-slate-500 2xl:table-cell">{c.closingNo}</td>
                       <td className="hidden text-right tabular-nums md:table-cell">{money(soldOf(c))}</td>
                       <td className="text-right tabular-nums">{money(c.expectedCash)}</td>
-                      <td className="text-right tabular-nums">{money(c.countedCash)}</td>
                       <td>
                         {(() => {
                           const corr = corrOf.get(c.closingNo) ?? new Prisma.Decimal(0);
