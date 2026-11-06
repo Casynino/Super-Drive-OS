@@ -427,6 +427,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   return (
                     <tr key={p.id}>
                       <td>
+                        {/* the whole product cell opens the product, one press */}
+                        <Wrap href={canOpenProduct ? `/products/${p.id}` : null}>
                         <div className="flex items-center gap-3">
                           <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
                             {p.image ? (
@@ -441,6 +443,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                             <span className="block text-xs text-slate-500">{p.sku}</span>
                           </span>
                         </div>
+                        </Wrap>
                       </td>
                       <td className="hidden text-slate-600 sm:table-cell">{p.category.name}</td>
                       <td className="text-right">
@@ -533,5 +536,16 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </div>
       )}
     </>
+  );
+}
+
+/** A link around its content when the person may open the page; otherwise just the content. */
+function Wrap({ href, children }: { href: string | null; children: React.ReactNode }) {
+  return href ? (
+    <Link href={href} className="block rounded-lg hover:text-navy-700">
+      {children}
+    </Link>
+  ) : (
+    <>{children}</>
   );
 }
