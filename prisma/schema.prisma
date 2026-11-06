@@ -111,6 +111,13 @@ model User {
   resellerReturns     ResellerReturn[]
   supplierPayments    SupplierPayment[]
   issuesDecided       ShipmentIssueDecision[] @relation("IssueDecider")
+  pickupsCreated      PickupNote[]            @relation("PickupCreator")
+  pickupsStarted      PickupNote[]            @relation("PickupStarter")
+  pickupsReady        PickupNote[]            @relation("PickupReadier")
+  pickupsCompleted    PickupNote[]            @relation("PickupCompleter")
+  pickupsCancelled    PickupNote[]            @relation("PickupCanceller")
+  pickupReleases      PickupRelease[]
+  warehouseEvents     WarehouseEvent[]
 
   @@index([roleId])
 }
@@ -139,9 +146,13 @@ model Location {
   address   String?
   isDefault Boolean      @default(false)
   status    RecordStatus @default(ACTIVE)
+  // true = sales from this location RESERVE the stock and make a pickup note; the stock leaves only when the goods are released (Store Warehouse)
+  pickupRequired Boolean  @default(false)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
+  pickupNotes         PickupNote[]
+  warehouseEvents     WarehouseEvent[]
   balances            StockBalance[]
   movements           StockMovement[]
   receipts            StockReceipt[]
@@ -259,6 +270,9 @@ model Product {
   items                 InventoryItem[]
   issueDecisions        ShipmentIssueDecision[]
   issueVariantOf        ShipmentIssueDecision[] @relation("IssueVariant")
+  pickupItems           PickupNoteItem[]
+  pickupReleaseItems    PickupReleaseItem[]
+  warehouseEvents       WarehouseEvent[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -362,7 +376,8 @@ model StockBalance {
   product    Product  @relation(fields: [productId], references: [id])
   locationId String
   location   Location @relation(fields: [locationId], references: [id])
-  quantity   Decimal  @default(0) @db.Decimal(14, 3)
+  quantity   Decimal  @default(0) @db.Decimal(14, 3) // physical stock
+  reserved   Decimal  @default(0) @db.Decimal(14, 3) // sold, waiting to be collected (still physically here). Available = quantity - reserved
   updatedAt  DateTime @updatedAt
 
   @@id([productId, locationId])
@@ -599,6 +614,7 @@ model Sale {
   items                 SaleItem[]
   allocations           PaymentAllocation[]
   reversals             SaleReversal[]
+  pickupNote            PickupNote?
 
   @@index([createdAt])
   @@index([customerId, status])
@@ -626,6 +642,7 @@ model SaleItem {
   unitCost      Decimal        @db.Decimal(16, 4) // average cost per base unit at sale time
   costTotal     Decimal        @db.Decimal(14, 2)
   reversalItems ReversalItem[]
+  pickupItem    PickupNoteItem?
 
   @@index([saleId])
   @@index([productId])
@@ -1441,4 +1458,143 @@ model ItemMovement {
   createdAt      DateTime      @default(now())
 
   @@index([itemId, createdAt])
+}
+
+
+// ───────────── Store Warehouse: reservations, pickup notes, collection ─────────────
+
+enum PickupStatus {
+  NEW // sold, waiting for the warehouse
+  PREPARING // the attendant started picking the goods
+  READY // goods set aside, waiting to be collected
+  PARTIAL // some goods collected, the rest is still reserved
+  COMPLETED // everything collected (terminal)
+  CANCELLED // sale cancelled before anything was collected (terminal)
+}
+
+enum PickupAuth {
+  PAID // fully paid
+  PART_PAID // part paid, the rest on authorised credit
+  CREDIT_APPROVED // on credit that passed the credit rules (limit or approved exception)
+}
+
+// The document that lets goods leave the warehouse. One per sale made from a pickup location. The QR code carries only `token`;
+// everything else is looked up on the server after the scan.
+model PickupNote {
+  id            String       @id @default(cuid())
+  noteNo        String       @unique // PU-2026-000125
+  token         String       @unique // random, not guessable; QR text is SDOPU:<token>
+  saleId        String       @unique
+  sale          Sale         @relation(fields: [saleId], references: [id])
+  locationId    String
+  location      Location     @relation(fields: [locationId], references: [id])
+  status        PickupStatus @default(NEW)
+  auth          PickupAuth
+  createdById   String
+  createdBy     User         @relation("PickupCreator", fields: [createdById], references: [id])
+  createdAt     DateTime     @default(now())
+  startedById   String?
+  startedBy     User?        @relation("PickupStarter", fields: [startedById], references: [id])
+  startedAt     DateTime?
+  readyById     String?
+  readyBy       User?        @relation("PickupReadier", fields: [readyById], references: [id])
+  readyAt       DateTime?
+  completedById String?
+  completedBy   User?        @relation("PickupCompleter", fields: [completedById], references: [id])
+  completedAt   DateTime?
+  cancelledById String?
+  cancelledBy   User?        @relation("PickupCanceller", fields: [cancelledById], references: [id])
+  cancelledAt   DateTime?
+  cancelReason  String?
+  items         PickupNoteItem[]
+  releases      PickupRelease[]
+  events        WarehouseEvent[]
+
+  @@index([status, createdAt])
+  @@index([locationId, status])
+  @@index([createdAt])
+}
+
+// One line of a pickup note = one invoice line. Reserved = quantity - releasedQty - cancelledQty (all in base units).
+model PickupNoteItem {
+  id           String     @id @default(cuid())
+  noteId       String
+  note         PickupNote @relation(fields: [noteId], references: [id])
+  saleItemId   String     @unique
+  saleItem     SaleItem   @relation(fields: [saleItemId], references: [id])
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id])
+  quantity     Decimal    @db.Decimal(14, 3)
+  releasedQty  Decimal    @default(0) @db.Decimal(14, 3)
+  cancelledQty Decimal    @default(0) @db.Decimal(14, 3) // reservation given back because the sale was cancelled / returned before collection
+  releaseItems PickupReleaseItem[]
+
+  @@index([noteId])
+  @@index([productId])
+}
+
+// A goods collection record: who released what, when. Append-only (database trigger).
+model PickupRelease {
+  id            String     @id @default(cuid())
+  releaseNo     String     @unique // COL-2026-000001
+  noteId        String
+  note          PickupNote @relation(fields: [noteId], references: [id])
+  releasedById  String
+  releasedBy    User       @relation(fields: [releasedById], references: [id])
+  collectedBy   String? // who took the goods (name), optional
+  remark        String?
+  submissionKey String     @unique // blocks a double submit
+  createdAt     DateTime   @default(now())
+  items         PickupReleaseItem[]
+
+  @@index([noteId])
+  @@index([releasedById, createdAt])
+}
+
+model PickupReleaseItem {
+  id         String         @id @default(cuid())
+  releaseId  String
+  release    PickupRelease  @relation(fields: [releaseId], references: [id])
+  noteItemId String
+  noteItem   PickupNoteItem @relation(fields: [noteItemId], references: [id])
+  productId  String
+  product    Product        @relation(fields: [productId], references: [id])
+  quantity   Decimal        @db.Decimal(14, 3)
+
+  @@index([releaseId])
+  @@index([noteItemId])
+}
+
+enum WarehouseEventType {
+  RESERVED // stock set aside for a sale
+  PREPARING // attendant started picking
+  READY // goods set aside for collection
+  RELEASED // goods handed over, physical stock deducted
+  RESERVATION_FREED // reservation given back (sale cancelled or returned before collection)
+  SCAN_REJECTED // a pickup note was refused at the scanner
+}
+
+// The warehouse activity log. Append-only (database trigger). Stock quantities themselves are in StockMovement; this records
+// the reservation side (previous / new reserved) and who did what at the warehouse.
+model WarehouseEvent {
+  id               String             @id @default(cuid())
+  type             WarehouseEventType
+  locationId       String?
+  location         Location?          @relation(fields: [locationId], references: [id])
+  productId        String?
+  product          Product?           @relation(fields: [productId], references: [id])
+  quantity         Decimal?           @db.Decimal(14, 3)
+  previousReserved Decimal?           @db.Decimal(14, 3)
+  newReserved      Decimal?           @db.Decimal(14, 3)
+  pickupNoteId     String?
+  pickupNote       PickupNote?        @relation(fields: [pickupNoteId], references: [id])
+  detail           String?
+  userId           String
+  user             User               @relation(fields: [userId], references: [id])
+  createdAt        DateTime           @default(now())
+
+  @@index([pickupNoteId, createdAt])
+  @@index([type, createdAt])
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }

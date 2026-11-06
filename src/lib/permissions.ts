@@ -53,6 +53,10 @@ export const PERMISSIONS = [
   { key: "shipments.manage", module: "Shipments", label: "Announce incoming shipments and investigate problems" },
   { key: "shipments.receive", module: "Shipments", label: "Count and confirm incoming shipments" },
 
+  // Store Warehouse
+  { key: "warehouse.view", module: "Warehouse", label: "See the Store Warehouse overview, collections, history and who did what" },
+  { key: "warehouse.operate", module: "Warehouse", label: "Prepare orders, scan pickup notes and release goods" },
+
   // Purchasing & suppliers
   { key: "purchasing.view", module: "Purchasing", label: "View purchase orders" },
   { key: "purchasing.create", module: "Purchasing", label: "Create purchase orders" },
@@ -117,6 +121,7 @@ export const SHOP_FLOOR_PERMISSIONS: ReadonlySet<string> = new Set<PermissionKey
   "closing.submit",
   "deposits.record",
   "resellers.operate",
+  "warehouse.operate",
 ]);
 
 export const PERMISSION_KEYS: readonly string[] = PERMISSIONS.map((p) => p.key);
@@ -129,56 +134,36 @@ export type DefaultRole = {
   permissions: PermissionKey[];
 };
 
+/** The positions from the lowest to the highest, the way they are listed on screen. Anything not listed comes first. */
+export const POSITION_RANK = ["SALESPERSON", "WAREHOUSE", "SUPER_ADMIN"] as const;
+export const byPositionRank = (a: { key: string }, b: { key: string }) => POSITION_RANK.indexOf(a.key as never) - POSITION_RANK.indexOf(b.key as never);
+
 export const DEFAULT_ROLES: DefaultRole[] = [
   {
     key: "SUPER_ADMIN",
     name: "Super Admin / Owner",
-    description: "Full access to the entire system.",
+    description: "Full access to the entire system. Watches the warehouse and the shop without doing their daily jobs.",
     isSuperAdmin: true,
     permissions: [], // implicit: a super admin role always has every permission
   },
   {
-    key: "MANAGER",
-    name: "Manager",
-    description: "Supervises daily operations, reviews credit sales and approves operational transactions.",
+    key: "WAREHOUSE",
+    name: "Warehouse Attendant",
+    description: "Looks after the Store Warehouse: receives and counts goods from China, prepares orders, scans pickup notes and releases goods. Never sees prices, costs or money.",
     permissions: [
-      "dashboard.view",
-      "sales.pos",
-      "sales.view_all",
-      "sales.credit",
-      "sales.discount",
-      "customers.view",
-      "customers.create",
-      "customers.edit",
-      "credit.view",
-      "credit.approve_exception",
-      "payments.view",
-      "payments.record",
       "products.view",
       "inventory.view",
       "inventory.movements",
-      "purchasing.view",
-      "suppliers.view",
-      "returns.create",
-      "returns.approve",
-      "shipments.manage",
-      "expenses.view",
-      "expenses.approve",
-      "cash.view",
-      "closing.submit",
-      "closing.approve",
-      "deposits.record",
-      "resellers.view",
-      "resellers.manage",
-      "resellers.operate",
-      "reports.view",
-      "employees.view",
+      "shipments.receive",
+      "inventory.count",
+      "inventory.report_damage",
+      "warehouse.operate",
     ],
   },
   {
     key: "SALESPERSON",
     name: "Shop Attendant",
-    description: "Runs the shop day to day: sells, receives stock, takes payments, records expenses and closes the day. Never sees costs, profit or business-wide finances.",
+    description: "Sells at the POS: takes payments, records credit sales and expenses, and closes the day. Collects goods from the warehouse with the pickup note. Never receives stock and never sees costs, profit or business-wide finances.",
     permissions: [
       "sales.pos",
       "sales.view_own",
@@ -190,60 +175,12 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "payments.record",
       "products.view",
       "inventory.view",
-      "shipments.receive",
-      "inventory.report_damage",
       "returns.create",
       "expenses.create",
       "closing.submit",
       "deposits.record",
       "resellers.view",
       "resellers.operate",
-    ],
-  },
-  {
-    key: "STOREKEEPER",
-    name: "Storekeeper / Inventory Officer",
-    description: "Receives stock, records transfers, counts and damaged stock.",
-    permissions: [
-      "products.view",
-      "inventory.view",
-      "inventory.movements",
-      "shipments.receive",
-      "inventory.transfer",
-      "inventory.count",
-      "inventory.report_damage",
-      "purchasing.view",
-      "suppliers.view",
-    ],
-  },
-  {
-    key: "ACCOUNTANT",
-    name: "Accountant / Finance Officer",
-    description: "Financial reconciliation, payments and financial reports.",
-    permissions: [
-      "dashboard.view",
-      "dashboard.financials",
-      "sales.view_all",
-      "customers.view",
-      "credit.view",
-      "payments.view",
-      "payments.record",
-      "products.view",
-      "products.cost",
-      "inventory.view",
-      "inventory.valuation",
-      "inventory.movements",
-      "purchasing.view",
-      "suppliers.view",
-      "suppliers.pay",
-      "expenses.view",
-      "expenses.create",
-      "cash.view",
-      "resellers.view",
-      "finance.view",
-      "finance.reconcile",
-      "reports.view",
-      "reports.financial",
     ],
   },
 ];

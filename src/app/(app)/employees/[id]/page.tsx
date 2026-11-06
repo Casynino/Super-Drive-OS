@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
 import { Alert, PageHeader, StatusBadge } from "@/components/ui";
 import EntityForm from "@/components/EntityForm";
+import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { formatDateTime } from "@/lib/utils";
+import Link from "next/link";
+import { ScrollText } from "lucide-react";
 import { resetEmployeePassword, updateEmployee } from "../actions";
 
-export const metadata = { title: "Employee" };
+export const metadata = { title: "Member" };
 
 export default async function EmployeePage({
   params,
@@ -19,9 +22,11 @@ export default async function EmployeePage({
   const { id } = await params;
   const sp = await searchParams;
 
-  const [employee, roles] = await Promise.all([
+  const [employee, roles, activity] = await Promise.all([
     db.user.findUnique({ where: { id }, include: { role: true } }),
     db.role.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, isSuperAdmin: true } }),
+    // what this person has done: the permanent audit record, newest first
+    can(actor, "audit.view") ? db.auditLog.findMany({ where: { userId: id }, orderBy: { createdAt: "desc" }, take: 25, select: { id: true, action: true, entityType: true, reference: true, reason: true, createdAt: true } }) : Promise.resolve(null),
   ]);
   if (!employee) notFound();
 
@@ -37,12 +42,12 @@ export default async function EmployeePage({
       <PageHeader
         title={employee.name}
         description={`@${employee.username} · Last sign-in ${formatDateTime(employee.lastLoginAt)}`}
-        back={{ href: "/employees", label: "Employees" }}
+        back={{ href: "/employees", label: "Roles" }}
         actions={<StatusBadge status={employee.status} />}
       />
       {sp.created && (
         <div className="mb-4">
-          <Alert kind="success">Employee created. Give them their username and temporary password.</Alert>
+          <Alert kind="success">Member added. Give them their username and temporary password.</Alert>
         </div>
       )}
       {locked && (
@@ -102,6 +107,35 @@ export default async function EmployeePage({
           </div>
         )}
       </div>
+
+      {activity && (
+        <div className="card mt-6 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+            <h2 className="text-base font-semibold text-slate-900">Activity</h2>
+            <Link href={`/audit?q=${encodeURIComponent(employee.name)}`} className="text-sm font-medium text-navy-700 hover:underline">
+              See everything in the audit log
+            </Link>
+          </div>
+          {activity.length === 0 ? (
+            <p className="flex items-center gap-2 px-5 py-6 text-sm text-slate-500">
+              <ScrollText size={16} /> Nothing recorded for {employee.name.split(" ")[0]} yet.
+            </p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {activity.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-4 py-2.5 text-sm sm:px-5">
+                  <span className="min-w-0">
+                    <span className="font-medium text-slate-900">{a.action.replace(/[._]/g, " ")}</span>
+                    {a.reference && <span className="ml-2 text-slate-500">{a.reference}</span>}
+                    {a.reason && <span className="ml-2 text-xs text-slate-400">“{a.reason}”</span>}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-500">{formatDateTime(a.createdAt)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </>
   );
 }

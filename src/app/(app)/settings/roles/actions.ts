@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { canGrant } from "@/lib/auth/can";
@@ -76,36 +75,4 @@ export async function resetRoleToDefaults(fd: FormData): Promise<void> {
     return { ok: true };
   });
   if (result.error) throw new Error(result.error);
-}
-
-/** A new position (for example a driver or a sales rep), optionally starting from what another position can do. Its ticks are set on the next page. */
-export async function createRole(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const values = { name: formString(fd, "name"), description: formString(fd, "description"), copyFrom: formString(fd, "copyFrom") };
-  const result = await guarded("roles.manage", async (user) => {
-    const name = values.name.trim();
-    if (name.length < 2 || name.length > 60) return fail("Please fix the highlighted fields.", { name: "Enter a name of 2 to 60 characters." }, values);
-    if (values.description.length > 200) return fail("Please fix the highlighted fields.", { description: "Keep it under 200 characters." }, values);
-    const same = await db.role.findFirst({ where: { name: { equals: name, mode: "insensitive" } }, select: { id: true } });
-    if (same) return fail("Please fix the highlighted fields.", { name: "There is already a position with this name." }, values);
-    const source = values.copyFrom ? await db.role.findUnique({ where: { id: values.copyFrom }, include: { permissions: { include: { permission: true } } } }) : null;
-    if (values.copyFrom && (!source || source.isSuperAdmin)) return fail("Please fix the highlighted fields.", { copyFrom: "Choose a position to copy." }, values);
-
-    // nobody can hand out access they do not have themselves
-    const copied = (source?.permissions ?? []).map((rp) => rp.permission).filter((p) => canGrant(user, p.key as PermissionKey));
-    const base = name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "POSITION";
-    let key = base;
-    for (let n = 2; await db.role.findUnique({ where: { key }, select: { id: true } }); n++) key = `${base}_${n}`;
-
-    const role = await db.$transaction(async (tx) => {
-      const r = await tx.role.create({ data: { key, name, description: values.description.trim() || null, isSystem: false } });
-      if (copied.length) await tx.rolePermission.createMany({ data: copied.map((p) => ({ roleId: r.id, permissionId: p.id })) });
-      await writeAudit(tx, { user, action: "role.created", entityType: "Role", entityId: r.id, reference: r.name, after: { name: r.name, copiedFrom: source?.name ?? null, permissions: copied.length } });
-      return r;
-    });
-    revalidatePath("/settings/roles");
-    revalidatePath("/employees");
-    return { ok: true, message: role.id };
-  });
-  if (result.ok && result.message) redirect(`/settings/roles/${result.message}?created=1`);
-  return result;
 }

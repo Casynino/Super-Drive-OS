@@ -75,8 +75,8 @@ export default async function SettingsPage() {
               Payment reminders
             </Link>
             {can(user, "roles.manage") && (
-              <Link href="/settings/roles" className="btn-secondary">
-                Roles &amp; permissions
+              <Link href="/employees" className="btn-secondary">
+                Roles
               </Link>
             )}
           </>
