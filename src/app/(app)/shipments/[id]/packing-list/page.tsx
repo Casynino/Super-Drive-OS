@@ -53,7 +53,7 @@ export default async function PackingListPage({ params, searchParams }: { params
     return {
       name: i.product.name,
       code: i.product.sku,
-      barcode: i.product.barcode,
+      barcode: null,
       imageUrl: i.product.image ? `/api/product-image/${i.productId}?size=thumb&v=${i.product.image.updatedAt.getTime()}` : null,
       packed: `${Number(i.enteredQty.toFixed(3))} ${i.enteredUnit.symbol}`,
       pieces: Number(i.expectedQty),

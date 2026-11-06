@@ -3,11 +3,13 @@ import { PageHeader } from "@/components/ui";
 import ScanScreen from "@/components/scan/ScanScreen";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
+import { LABELS_ENABLED } from "@/lib/features";
 
 export const metadata = { title: "Scan" };
 
 export default async function ScanPage() {
   const user = await requireUser();
+  if (!LABELS_ENABLED) redirect("/products");
   if (!canAny(user, ["inventory.view", "sales.pos"])) redirect("/forbidden");
   return (
     <>

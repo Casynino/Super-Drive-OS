@@ -1,5 +1,6 @@
 "use client";
 
+import { LABELS_ENABLED } from "@/lib/features";
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { ImagePlus, Trash2 } from "lucide-react";
@@ -146,7 +147,7 @@ export default function ProductForm({ product, categories, brands, units, curren
               </>
             ) : (
               <div className="md:col-span-2">
-                <p className="rounded-lg bg-navy-50 px-3 py-2 text-sm text-navy-800">The product code, the barcode and the QR code are made for you when you save. You never type them.</p>
+                <p className="rounded-lg bg-navy-50 px-3 py-2 text-sm text-navy-800">The product code is made for you when you save. You never type it.</p>
               </div>
             )}
           </div>
@@ -156,14 +157,16 @@ export default function ProductForm({ product, categories, brands, units, curren
       {isEdit && (
         <section className="card card-pad">
           <h2 className="mb-1 text-base font-semibold text-slate-900">Product codes</h2>
-          <p className="mb-4 text-sm text-slate-500">Made by the system. Change the barcode only if the bottle already has a barcode printed by the maker and you want to scan that one instead.</p>
+          <p className="mb-4 text-sm text-slate-500">Made by the system when the product was added.</p>
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Product code" name="sku" error={fe.sku} hint="Letters and numbers, e.g. CAS-GTX-5L.">
               <input id="sku" name="sku" defaultValue={v("sku")} disabled={disabled} className={inputClass(fe.sku)} autoCapitalize="characters" />
             </Field>
-            <Field label="Barcode" name="barcode" error={fe.barcode}>
-              <input id="barcode" name="barcode" defaultValue={v("barcode")} disabled={disabled} className={inputClass(fe.barcode)} inputMode="numeric" />
-            </Field>
+            {LABELS_ENABLED && (
+              <Field label="Barcode" name="barcode" error={fe.barcode}>
+                <input id="barcode" name="barcode" defaultValue={v("barcode")} disabled={disabled} className={inputClass(fe.barcode)} inputMode="numeric" />
+              </Field>
+            )}
           </div>
         </section>
       )}

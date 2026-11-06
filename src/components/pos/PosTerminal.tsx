@@ -4,6 +4,7 @@ import { useActionState, useCallback, useMemo, useRef, useState, useTransition }
 import { ImageOff, Minus, Plus, ScanBarcode, Search, Trash2, UserPlus, X } from "lucide-react";
 import { posScan } from "@/app/(app)/scan/actions";
 import CodeScanner from "@/components/scan/CodeScanner";
+import { LABELS_ENABLED } from "@/lib/features";
 import { parseItemCode } from "@/lib/item-code";
 import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
@@ -260,7 +261,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
             <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
               <div className="relative">
                 <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input className="input h-11 pl-10 text-base" placeholder="Search products or scan a barcode…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onSearchKey} aria-label="Search products" autoFocus />
+                <input className="input h-11 pl-10 text-base" placeholder="Search products…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onSearchKey} aria-label="Search products" autoFocus />
               </div>
               {locations.length > 1 && (
                 <select className="input h-11" value={locationId} onChange={(e) => setLocationId(e.target.value)} aria-label="Sell from">
@@ -272,16 +273,18 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                 </select>
               )}
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button type="button" className={cn("inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition", scanOpen ? "border-navy-700 bg-navy-700 text-white" : "border-navy-200 bg-navy-50 text-navy-800 hover:bg-navy-100")} onClick={() => setScanOpen((o) => !o)} aria-pressed={scanOpen}>
-                <ScanBarcode size={18} /> {scanOpen ? "Close scanner" : "Scan to sell"}
-              </button>
-              {scanMsg && (
-                <p role="status" aria-live="polite" className={cn("min-w-0 flex-1 rounded-lg px-3 py-2 text-sm font-medium", scanMsg.ok ? "bg-emerald-50 text-emerald-800" : "bg-brand-red-soft text-brand-red-dark")}>
-                  {scanMsg.text}
-                </p>
-              )}
-            </div>
+            {LABELS_ENABLED && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button type="button" className={cn("inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition", scanOpen ? "border-navy-700 bg-navy-700 text-white" : "border-navy-200 bg-navy-50 text-navy-800 hover:bg-navy-100")} onClick={() => setScanOpen((o) => !o)} aria-pressed={scanOpen}>
+                  <ScanBarcode size={18} /> {scanOpen ? "Close scanner" : "Scan to sell"}
+                </button>
+                {scanMsg && (
+                  <p role="status" aria-live="polite" className={cn("min-w-0 flex-1 rounded-lg px-3 py-2 text-sm font-medium", scanMsg.ok ? "bg-emerald-50 text-emerald-800" : "bg-brand-red-soft text-brand-red-dark")}>
+                    {scanMsg.text}
+                  </p>
+                )}
+              </div>
+            )}
             {scanOpen && (
               <div className="mt-3">
                 <CodeScanner onScan={(c) => void onCode(c)} autoStart compact />

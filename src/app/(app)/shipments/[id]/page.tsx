@@ -6,6 +6,7 @@ import { CancelShipmentForm, ResolveIssueForm } from "@/components/shipments/Iss
 import MarkArrivedButton from "@/components/shipments/MarkArrivedButton";
 import ShipmentSteps from "@/components/shipments/ShipmentSteps";
 import IssueRecords from "@/components/shipments/IssueRecords";
+import { LABELS_ENABLED } from "@/lib/features";
 import { loadIssueRecords } from "@/lib/shipments/issues";
 import { toIssueViews } from "@/lib/shipments/issue-view";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -119,7 +120,7 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
             <Link href={`/shipments/${id}/packing-list`} className="btn-secondary">
               <FileText size={16} /> Packing list
             </Link>
-            {itemCount > 0 && can(user, "inventory.view") && (
+            {LABELS_ENABLED && itemCount > 0 && can(user, "inventory.view") && (
               <Link href={`/items/labels?shipment=${id}`} className="btn-secondary">
                 <Printer size={16} /> Print item labels ({itemCount})
               </Link>
@@ -134,7 +135,7 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
         }
       />
       {sp.created && <div className="mb-4"><Alert kind="success">Sent. The shop has been told it is on its way. They will mark it arrived and check it; stock only goes up when they confirm the count.</Alert></div>}
-      {sp.counted && <div className="mb-4"><Alert kind="success">Check confirmed. The good items are now in stock{shipment.issue === "OPEN" ? ", and the owner has been told about the problem" : ""}. Every piece got its own QR code: press <strong>Print item labels</strong> to stick them on.</Alert></div>}
+      {sp.counted && <div className="mb-4"><Alert kind="success">Check confirmed. The good items are now in stock{shipment.issue === "OPEN" ? ", and the owner has been told about the problem" : ""}.</Alert></div>}
 
       {shipment.status !== "CANCELLED" && (
         <div className="card card-pad mb-5">

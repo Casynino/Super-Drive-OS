@@ -8,6 +8,7 @@ import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { Prisma } from "@/generated/prisma/client";
+import { LABELS_ENABLED } from "@/lib/features";
 import { untrackedStock } from "@/lib/inventory/items";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
@@ -163,7 +164,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      {missing > 0 && <LabelExistingStock missing={missing} action={labelExistingStockAction} />}
+      {LABELS_ENABLED && missing > 0 && <LabelExistingStock missing={missing} action={labelExistingStockAction} />}
 
       <form className="card card-pad mb-4 grid gap-3 sm:grid-cols-[1fr_200px_160px_auto]" method="get">
         {sp.view && <input type="hidden" name="view" value={sp.view} />}

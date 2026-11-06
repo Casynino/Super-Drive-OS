@@ -11,6 +11,7 @@ import { Prisma, type ItemStatus } from "@/generated/prisma/client";
 import { ITEM_STATUSES, ITEM_STATUS_LABEL } from "@/lib/inventory/item-labels";
 import { formatMoney } from "@/lib/money";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import { LABELS_ENABLED } from "@/lib/features";
 import { getProductFormOptions } from "../options";
 import ProductForm, { type ProductFormData } from "../ProductForm";
 import { setProductStatus } from "../actions";
@@ -156,11 +157,13 @@ export default async function EditProductPage({ params, searchParams }: { params
           <div className="flex flex-wrap items-start justify-between gap-3 px-5 pb-3 pt-4">
             <div>
               <h2 className="text-base font-semibold text-slate-900">Every piece of {product.name}</h2>
-              <p className="text-sm text-slate-500">Each one has its own number and QR code. Open one to see where it is and its whole history.</p>
+              <p className="text-sm text-slate-500">Each piece has its own number. Open one to see where it is and its whole history.</p>
             </div>
-            <Link href={`/items/labels?product=${id}`} className="btn-secondary btn-sm">
-              <Printer size={14} /> Print labels
-            </Link>
+            {LABELS_ENABLED && (
+              <Link href={`/items/labels?product=${id}`} className="btn-secondary btn-sm">
+                <Printer size={14} /> Print labels
+              </Link>
+            )}
           </div>
 
           <form method="get" className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3">
@@ -223,7 +226,7 @@ export default async function EditProductPage({ params, searchParams }: { params
 
       {tab === "details" && (
         <>
-          <ProductIdentityCard productId={product.id} sku={product.sku} barcode={product.barcode} />
+          {LABELS_ENABLED && <ProductIdentityCard productId={product.id} sku={product.sku} barcode={product.barcode} />}
           <ProductImageCard productId={product.id} productName={product.name} version={image ? image.updatedAt.getTime() : null} canEdit={canEdit} upload={uploadProductImage} remove={removeProductImage} />
           <ProductForm
             product={data}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Printer } from "lucide-react";
 import type { ItemStatus } from "@/generated/prisma/client";
+import { LABELS_ENABLED } from "@/lib/features";
 import { ITEM_STATUS_BADGE, ITEM_STATUS_LABEL } from "@/lib/inventory/item-labels";
 
 export type ItemRow = {
@@ -33,24 +34,26 @@ export default function ItemsTable({ rows, showProduct = true }: { rows: ItemRow
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <input type="checkbox" className="h-4 w-4 rounded border-slate-400" checked={allOn} onChange={() => setPicked(allOn ? new Set() : new Set(rows.map((r) => r.id)))} />
-          Select all on this page
-        </label>
-        {picked.size > 0 ? (
-          <Link href={`/items/labels?ids=${[...picked].join(",")}`} className="btn-primary btn-sm">
-            <Printer size={14} /> Print {picked.size} label{picked.size === 1 ? "" : "s"}
-          </Link>
-        ) : (
-          <span className="text-xs text-slate-500">Tick pieces to print or reprint their labels</span>
-        )}
-      </div>
+      {LABELS_ENABLED && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" className="h-4 w-4 rounded border-slate-400" checked={allOn} onChange={() => setPicked(allOn ? new Set() : new Set(rows.map((r) => r.id)))} />
+            Select all on this page
+          </label>
+          {picked.size > 0 ? (
+            <Link href={`/items/labels?ids=${[...picked].join(",")}`} className="btn-primary btn-sm">
+              <Printer size={14} /> Print {picked.size} label{picked.size === 1 ? "" : "s"}
+            </Link>
+          ) : (
+            <span className="text-xs text-slate-500">Tick pieces to print or reprint their labels</span>
+          )}
+        </div>
+      )}
       <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
-              <th className="w-8" />
+              {LABELS_ENABLED && <th className="w-8" />}
               <th>Item ID</th>
               {showProduct && <th>Product</th>}
               <th>Status</th>
@@ -63,9 +66,11 @@ export default function ItemsTable({ rows, showProduct = true }: { rows: ItemRow
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td>
-                  <input type="checkbox" className="h-4 w-4 rounded border-slate-400" checked={picked.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Select ${r.itemNo}`} />
-                </td>
+                {LABELS_ENABLED && (
+                  <td>
+                    <input type="checkbox" className="h-4 w-4 rounded border-slate-400" checked={picked.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Select ${r.itemNo}`} />
+                  </td>
+                )}
                 <td>
                   <Link href={`/items/${r.itemNo}`} className="font-mono text-[13px] font-semibold text-navy-700 hover:underline">
                     {r.itemNo}

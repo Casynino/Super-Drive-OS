@@ -9,6 +9,7 @@ import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { findItemByCode } from "@/lib/inventory/items";
+import { LABELS_ENABLED } from "@/lib/features";
 import { ITEM_EVENT_LABEL } from "@/lib/inventory/item-labels";
 import { itemQrText } from "@/lib/qr";
 import { getCurrency } from "@/lib/settings";
@@ -51,14 +52,16 @@ export default async function ItemPage({ params }: { params: Promise<{ code: str
         actions={
           <>
             <ItemStatusBadge status={item.status} />
-            <Link href={`/items/labels?ids=${item.id}`} className="btn-secondary btn-sm">
-              <Printer size={14} /> Reprint label
-            </Link>
+            {LABELS_ENABLED && (
+              <Link href={`/items/labels?ids=${item.id}`} className="btn-secondary btn-sm">
+                <Printer size={14} /> Reprint label
+              </Link>
+            )}
           </>
         }
       />
 
-      <div className="mb-5 grid gap-5 lg:grid-cols-[1fr_220px]">
+      <div className={`mb-5 grid gap-5 ${LABELS_ENABLED ? "lg:grid-cols-[1fr_220px]" : ""}`}>
         <section className="card card-pad">
           <div className="flex items-start gap-4">
             <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-white">
@@ -95,13 +98,15 @@ export default async function ItemPage({ params }: { params: Promise<{ code: str
             ))}
           </dl>
         </section>
-        <section className="card card-pad text-center">
-          <div className="mx-auto w-40 overflow-hidden rounded-lg border border-line bg-white p-1">
-            <QrImage text={itemQrText(item.token)} label={`QR code for ${item.itemNo}`} />
-          </div>
-          <p className="mt-2 font-mono text-sm font-semibold text-slate-900">{item.itemNo}</p>
-          <p className="text-xs text-slate-500">This piece's own code. It never changes.</p>
-        </section>
+        {LABELS_ENABLED && (
+          <section className="card card-pad text-center">
+            <div className="mx-auto w-40 overflow-hidden rounded-lg border border-line bg-white p-1">
+              <QrImage text={itemQrText(item.token)} label={`QR code for ${item.itemNo}`} />
+            </div>
+            <p className="mt-2 font-mono text-sm font-semibold text-slate-900">{item.itemNo}</p>
+            <p className="text-xs text-slate-500">This piece's own code. It never changes.</p>
+          </section>
+        )}
       </div>
 
       <section className="card overflow-hidden">
@@ -127,7 +132,7 @@ export default async function ItemPage({ params }: { params: Promise<{ code: str
                     <td className="whitespace-nowrap">{formatDateTime(m.createdAt)}</td>
                     <td>
                       <span className="font-medium">{ITEM_EVENT_LABEL[m.kind]}</span>
-                      {m.auto && <span className="block text-xs text-slate-500">Taken by quantity, this piece was not scanned</span>}
+                      {m.auto && <span className="block text-xs text-slate-500">Taken by quantity, not picked by its number</span>}
                       {m.note && <span className="block text-xs text-slate-500">{m.note}</span>}
                     </td>
                     <td>

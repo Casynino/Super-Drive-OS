@@ -6,6 +6,7 @@ import ProductLevelCard, { type ProductLevel } from "@/components/items/ProductL
 import ItemsTable, { type ItemRow } from "@/components/products/ItemsTable";
 import { Prisma, type ItemStatus } from "@/generated/prisma/client";
 import LabelExistingStock from "@/components/products/LabelExistingStock";
+import { LABELS_ENABLED } from "@/lib/features";
 import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
@@ -95,7 +96,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
   const share = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of all pieces` : "—");
   type Card = { key: string; label: string; icon: LucideIcon; tone: "navy" | "green" | "slate" | "blue" | "red" | "yellow"; value: number; hint: string; always?: boolean };
   const allCards: Card[] = [
-    { key: "", label: "All pieces", icon: QrCode, tone: "navy", value: total, hint: "Each with its own QR code", always: true },
+    { key: "", label: "All pieces", icon: QrCode, tone: "navy", value: total, hint: "Every piece has its own number", always: true },
     { key: "AVAILABLE", label: "In the shop", icon: PackageCheck, tone: "green", value: counts.get("AVAILABLE") ?? 0, hint: share(counts.get("AVAILABLE") ?? 0), always: true },
     { key: "SOLD", label: "Sold", icon: ShoppingCart, tone: "slate", value: counts.get("SOLD") ?? 0, hint: share(counts.get("SOLD") ?? 0), always: true },
     { key: "WITH_RESELLER", label: "With resellers", icon: Handshake, tone: "blue", value: counts.get("WITH_RESELLER") ?? 0, hint: "Held on trust, not sold yet", always: true },
@@ -110,20 +111,22 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
       <PageHeader
         title="All pieces"
         back={{ href: "/products", label: "Products" }}
-        description="Every bottle, gallon or box has its own number and QR code. See how many there are and where they went, find one, print or reprint its label."
+        description="Every bottle, gallon or box has its own number. See how many there are and where they went, and find one."
         actions={
-          <>
-            <Link href="/scan" className="btn-primary">
-              <ScanBarcode size={16} /> Scan an item
-            </Link>
-            <Link href={`/items/labels${sp.shipment ? `?shipment=${sp.shipment}` : sp.product ? `?product=${sp.product}` : ""}`} className="btn-secondary">
-              <QrCode size={16} /> Labels
-            </Link>
-          </>
+          LABELS_ENABLED && (
+            <>
+              <Link href="/scan" className="btn-primary">
+                <ScanBarcode size={16} /> Scan an item
+              </Link>
+              <Link href={`/items/labels${sp.shipment ? `?shipment=${sp.shipment}` : sp.product ? `?product=${sp.product}` : ""}`} className="btn-secondary">
+                <QrCode size={16} /> Labels
+              </Link>
+            </>
+          )
         }
       />
 
-      {untracked > 0 && <LabelExistingStock missing={untracked} action={labelExistingStockAction} />}
+      {LABELS_ENABLED && untracked > 0 && <LabelExistingStock missing={untracked} action={labelExistingStockAction} />}
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
         {cards.map((c) => (

@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import BarcodeImage from "@/components/products/BarcodeImage";
 import PrintButton from "@/components/PrintButton";
 import { requirePagePermission } from "@/lib/auth/guard";
+import { LABELS_ENABLED } from "@/lib/features";
 import { db } from "@/lib/db";
 
 export const metadata = { title: "Product labels" };
@@ -11,6 +13,7 @@ export const metadata = { title: "Product labels" };
  * A sheet is 3 labels across, 7 down (63.5 x 38.1 mm), the common A4 label paper. Several copies of one product are fine.
  */
 export default async function ProductLabelsPage({ searchParams }: { searchParams: Promise<{ ids?: string; copies?: string }> }) {
+  if (!LABELS_ENABLED) redirect("/products");
   await requirePagePermission("products.view");
   const sp = await searchParams;
   const ids = (sp.ids ?? "").split(",").map((s) => s.trim()).filter(Boolean);

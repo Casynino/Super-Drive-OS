@@ -67,7 +67,7 @@ export default async function PosPage() {
 
   return (
     <>
-      <PageHeader title="Point of sale" description="Search or scan a product, set the quantity, and take payment." />
+      <PageHeader title="Point of sale" description="Search for a product, set the quantity, and take payment." />
       {posProducts.length === 0 || locations.length === 0 ? (
         <div className="card">
           <EmptyState

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Printer } from "lucide-react";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import QrImage from "@/components/products/QrImage";
 import PrintButton from "@/components/PrintButton";
 import { Prisma } from "@/generated/prisma/client";
 import { requirePagePermission } from "@/lib/auth/guard";
+import { LABELS_ENABLED } from "@/lib/features";
 import { db } from "@/lib/db";
 import { itemQrText } from "@/lib/qr";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,7 @@ const MAX = 1000;
  * (3 across) or one label per page for a roll printer; "Save as PDF" in the print window makes a PDF.
  */
 export default async function ItemLabelsPage({ searchParams }: { searchParams: Promise<{ shipment?: string; receipt?: string; product?: string; ids?: string; status?: string; layout?: string }> }) {
+  if (!LABELS_ENABLED) redirect("/products");
   await requirePagePermission("inventory.view");
   const sp = await searchParams;
   const ids = (sp.ids ?? "").split(",").map((s) => s.trim()).filter(Boolean).slice(0, MAX);

@@ -165,7 +165,7 @@ export default function ShipmentForm({ action, createProduct, products: initialP
         return {
           name: p?.name ?? "Unknown product",
           code: p?.sku ?? null,
-          barcode: p?.barcode ?? null,
+          barcode: null,
           imageUrl: p?.imageV ? `${origin}/api/product-image/${l.productId}?size=thumb&v=${p.imageV}` : null,
           packed: `${Number(Number(l.quantity).toFixed(3))} ${f.unit?.symbol ?? ""}`.trim(),
           pieces: Number.isFinite(f.baseQty) ? f.baseQty : 0,
