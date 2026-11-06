@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { trackPage } from "@/lib/auth/track-page";
 import { useEffect, useState } from "react";
 import { Bell, ChevronDown, LogOut, Menu, X } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -35,6 +36,12 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   const [open, setOpen] = useState(false);
 
   useEffect(() => setOpen(false), [pathname]);
+
+  // The Admin can follow what everyone opens: one activity row per page (after the page has its title)
+  useEffect(() => {
+    const t = setTimeout(() => void trackPage(pathname, document.title.replace(/\s*·\s*Super Drive Oil$/, "")), 700);
+    return () => clearTimeout(t);
+  }, [pathname]);
 
   const visible = new Set(visibleHrefs);
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.ready && visible.has(i.href)) })).filter((g) => g.items.length > 0);

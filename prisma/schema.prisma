@@ -118,6 +118,7 @@ model User {
   pickupsCancelled    PickupNote[]            @relation("PickupCanceller")
   pickupReleases      PickupRelease[]
   warehouseEvents     WarehouseEvent[]
+  activity            ActivityLog[]
 
   @@index([roleId])
 }
@@ -1595,6 +1596,25 @@ model WarehouseEvent {
 
   @@index([pickupNoteId, createdAt])
   @@index([type, createdAt])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+
+// Every page a signed-in person opens, with who, when and from where. Append-only (database trigger). Together with the audit log
+// (what they changed) and the sign-in records, this lets the owner follow everything everyone does.
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userName  String // snapshot, so history stays readable
+  roleName  String?
+  path      String
+  title     String? // the page's name as the person saw it
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
   @@index([userId, createdAt])
   @@index([createdAt])
 }

@@ -102,7 +102,7 @@ export type PermissionKey = (typeof PERMISSIONS)[number]["key"];
 
 /**
  * SEPARATION OF DUTIES. These are the shop's day-to-day jobs: selling, taking payments, receiving stock,
- * recording expenses, requesting returns, closing the day. They belong to the Shop Attendant (and to a Manager
+ * recording expenses, requesting returns, closing the day. They belong to Sales / Shop and Warehouse / Store (and to a manager
  * if the owner chooses). The business owner does NOT get them automatically, even as Super Admin: his job is to
  * buy stock, set prices, watch the numbers, approve and manage people. A Super Admin only holds one of these
  * if it is explicitly granted to his role.
@@ -134,21 +134,21 @@ export type DefaultRole = {
   permissions: PermissionKey[];
 };
 
-/** The three roles in the order they are listed on screen: Admin on top, then the warehouse, then the shop. */
+/** The three roles in the order they are listed on screen: Director on top, then the warehouse / store, then sales / shop. */
 export const POSITION_RANK = ["SUPER_ADMIN", "WAREHOUSE", "SALESPERSON"] as const;
 export const byPositionRank = (a: { key: string }, b: { key: string }) => POSITION_RANK.indexOf(a.key as never) - POSITION_RANK.indexOf(b.key as never);
 
 export const DEFAULT_ROLES: DefaultRole[] = [
   {
     key: "SUPER_ADMIN",
-    name: "Admin",
-    description: "The boss. Full access to the entire system, watches the warehouse and the shop and tracks everything people do.",
+    name: "Director",
+    description: "The boss. Full access to the entire system: watches the warehouse and the shop and tracks everything people do.",
     isSuperAdmin: true,
     permissions: [], // implicit: a super admin role always has every permission
   },
   {
     key: "WAREHOUSE",
-    name: "Warehouse Attendant",
+    name: "Warehouse / Store",
     description: "Looks after the Store Warehouse: receives and counts goods from China, prepares orders, scans pickup notes and releases goods. Never sees prices, costs or money.",
     permissions: [
       "products.view",
@@ -162,7 +162,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
   },
   {
     key: "SALESPERSON",
-    name: "Shop Attendant",
+    name: "Sales / Shop",
     description: "Sells at the POS: takes payments, records credit sales and expenses, and closes the day. Collects goods from the warehouse with the pickup note. Never receives stock and never sees costs, profit or business-wide finances.",
     permissions: [
       "sales.pos",

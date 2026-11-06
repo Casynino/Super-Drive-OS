@@ -25,7 +25,7 @@ export default async function RolePage({ params }: { params: Promise<{ id: strin
     <>
       <PageHeader title={role.name} description={role.description ?? undefined} back={{ href: "/employees", label: "Roles" }} />
       {role.isSuperAdmin ? (
-        <Alert kind="info">The owner role holds every management permission and cannot be restricted, so the business can never be locked out. Shop-floor work (selling, receiving stock, taking payments, recording expenses, closing the day) belongs to the Shop Attendant and is deliberately not given to the owner.</Alert>
+        <Alert kind="info">The Director role holds every management permission and cannot be restricted, so the business can never be locked out. Daily work (selling and taking payments belongs to Sales / Shop; receiving and releasing goods belongs to Warehouse / Store) is deliberately not given to the Director.</Alert>
       ) : (
         <>
         {role.isSystem && DEFAULT_ROLES.some((r) => r.key === role.key) && (

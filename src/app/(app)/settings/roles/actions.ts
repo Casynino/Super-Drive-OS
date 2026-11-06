@@ -12,7 +12,7 @@ export async function saveRolePermissions(_prev: ActionState, fd: FormData): Pro
     const roleId = formString(fd, "roleId");
     const role = await db.role.findUnique({ where: { id: roleId }, include: { permissions: { include: { permission: true } } } });
     if (!role) return fail("This role no longer exists.");
-    if (role.isSuperAdmin) return fail("The Admin role always has full access and cannot be edited.");
+    if (role.isSuperAdmin) return fail("The Director role always has full access and cannot be edited.");
 
     const requested = [...new Set(fd.getAll("perm").filter((v): v is string => typeof v === "string"))];
     if (requested.some((k) => !PERMISSION_KEYS.includes(k))) return fail("Unknown permission submitted.");

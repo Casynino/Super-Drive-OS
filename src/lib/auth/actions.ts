@@ -46,6 +46,9 @@ export async function login(_prev: ActionState, formData: FormData): Promise<Act
         entityType: "User",
         entityId: user.id,
       });
+    } else {
+      // somebody typed a username that does not exist: the Admin should know
+      await writeAudit(db, { user: null, action: "auth.login_unknown", entityType: "User", reference: username.slice(0, 64) });
     }
     return genericError;
   }

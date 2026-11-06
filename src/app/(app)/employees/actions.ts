@@ -50,7 +50,7 @@ export async function createEmployee(_prev: ActionState, fd: FormData): Promise<
 
     const role = await db.role.findUnique({ where: { id: parsed.data.roleId } });
     if (!role) return bad({ roleId: "Unknown role." }, values);
-    if (!mayTouch(actor, role.isSuperAdmin)) return fail("Only an Admin can create another Admin.", undefined, values);
+    if (!mayTouch(actor, role.isSuperAdmin)) return fail("Only a Director can create another Director.", undefined, values);
 
     const [dupUser, dupMail] = await Promise.all([
       db.user.findUnique({ where: { username: parsed.data.username } }),
@@ -116,7 +116,7 @@ export async function updateEmployee(_prev: ActionState, fd: FormData): Promise<
     if (!target) return fail("This employee no longer exists.");
     if (!newRole) return bad({ roleId: "Unknown role." }, values);
     if (!mayTouch(actor, target.role.isSuperAdmin) || !mayTouch(actor, newRole.isSuperAdmin)) {
-      return fail("Only an Admin can change an Admin account or assign that role.", undefined, values);
+      return fail("Only a Director can change a Director account or assign that role.", undefined, values);
     }
     const isSelf = target.id === actor.id;
     if (isSelf && (newRole.id !== target.roleId || status !== target.status)) {
@@ -160,7 +160,7 @@ export async function updateEmployee(_prev: ActionState, fd: FormData): Promise<
         }
       });
     } catch (e) {
-      if (e instanceof LastSuperAdminError) return fail("There must always be at least one active Admin.", undefined, values);
+      if (e instanceof LastSuperAdminError) return fail("There must always be at least one active Director.", undefined, values);
       if (isUniqueViolation(e)) return bad({ email: "This email is already used by another employee." }, values);
       throw e;
     }
@@ -180,7 +180,7 @@ export async function resetEmployeePassword(_prev: ActionState, fd: FormData): P
 
     const target = await db.user.findUnique({ where: { id }, include: { role: true } });
     if (!target) return fail("This employee no longer exists.");
-    if (!mayTouch(actor, target.role.isSuperAdmin)) return fail("Only an Admin can reset an Admin's password.");
+    if (!mayTouch(actor, target.role.isSuperAdmin)) return fail("Only a Director can reset a Director's password.");
     if (target.id === actor.id) return fail("Use “My account” to change your own password.");
 
     await db.$transaction(async (tx) => {

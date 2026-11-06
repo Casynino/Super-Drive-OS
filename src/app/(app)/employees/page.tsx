@@ -26,7 +26,7 @@ function lastSeen(d: Date | null) {
 type Search = { q?: string; status?: string };
 
 /**
- * The Roles page: the three roles, Admin on top, and under each one the people who hold it.
+ * The Roles page: the three roles, Director on top, and under each one the people who hold it.
  * Press a person to open them (their details and everything they have done); add a member from the button.
  */
 export default async function EmployeesPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -48,7 +48,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader
         title="Roles"
-        description="Admin, warehouse and shop: who holds each role."
+        description="Director, warehouse / store and sales / shop: who holds each role."
         actions={
           canManage && (
             <Link href="/employees/new" className="btn-primary">
