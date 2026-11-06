@@ -109,9 +109,10 @@ export default async function ReminderSettingsPage() {
                 </li>
               </ul>
             </div>
-            <p>The business name, shop number and payment accounts are written into the text from Settings → Business. If you change them, submit a new template with the new text.</p>
-            {tooLong && <Alert>This text is longer than WhatsApp allows for a template. Shorten the payment accounts in Settings → Business.</Alert>}
-            {!profile.paymentAccounts && <Alert kind="info">No payment accounts are set yet. Add them in Settings → Business so customers know where to pay.</Alert>}
+            <p>The business name and shop number come from Settings → Business, and the payment accounts from Cash & Accounts (the bank and mobile-money accounts that have a number). If you change any of them, submit a new template with the new text.</p>
+            {tooLong && <Alert>This text is longer than WhatsApp allows for a template. Close or remove an account you no longer use in Cash & Accounts.</Alert>}
+            {profile.paymentAccountsSource === "none" && <Alert kind="info">No payment accounts with a number yet. Add them in Cash & Accounts so customers know where to pay.</Alert>}
+            {profile.paymentAccountsSource === "text" && <Alert kind="info">The payment accounts come from the fallback text in Settings → Business. Add the accounts with their numbers in Cash & Accounts to replace it.</Alert>}
           </div>
         </div>
       </section>

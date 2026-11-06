@@ -95,7 +95,7 @@ export default async function SettingsPage() {
                 { name: "businessPhone", label: "Phone", value: profile.phone },
                 { name: "businessAddress", label: "Address", value: profile.address },
                 { name: "creditTermsDays", label: "Credit period (days)", value: String(profile.creditTermsDays), hint: "How long customers have to pay a credit sale before it is overdue." },
-                { name: "paymentAccounts", label: "Payment accounts (copied into payment reminders)", type: "textarea" as const, value: profile.paymentAccounts, span: 2 as const, hint: "Bank and mobile-money accounts customers should pay into. Each account on its own lines, with a blank line between accounts." },
+                { name: "paymentAccounts", label: "Payment accounts text (a fallback)", type: "textarea" as const, value: profile.paymentAccountsManual, span: 2 as const, hint: profile.paymentAccountsSource === "accounts" ? "Not used right now: payment reminders copy the bank and mobile-money accounts from Cash & Accounts. This text is only used when none of them has a number." : "Payment reminders copy the bank and mobile-money accounts from Cash & Accounts once they have numbers. Until then this text is used. Each account on its own lines, with a blank line between accounts." },
               ]}
             />
             <p className="mt-3 text-sm text-slate-500">
