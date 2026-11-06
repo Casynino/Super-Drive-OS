@@ -113,7 +113,7 @@ export default async function EditProductPage({
       />
       {sp.created && (
         <div className="mb-4">
-          <Alert kind="success">Product created. Stock is added through Stock Receiving.</Alert>
+          <Alert kind="success">Product created. Stock is added through Stock In or a purchase order.</Alert>
         </div>
       )}
       <ProductIdentityCard productId={product.id} sku={product.sku} barcode={product.barcode} />

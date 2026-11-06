@@ -9,7 +9,7 @@ import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { formatDate } from "@/lib/utils";
 
-export const metadata = { title: "Stock receiving" };
+export const metadata = { title: "Stock in" };
 
 export default async function ReceivingPage() {
   const user = await requireUser();
@@ -26,8 +26,8 @@ export default async function ReceivingPage() {
   return (
     <>
       <PageHeader
-        title="Stock receiving"
-        description="Every delivery that adds stock. Stock only increases here, once the goods are physically received."
+        title="Stock in"
+        description="Every delivery that came into stock. Stock only goes up once the goods are physically received."
         actions={
           can(user, "inventory.receive") && (
             <Link href="/inventory/receiving/new" className="btn-primary">

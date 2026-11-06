@@ -31,7 +31,7 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
 
   return (
     <>
-      <PageHeader title={r.receiptNo} description={r.type === "OPENING_STOCK" ? "Opening stock" : "Delivery from supplier"} back={{ href: "/inventory/receiving", label: "Stock receiving" }} />
+      <PageHeader title={r.receiptNo} description={r.type === "OPENING_STOCK" ? "Opening stock" : "Delivery from supplier"} back={{ href: "/inventory/receiving", label: "Stock in" }} />
       {sp.created && (
         <div className="mb-4">
           <Alert kind="success">Stock received. Quantities are now in the stock ledger.</Alert>
