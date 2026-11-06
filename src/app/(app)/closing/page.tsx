@@ -65,6 +65,9 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
     return new Map(rows.map((r) => [r.referenceNo ?? "", new Prisma.Decimal(r._sum.amount ?? 0)]));
   };
   const corrOf = await corrFor(history.map((c) => c.closingNo));
+  // what reached the bank on each day (a closing's own banking and any deposit made that day), not only what was tied to the closing
+  const bankedRows = history.length ? await db.bankDeposit.groupBy({ by: ["businessDate", "locationId"], where: { businessDate: { in: history.map((c) => c.businessDate) }, ...(canReview ? {} : { createdById: user.id }) }, _sum: { amount: true } }) : [];
+  const bankedOn = new Map(bankedRows.map((r) => [`${r.locationId}|${r.businessDate.toISOString().slice(0, 10)}`, new Prisma.Decimal(r._sum.amount ?? 0)]));
   const monthRows = canReview ? await db.dailyClosing.findMany({ where: { businessDate: { gte: monthStart } }, select: { closingNo: true, difference: true } }) : [];
   const monthCorr = await corrFor(monthRows.map((c) => c.closingNo));
   const monthNet = monthRows.map((c) => c.difference.plus(monthCorr.get(c.closingNo) ?? 0)).filter((d) => d.lt(0));
@@ -253,7 +256,10 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                           );
                         })()}
                       </td>
-                      <td className="hidden text-right tabular-nums xl:table-cell">{c.depositedNow.gt(0) ? money(c.depositedNow) : <span className="text-slate-400">—</span>}</td>
+                      <td className="hidden text-right tabular-nums xl:table-cell">{(() => {
+                          const b = bankedOn.get(`${c.locationId}|${c.businessDate.toISOString().slice(0, 10)}`) ?? new Prisma.Decimal(0);
+                          return b.gt(0) ? money(b) : <span className="text-slate-400">—</span>;
+                        })()}</td>
                       <td className="hidden 2xl:table-cell">
                         {c.submittedBy.name}
                         <span className="block text-xs text-slate-400">{formatDateTime(c.submittedAt)}</span>
