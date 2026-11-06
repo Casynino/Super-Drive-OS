@@ -60,7 +60,7 @@ async function fixture(stock = 100, cost = 10000) {
 }
 
 const newCustomer = (data: Partial<Prisma.CustomerUncheckedCreateInput> = {}) =>
-  db.customer.create({ data: { name: `Cust ${randomUUID()}`, ...data } });
+  db.customer.create({ data: { name: `Cust ${randomUUID()}`, phone: "0712 000 111", ...data } });
 
 const qty = async (productId: string, locationId: string) =>
   (await db.stockBalance.findUnique({ where: { productId_locationId: { productId, locationId } } }))?.quantity ?? D(0);
@@ -156,6 +156,16 @@ describe("credit sales", () => {
     expect(payment).toBeNull();
     expect((await customerOutstanding(db, c.id)).toString()).toBe("300000");
     expect((await qty(f.product.id, f.location.id)).toString()).toBe("88"); // stock still leaves
+  });
+
+  it("refuses credit for a customer with no phone number (it is how late payments are followed up), but not a paid sale", async () => {
+    const f = await fixture();
+    const c = await newCustomer({ creditLimit: 500000, phone: null });
+    const line = [{ productId: f.product.id, unitId: unitBottle, quantity: "2", unitPrice: "" }];
+    await expect(sell(f, { customerId: c.id, mode: "CREDIT", method: null, lines: line })).rejects.toThrow(/phone number/i);
+    expect((await qty(f.product.id, f.location.id)).toString()).toBe("100"); // nothing was taken from stock
+    const { sale } = await sell(f, { customerId: c.id, mode: "FULL", method: "CASH", lines: line });
+    expect(sale.paymentStatus).toBe("PAID");
   });
 
   it("part payment leaves the rest outstanding", async () => {

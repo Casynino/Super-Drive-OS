@@ -26,7 +26,7 @@ export type ScanResult =
 
 const statusNote = (s: ItemStatus, soldAt: string | null): string | null =>
   s === "SOLD" ? `This product has already been sold${soldAt ? ` (${soldAt})` : ""}.`
-  : s === "WITH_RESELLER" ? "This product is currently assigned to a reseller."
+  : s === "WITH_RESELLER" ? "This product is currently assigned to a winga."
   : s === "DAMAGED" ? "This item was marked damaged. It is not for sale."
   : s === "MISSING" ? "This item was marked missing. If you are holding it, tell the owner."
   : s === "DISPOSED" ? "This item was disposed of."
@@ -117,7 +117,7 @@ export async function posScan(raw: string, locationId: string): Promise<PosScanR
   if (!found) return { ok: false, message: "This item was not found. Check the label and scan again." };
   const it = await db.inventoryItem.findUniqueOrThrow({ where: { id: found.id }, select: { id: true, itemNo: true, token: true, status: true, locationId: true, productId: true, product: { select: { name: true, status: true, sellingPrice: true } } } });
   if (it.status === "SOLD") return { ok: false, message: "This product has already been sold." };
-  if (it.status === "WITH_RESELLER") return { ok: false, message: "This product is currently assigned to a reseller." };
+  if (it.status === "WITH_RESELLER") return { ok: false, message: "This product is currently assigned to a winga." };
   if (it.locationId !== locationId) return { ok: false, message: "This product is not available at this location." };
   if (it.status !== "AVAILABLE") return { ok: false, message: `This item cannot be sold: it is ${ITEM_STATUS_LABEL[it.status].toLowerCase()}.` };
   if (it.product.status !== "ACTIVE") return { ok: false, message: `${it.product.name} is not for sale any more.` };

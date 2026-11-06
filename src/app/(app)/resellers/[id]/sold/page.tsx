@@ -10,7 +10,7 @@ import { getCurrency } from "@/lib/settings";
 import { getActiveLocations, getPickerProducts, getStockByLocation } from "../../../inventory/data";
 import { reportSoldAction } from "../../actions";
 
-export const metadata = { title: "Record what a reseller sold" };
+export const metadata = { title: "Record what a winga sold" };
 
 export default async function SoldPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requirePagePermission("resellers.operate");
@@ -21,7 +21,7 @@ export default async function SoldPage({ params }: { params: Promise<{ id: strin
   const prices = Object.fromEntries(held.map((p) => [p.productId, p.basePrice.toString()]));
   return (
     <>
-      <PageHeader title={`What ${r.name} sold`} back={{ href: `/resellers/${id}`, label: r.name }} description="Enter what the reseller says they sold. The goods are taken from their stock and invoiced to them at the prices agreed when the stock was issued." />
+      <PageHeader title={`What ${r.name} sold`} back={{ href: `/resellers/${id}`, label: r.name }} description="Enter what the winga says they sold. The goods are taken from their stock and invoiced to them at the prices agreed when the stock was issued." />
       <ResellerStockForm
         variant="sold"
         action={reportSoldAction}

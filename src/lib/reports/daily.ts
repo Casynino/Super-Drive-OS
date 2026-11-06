@@ -118,7 +118,7 @@ export async function buildDailyReport(db: Db, locationId: string, day: string):
     "",
     "COLLECTIONS",
     `Customer Collections: ${m(customerColl)}`,
-    `Reseller Collections: ${m(resellerColl)}`,
+    `Winga Collections: ${m(resellerColl)}`,
     "",
     "EXPENSES",
     `Total Expenses: ${m(spent)}`,
@@ -136,7 +136,7 @@ export async function buildDailyReport(db: Db, locationId: string, day: string):
     `Out of Stock Products: ${alerts.out.length}`,
     "",
     "RESELLERS",
-    `Active Resellers: ${resellers.length}`,
+    `Active Winga: ${resellers.length}`,
     `Outstanding Settlements: ${m(resellerOwed)}${resellerOverdue > 0 ? ` (overdue ${m(resellerOverdue)})` : ""}`,
     "",
     "DAILY CLOSING",
@@ -156,7 +156,7 @@ export async function buildDailyReport(db: Db, locationId: string, day: string):
     for (const a of x.allocations) if (a.payment.source === "AT_SALE") paid.set(a.payment.method, (paid.get(a.payment.method) ?? 0) + num(a.amount));
     const pay = [...paid].map(([k, v]) => `${k === "CASH" ? "Cash" : k === "MOBILE_MONEY" ? "Mobile" : "Bank"} ${m(v)}`).join(" + ");
     const credit = num(x.total) - [...paid.values()].reduce((t, v) => t + v, 0);
-    L.push(`${i + 1}. ${x.saleNo} ${hhmm(x.createdAt)} · ${x.customer?.name ?? "Walk-in"}${x.channel === "RESELLER" ? " (reseller report)" : ""} · ${x.salesperson.name}${x.status === "CANCELLED" ? " · CANCELLED" : ""}`);
+    L.push(`${i + 1}. ${x.saleNo} ${hhmm(x.createdAt)} · ${x.customer?.name ?? "Walk-in"}${x.channel === "RESELLER" ? " (winga report)" : ""} · ${x.salesperson.name}${x.status === "CANCELLED" ? " · CANCELLED" : ""}`);
     for (const it of x.items) L.push(`   ${it.enteredQty.toString()} x ${it.product.name} @ ${m(num(it.unitPrice))}${num(it.discount) > 0 ? ` (discount ${m(num(it.discount))})` : ""}`);
     L.push(`   Total ${m(num(x.total))}${num(x.returnedTotal) > 0 ? ` (returned ${m(num(x.returnedTotal))})` : ""} · ${pay || "no payment"}${credit > 0.5 ? ` · on credit ${m(credit)}` : ""}${x.discountReason ? ` · discount reason: ${x.discountReason}` : ""}`);
   });

@@ -69,7 +69,7 @@ function Detail({ result, canSell }: { result: ScanResult; canSell: boolean }) {
               <dd className="text-xl font-bold text-slate-900">{result.stock.shelf}</dd>
             </div>
             <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <dt className="text-xs text-slate-500">With resellers</dt>
+              <dt className="text-xs text-slate-500">With winga</dt>
               <dd className="text-xl font-bold text-slate-900">{result.stock.withResellers}</dd>
             </div>
           </dl>

@@ -154,7 +154,7 @@ export async function reportSoldAction(_prev: ActionState, fd: FormData): Promis
             lines: lines.map((l) => ({ productId: l.productId, unitId: l.unitId, quantity: l.quantity, unitPrice: canDiscount ? (l.totalCost ?? "").trim() : "" })),
           });
           await writeAudit(tx, { user, action: "reseller.sold_report", entityType: "Sale", entityId: r.sale.id, reference: `${r.sale.saleNo} · ${r.reseller.name}`, after: { total: r.sale.total.toString(), discount: r.sale.discountTotal.toString() } });
-          await notifyPermission(tx, "resellers.manage", { type: "reseller.sold_report", title: `${r.reseller.name} sold ${formatMoney(r.sale.total, currency)}`, body: `${user.name} recorded ${r.sale.saleNo}. The reseller now owes this amount.`, link: `/resellers/${resellerId}` }, user.id);
+          await notifyPermission(tx, "resellers.manage", { type: "reseller.sold_report", title: `${r.reseller.name} sold ${formatMoney(r.sale.total, currency)}`, body: `${user.name} recorded ${r.sale.saleNo}. The winga now owes this amount.`, link: `/resellers/${resellerId}` }, user.id);
           return r.sale.saleNo;
         },
         { timeout: 30000, maxWait: 15000 },
@@ -164,7 +164,7 @@ export async function reportSoldAction(_prev: ActionState, fd: FormData): Promis
     } catch (e) {
       if (e instanceof ResellerError) return fail(e.message, e.fieldErrors, values);
       if (e instanceof SaleError) return fail(e.message, e.fieldErrors, values);
-      if (e instanceof InsufficientStockError) return fail(await stockMessage(e, "with this reseller"), undefined, values);
+      if (e instanceof InsufficientStockError) return fail(await stockMessage(e, "with this winga"), undefined, values);
       if (isUniqueViolation(e)) {
         const existing = await db.sale.findUnique({ where: { submissionKey }, select: { saleNo: true } });
         if (existing) return { ok: true, message: existing.saleNo };
@@ -203,7 +203,7 @@ export async function returnStockAction(_prev: ActionState, fd: FormData): Promi
       return { ok: true, message: out };
     } catch (e) {
       if (e instanceof ResellerError) return fail(e.message, e.fieldErrors, values);
-      if (e instanceof InsufficientStockError) return fail(await stockMessage(e, "with this reseller"), undefined, values);
+      if (e instanceof InsufficientStockError) return fail(await stockMessage(e, "with this winga"), undefined, values);
       if (isUniqueViolation(e)) {
         const existing = await db.resellerReturn.findUnique({ where: { submissionKey }, select: { returnNo: true } });
         if (existing) return { ok: true, message: existing.returnNo };

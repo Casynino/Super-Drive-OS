@@ -220,7 +220,7 @@ export async function insights(db: Db, sales: Awaited<ReturnType<typeof salesAna
     const ch = pct(now, before);
     if (ch !== null && ch >= 20 && before > 0) out.push({ tone: "warn", text: `${name} expenses went up ${ch.toFixed(0)}% compared with the previous ${r.days} days.` });
   }
-  if (fin.resellerOverdue > 0) out.push({ tone: "warn", text: `Resellers owe ${new Intl.NumberFormat("en-US").format(fin.resellerOverdue)} past the settlement date.` });
+  if (fin.resellerOverdue > 0) out.push({ tone: "warn", text: `Winga owe ${new Intl.NumberFormat("en-US").format(fin.resellerOverdue)} past the settlement date.` });
   if (fin.customerOverdue > 0) out.push({ tone: "warn", text: `Customers owe ${new Intl.NumberFormat("en-US").format(fin.customerOverdue)} past the due date.` });
   if (inv.frequentlyOut.length) out.push({ tone: "warn", text: `${inv.frequentlyOut.map((p) => p.name).slice(0, 3).join(", ")} ran out of stock more than once in the last 90 days.` });
   if (out.length === 0) out.push({ tone: "info", text: "Not enough activity in this period to draw conclusions yet." });

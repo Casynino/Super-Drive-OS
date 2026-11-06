@@ -70,6 +70,7 @@ async function main() {
   await db.setting.createMany({
     data: [
       { key: "businessName", value: "Super Drive Oil" },
+      { key: "businessPhone", value: "+255 750 496 756" }, // the shop's WhatsApp number (from its Instagram page); printed on receipts and used in payment reminders
       { key: "currency", value: { code: "TZS", symbol: "TSh", decimals: 0 } },
       { key: "creditTermsDays", value: 30 },
       { key: "expenseApprovalLimit", value: 0 }, // 0 = every expense needs the owner's approval until the owner sets a limit

@@ -40,7 +40,7 @@ function cleanProfile(i: ProfileInput) {
   const fe: Record<string, string> = {};
   const name = i.name.trim();
   const phone = i.phone.trim();
-  if (name.length < 2) fe.name = "Enter the reseller's full name.";
+  if (name.length < 2) fe.name = "Enter the winga's full name.";
   if (phone.length < 6) fe.phone = "Enter a phone number.";
   const days = Number(i.settlementDays || "14");
   if (!Number.isInteger(days) || days < 0 || days > 365) fe.settlementDays = "Enter a number of days between 0 and 365.";
@@ -55,7 +55,7 @@ export async function createReseller(tx: Tx, input: ProfileInput & { user: { id:
   const code = await nextDocumentNo(tx, "RSL");
   const label = p.businessName ? `${p.name} (${p.businessName})` : p.name;
   const customer = await tx.customer.create({
-    data: { name: label, contactPerson: p.name, phone: p.phone, businessLocation: p.salesLocation, type: "WHOLESALE", creditLimit: 0, notes: "Reseller account", createdById: input.user.id },
+    data: { name: label, contactPerson: p.name, phone: p.phone, businessLocation: p.salesLocation, type: "WHOLESALE", creditLimit: 0, notes: "Winga account", createdById: input.user.id },
   });
   const location = await tx.location.create({ data: { code, name: `Reseller: ${label} (${code.slice(-6)})`, type: "RESELLER", address: p.salesLocation } });
   return tx.reseller.create({ data: { ...p, customerId: customer.id, locationId: location.id, createdById: input.user.id } });
@@ -80,7 +80,7 @@ type LineIn = { productId: string; unitId: string; quantity: string };
 async function loadReseller(tx: Tx, id: string, opts: { mustBeActive: boolean }) {
   await tx.$queryRaw`SELECT "id" FROM "Reseller" WHERE "id" = ${id} FOR SHARE`;
   const r = await tx.reseller.findUnique({ where: { id } });
-  if (!r) throw new ResellerError("This reseller no longer exists.");
+  if (!r) throw new ResellerError("This winga no longer exists.");
   if (opts.mustBeActive && r.status !== "ACTIVE") throw new ResellerError(`${r.name} is deactivated. Reactivate them before issuing more stock.`);
   return r;
 }
@@ -160,7 +160,7 @@ export async function reportSold(
     method: null,
     partAmount: null,
     reference: null,
-    notes: input.notes ? `Reseller report: ${input.notes}` : "Reseller sold report",
+    notes: input.notes ? `Winga report: ${input.notes}` : "Winga sold report",
     discountReason: input.discountReason,
     lines: input.lines.map((l) => ({ productId: l.productId, unitId: l.unitId, quantity: l.quantity, unitPrice: l.unitPrice ?? "" })),
     creditException: null,

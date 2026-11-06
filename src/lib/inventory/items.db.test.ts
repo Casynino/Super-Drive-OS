@@ -160,7 +160,7 @@ describe("scan to sell", () => {
     expect(toReseller.transferNo).toBeTruthy();
     const issued = (await items(p.id, { status: "WITH_RESELLER" }))[0]!;
     expect(issued.locationId).toBe(custody.id);
-    await expect(sell(shop, p.id, "1", [issued.token])).rejects.toThrow("This product is currently assigned to a reseller.");
+    await expect(sell(shop, p.id, "1", [issued.token])).rejects.toThrow("This product is currently assigned to a winga.");
     await expect(sell(shop, p.id, "1", ["SDO-ITEM-999999"])).rejects.toThrow(/not found/);
     await expect(sell(shop, p.id, "1", ["not a code"])).rejects.toThrow(/not an item code/);
     expect(await balance(p.id, shop.id)).toEqual(D(2)); // nothing was sold

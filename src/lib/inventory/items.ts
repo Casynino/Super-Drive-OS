@@ -195,7 +195,7 @@ async function lockScanned(tx: Tx, ids: string[], productId: string, locationId:
   for (const r of rows) {
     if (r.productId !== productId) throw new ItemError(`${r.itemNo} belongs to a different product.`, "WRONG_PRODUCT");
     if (r.status === "SOLD") throw new ItemError("This product has already been sold.", "SOLD");
-    if (r.status === "WITH_RESELLER" && r.locationId !== locationId) throw new ItemError("This product is currently assigned to a reseller.", "WITH_RESELLER");
+    if (r.status === "WITH_RESELLER" && r.locationId !== locationId) throw new ItemError("This product is currently assigned to a winga.", "WITH_RESELLER");
     if (r.locationId !== locationId) throw new ItemError("This product is not available at this location.", "WRONG_LOCATION");
     if (r.status !== "AVAILABLE" && r.status !== "WITH_RESELLER") throw new ItemError(`This item cannot be used: it is ${r.status.toLowerCase().replace("_", " ")}.`, "NOT_AVAILABLE");
   }

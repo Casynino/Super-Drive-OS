@@ -78,7 +78,7 @@ export async function postSale(tx: Tx, input: SaleInput) {
   const dp = input.currencyDecimals;
 
   // 1. Payment mode sanity (cheap checks first, nothing locked yet)
-  if (input.reseller && (input.mode !== "CREDIT" || !input.customerId)) throw new SaleError("A reseller's sold report is invoiced on the reseller's account.");
+  if (input.reseller && (input.mode !== "CREDIT" || !input.customerId)) throw new SaleError("A winga's sold report is invoiced on the winga's account.");
   if (input.mode !== "FULL" && !input.can.credit && !input.reseller) throw new SaleError("You are not allowed to record credit or part-payment sales.", { payment: "Not allowed for your role." });
   if (input.mode !== "CREDIT" && !input.method) throw new SaleError("Choose how the customer paid.", { method: "Choose cash, mobile money or bank." });
   if (input.mode !== "FULL" && !input.customerId) throw new SaleError("Choose the customer. Credit and part-payment sales must be linked to a customer.", { customer: "Choose a customer for credit sales." });
@@ -87,10 +87,10 @@ export async function postSale(tx: Tx, input: SaleInput) {
   // 2. Locks, in the documented order
   const saleNo = await nextDocumentNo(tx, "INV");
 
-  let customer: { id: string; name: string; type: string; status: string; creditLimit: Dec } | null = null;
+  let customer: { id: string; name: string; type: string; status: string; creditLimit: Dec; phone: string | null } | null = null;
   if (input.customerId) {
     await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${input.customerId} FOR UPDATE`;
-    customer = await tx.customer.findUnique({ where: { id: input.customerId }, select: { id: true, name: true, type: true, status: true, creditLimit: true } });
+    customer = await tx.customer.findUnique({ where: { id: input.customerId }, select: { id: true, name: true, type: true, status: true, creditLimit: true, phone: true } });
     if (!customer) throw new SaleError("This customer no longer exists.", { customer: "Customer not found." });
     if (customer.status !== "ACTIVE") throw new SaleError(`${customer.name} is deactivated and cannot buy.`, { customer: "Customer is deactivated." });
   }
@@ -120,7 +120,7 @@ export async function postSale(tx: Tx, input: SaleInput) {
     if (input.reseller) {
       const agreed = input.reseller.basePrices.get(l.productId);
       if (!agreed) {
-        errors[`line.${l.index}`] = `${l.productName} was never issued to this reseller.`;
+        errors[`line.${l.index}`] = `${l.productName} was never issued to this winga.`;
         return [];
       }
       list = money(agreed.mul(l.factor), dp);
@@ -175,6 +175,11 @@ export async function postSale(tx: Tx, input: SaleInput) {
     paidNow = p;
   }
   const onCredit = total.minus(paidNow);
+
+  // Anything left on credit needs a customer we can reach: the phone number is how late payments are followed up.
+  if (onCredit.gt(0) && !customer?.phone?.trim()) {
+    throw new SaleError(`${customer?.name ?? "This customer"} has no phone number. Add one on the customer's page first: it is used to remind them when payment is late.`, { customer: "This customer needs a phone number for credit." });
+  }
 
   // 5. Credit limit (customer row is locked, so two cashiers can't both slip under the limit)
   let creditApprovedById: string | null = null;

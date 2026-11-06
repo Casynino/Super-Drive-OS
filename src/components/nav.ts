@@ -66,7 +66,7 @@ export const NAV: NavGroup[] = [
       { label: "Customers", href: "/customers", icon: Users, permissions: ["customers.view"], ready: true },
       { label: "Sales", href: "/sales", icon: Receipt, permissions: ["sales.view_own", "sales.view_all"], ready: true },
       { label: "Credit", href: "/credit", icon: HandCoins, permissions: ["credit.view"], ready: true },
-      { label: "Resellers", href: "/resellers", icon: Handshake, permissions: ["resellers.view"], ready: true },
+      { label: "Winga", href: "/resellers", icon: Handshake, permissions: ["resellers.view"], ready: true },
     ],
   },
   {

@@ -82,7 +82,7 @@ export default function StockCard(p: StockCardProps) {
 
         {((p.awayBase ?? 0) > 0 || p.value) && (
           <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
-            <span>{(p.awayBase ?? 0) > 0 ? `${f(p.awayBase!)} with resellers` : ""}</span>
+            <span>{(p.awayBase ?? 0) > 0 ? `${f(p.awayBase!)} with winga` : ""}</span>
             {p.value && <span className="font-medium text-slate-700">{p.value}</span>}
           </div>
         )}

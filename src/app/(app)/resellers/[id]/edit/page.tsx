@@ -5,7 +5,7 @@ import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { updateResellerAction } from "../../actions";
 
-export const metadata = { title: "Edit reseller" };
+export const metadata = { title: "Edit winga" };
 
 export default async function EditResellerPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePagePermission("resellers.manage");

@@ -413,7 +413,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   <th>Product</th>
                   <th className="hidden sm:table-cell">Category</th>
                   <th className="text-right">On the shelf</th>
-                  {!locationId && <th className="hidden text-right md:table-cell">With resellers</th>}
+                  {!locationId && <th className="hidden text-right md:table-cell">With winga</th>}
                   <th className="hidden text-right md:table-cell">Minimum</th>
                   <th>Status</th>
                   {canValue && <th className="hidden text-right lg:table-cell">Value</th>}

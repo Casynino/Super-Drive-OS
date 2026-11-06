@@ -58,6 +58,10 @@ export async function saveCustomer(_prev: ActionState, fd: FormData): Promise<Ac
 
     const existing = id ? await db.customer.findUnique({ where: { id } }) : null;
     if (id && !existing) return fail("This customer no longer exists.");
+    // A customer who can buy on credit must be registered with a phone number: it is how we remind them when payment is late.
+    if ((creditLimit ?? existing?.creditLimit ?? new Prisma.Decimal(0)).gt(0) && !d.phone) {
+      return fail("Please fix the highlighted fields.", { phone: "A phone number is needed for customers who buy on credit (for payment reminders)." }, values);
+    }
     if (await findDuplicate(d.name, d.phone ?? null, id)) {
       return fail("Please fix the highlighted fields.", { name: "A customer with this name and phone number already exists." }, values);
     }

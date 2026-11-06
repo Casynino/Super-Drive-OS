@@ -61,9 +61,9 @@ export const PERMISSIONS = [
   { key: "suppliers.pay", module: "Suppliers", label: "Record supplier payments" },
 
   // Resellers / consignment
-  { key: "resellers.view", module: "Resellers", label: "View resellers and their stock accounts" },
-  { key: "resellers.manage", module: "Resellers", label: "Register, edit and deactivate resellers" },
-  { key: "resellers.operate", module: "Resellers", label: "Issue stock to resellers, record what they sold and what they return" },
+  { key: "resellers.view", module: "Winga", label: "View winga and their stock accounts" },
+  { key: "resellers.manage", module: "Winga", label: "Register, edit and deactivate winga" },
+  { key: "resellers.operate", module: "Winga", label: "Issue stock to winga, record what they sold and what they return" },
 
   // Returns
   { key: "returns.create", module: "Returns", label: "Record returns and exchanges" },

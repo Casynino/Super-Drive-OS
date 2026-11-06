@@ -91,7 +91,7 @@ export default async function IssueDocumentPage({ params, searchParams }: { para
         </table>
 
         {doc.notes && <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">Note: {doc.notes}</p>}
-        <p className="mt-4 text-xs text-slate-500">These goods remain the property of {biz.name} until sold. The reseller will report what is sold and pay for it, and return what is unsold. Nothing is owed until a sale is reported.</p>
+        <p className="mt-4 text-xs text-slate-500">These goods remain the property of {biz.name} until sold. The winga will report what is sold and pay for it, and return what is unsold. Nothing is owed until a sale is reported.</p>
 
         <div className="mt-10 grid grid-cols-2 gap-8 text-sm">
           <div>

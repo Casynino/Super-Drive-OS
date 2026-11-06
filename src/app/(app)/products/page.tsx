@@ -175,7 +175,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
           <KpiCard icon={Boxes} tone="navy" label="Products" value={n(top.products)} hint="Active, on sale" />
           <KpiCard icon={PackageCheck} tone="green" label="In the shop" value={top.inShop} hint={top.inShopPcs ?? "On the shelf"} />
-          <KpiCard icon={Handshake} tone="blue" label="With resellers" value={top.withResellers} hint="Held on trust" />
+          <KpiCard icon={Handshake} tone="blue" label="With winga" value={top.withResellers} hint="Held on trust" />
           <KpiCard icon={ShoppingCart} tone="slate" label="Sold" value={top.sold} hint="Sold so far" />
           <KpiCard icon={AlertTriangle} tone={top.restock > 0 ? "yellow" : "slate"} label="Restock" value={n(top.restock)} hint={top.restock > 0 ? "Low or out of stock" : "Nothing is low"} />
         </div>

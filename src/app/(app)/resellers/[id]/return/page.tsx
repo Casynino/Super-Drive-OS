@@ -8,7 +8,7 @@ import { getCurrency } from "@/lib/settings";
 import { getActiveLocations, getPickerProducts, getStockByLocation } from "../../../inventory/data";
 import { returnStockAction } from "../../actions";
 
-export const metadata = { title: "Reseller returns" };
+export const metadata = { title: "Winga returns" };
 
 export default async function ReturnPage({ params }: { params: Promise<{ id: string }> }) {
   await requirePagePermission("resellers.operate");

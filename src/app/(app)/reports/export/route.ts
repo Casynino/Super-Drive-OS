@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     body = csv([["Product", "Units sold", "Sales", ...(financials ? ["Profit"] : [])], ...s.byProduct.map((p) => [p.name, p.qty, p.revenue, ...(financials ? [p.profit] : [])])]);
   } else if (type === "stock") {
     const i = await inventoryAnalytics(db, financials);
-    body = csv([["Product", "SKU", "On the shelf", "With resellers", "Sold in the last 30 days", "Last sale", ...(financials ? ["Value"] : [])], ...i.list.map((p) => [p.name, p.sku, p.shelf, p.withResellers, p.sold30, p.lastSale?.toISOString().slice(0, 10) ?? "never", ...(financials ? [p.value] : [])])]);
+    body = csv([["Product", "SKU", "On the shelf", "With winga", "Sold in the last 30 days", "Last sale", ...(financials ? ["Value"] : [])], ...i.list.map((p) => [p.name, p.sku, p.shelf, p.withResellers, p.sold30, p.lastSale?.toISOString().slice(0, 10) ?? "never", ...(financials ? [p.value] : [])])]);
   } else if (type === "expenses") {
     if (!financials) return new Response("Forbidden", { status: 403 });
     const rows = await db.expense.findMany({

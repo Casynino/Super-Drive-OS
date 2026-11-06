@@ -219,8 +219,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <>
           <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <StatTile icon={Boxes} tone="navy" label="On the shelf" value={`${inv.shelfItems.toFixed(0)} items`} hint={`${inv.low.length} low · ${inv.out.length} out of stock`} />
-            <StatTile icon={Users} tone="yellow" label="Held by resellers" value={`${inv.resellerItems.toFixed(0)} items`} hint="Still ours, off the shelf" href="/resellers" />
-            {inv.totalValue !== null ? <StatTile icon={Wallet} tone="green" label="Stock value" value={m(inv.totalValue)} hint="Shelf and resellers, at average cost" /> : <StatTile icon={Wallet} tone="slate" label="Products" value={inv.list.length} />}
+            <StatTile icon={Users} tone="yellow" label="Held by winga" value={`${inv.resellerItems.toFixed(0)} items`} hint="Still ours, off the shelf" href="/resellers" />
+            {inv.totalValue !== null ? <StatTile icon={Wallet} tone="green" label="Stock value" value={m(inv.totalValue)} hint="Shelf and winga, at average cost" /> : <StatTile icon={Wallet} tone="slate" label="Products" value={inv.list.length} />}
             <StatTile icon={AlertTriangle} tone={inv.dead.length ? "red" : "slate"} label="Dead stock" value={inv.dead.length} hint="No sale in 60 days" />
           </div>
 
@@ -244,7 +244,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   <tr>
                     <th>Product</th>
                     <th className="text-right">On shelf</th>
-                    <th className="hidden text-right sm:table-cell">With resellers</th>
+                    <th className="hidden text-right sm:table-cell">With winga</th>
                     <th className="hidden text-right md:table-cell">Sold (30 days)</th>
                     <th className="hidden text-right md:table-cell">Last sale</th>
                     {inv.totalValue !== null && <th className="hidden text-right lg:table-cell">Value</th>}
@@ -282,7 +282,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               <h2 className="mb-3 text-base font-semibold text-slate-900">Who owes us</h2>
               <dl className="space-y-3 text-sm">
                 <div className="flex items-center justify-between"><dt className="text-slate-600">Customers</dt><dd className="font-semibold tabular-nums">{m(fin.customerOwed)} {fin.customerOverdue > 0 && <span className="badge-red ml-2">{m(fin.customerOverdue)} overdue</span>}</dd></div>
-                <div className="flex items-center justify-between"><dt className="text-slate-600">Resellers</dt><dd className="font-semibold tabular-nums">{m(fin.resellerOwed)} {fin.resellerOverdue > 0 && <span className="badge-red ml-2">{m(fin.resellerOverdue)} overdue</span>}</dd></div>
+                <div className="flex items-center justify-between"><dt className="text-slate-600">Winga</dt><dd className="font-semibold tabular-nums">{m(fin.resellerOwed)} {fin.resellerOverdue > 0 && <span className="badge-red ml-2">{m(fin.resellerOverdue)} overdue</span>}</dd></div>
                 <div className="flex items-center justify-between border-t border-line pt-3"><dt className="text-slate-600">Supplier obligations</dt><dd className="font-semibold tabular-nums">{m(supplierOwed)}</dd></div>
               </dl>
             </section>

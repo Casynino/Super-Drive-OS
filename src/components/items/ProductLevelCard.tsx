@@ -41,7 +41,7 @@ export default function ProductLevelCard({ p, href, active, showStock = true, mo
   const fmt = (n: number) => qtyText(n, p.pack ?? null, p.baseSymbol ?? "", mode).main;
   const segments = [
     { n: p.available, cls: out ? "bg-brand-red" : low ? "bg-oil-400" : "bg-emerald-500", label: "in the shop" },
-    { n: p.reseller, cls: "bg-blue-500", label: "with resellers" },
+    { n: p.reseller, cls: "bg-blue-500", label: "with winga" },
     { n: p.damaged, cls: "bg-brand-red", label: "damaged" },
     { n: p.sold, cls: "bg-slate-300", label: "sold" },
   ];
@@ -87,7 +87,7 @@ export default function ProductLevelCard({ p, href, active, showStock = true, mo
         <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-slate-500">
           <p className="min-w-0 truncate">
             {fmt(p.sold)} sold
-            {p.reseller > 0 && <> · {fmt(p.reseller)} with resellers</>}
+            {p.reseller > 0 && <> · {fmt(p.reseller)} with winga</>}
             {p.damaged > 0 && <> · <span className="text-brand-red-dark">{fmt(p.damaged)} damaged</span></>}
           </p>
           {p.price && <p className="shrink-0 font-semibold text-slate-700">{p.price}</p>}

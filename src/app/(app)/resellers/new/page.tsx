@@ -3,7 +3,7 @@ import EntityForm from "@/components/EntityForm";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { createResellerAction } from "../actions";
 
-export const metadata = { title: "Register reseller" };
+export const metadata = { title: "Register winga" };
 
 const resellerFields = (v: Record<string, string> = {}) => [
   { name: "name", label: "Full name", value: v.name ?? "", required: true },
@@ -21,7 +21,7 @@ export default async function NewResellerPage() {
   await requirePagePermission("resellers.manage");
   return (
     <>
-      <PageHeader title="Register a reseller" back={{ href: "/resellers", label: "Resellers" }} description="A reseller takes stock to sell elsewhere and brings the money back later. Registering also opens their account." />
+      <PageHeader title="Register a winga" back={{ href: "/resellers", label: "Winga" }} description="A winga takes stock to sell elsewhere and brings the money back later. Registering also opens their account." />
       <div className="card card-pad max-w-3xl">
         <EntityForm action={createResellerAction} submitLabel="Register reseller" fields={resellerFields()} />
       </div>

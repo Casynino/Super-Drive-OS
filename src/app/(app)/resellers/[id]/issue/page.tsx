@@ -8,7 +8,7 @@ import { getCurrency } from "@/lib/settings";
 import { getActiveLocations, getPickerProducts, getStockByLocation } from "../../../inventory/data";
 import { issueStockAction } from "../../actions";
 
-export const metadata = { title: "Issue stock to reseller" };
+export const metadata = { title: "Issue stock to winga" };
 
 export default async function IssuePage({ params }: { params: Promise<{ id: string }> }) {
   await requirePagePermission("resellers.operate");
@@ -26,7 +26,7 @@ export default async function IssuePage({ params }: { params: Promise<{ id: stri
   const prices = Object.fromEntries(priced.map((p) => [p.id, (p.wholesalePrice ?? p.sellingPrice).toString()]));
   return (
     <>
-      <PageHeader title={`Issue stock to ${r.name}`} back={{ href: `/resellers/${id}`, label: r.name }} description="The stock leaves the shop shelf and is held in this reseller's name. It is not a sale: the reseller only owes money for what they report sold." />
+      <PageHeader title={`Issue stock to ${r.name}`} back={{ href: `/resellers/${id}`, label: r.name }} description="The stock leaves the shop shelf and is held in this winga's name. It is not a sale: the winga only owes money for what they report sold." />
       <ResellerStockForm variant="issue" action={issueStockAction} resellerId={id} products={products} stockByLocation={stock} prices={prices} locations={locations} submissionKey={randomUUID()} symbol={currency.symbol} cancelHref={`/resellers/${id}`} />
     </>
   );

@@ -33,7 +33,7 @@ async function world() {
     if (!r.ok) throw new Error(r.message);
     await postReceipt(tx, { type: "OPENING_STOCK", supplierId: null, locationId: location.id, supplierInvoice: null, receivedDate: new Date(), notes: null, submissionKey: randomUUID(), lines: r.lines.map((l) => ({ ...l, lineTotal: D(1_000_000) })), user: { id: cashierId } });
   });
-  const customer = await db.customer.create({ data: { name: `Cust ${randomUUID()}`, creditLimit: 10_000_000 } });
+  const customer = await db.customer.create({ data: { name: `Cust ${randomUUID()}`, phone: "0712 000 111", creditLimit: 10_000_000 } });
   return { location, product, customer };
 }
 type W = Awaited<ReturnType<typeof world>>;

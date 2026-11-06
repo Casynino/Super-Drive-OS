@@ -19,14 +19,14 @@ export default function HeroStockPanel({ stock, pack, baseSymbol, minStock }: { 
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
   const tiles = [
     { k: "In the shop", v: stock.available, tone: out ? "text-brand-red-dark" : low ? "text-yellow-700" : "text-emerald-700" },
-    { k: "With resellers", v: stock.reseller, tone: "text-blue-700" },
+    { k: "With winga", v: stock.reseller, tone: "text-blue-700" },
     { k: "Sold", v: stock.sold, tone: "text-slate-900" },
     { k: "Returned", v: stock.returned, tone: "text-slate-900" },
     { k: "Damaged", v: stock.damaged, tone: stock.damaged > 0 ? "text-brand-red-dark" : "text-slate-900" },
   ];
   const segments = [
     { n: stock.available, cls: out ? "bg-brand-red" : low ? "bg-oil-400" : "bg-emerald-500", label: "in the shop" },
-    { n: stock.reseller, cls: "bg-blue-500", label: "with resellers" },
+    { n: stock.reseller, cls: "bg-blue-500", label: "with winga" },
     { n: stock.damaged, cls: "bg-brand-red", label: "damaged" },
     { n: stock.sold, cls: "bg-slate-300", label: "sold" },
   ];

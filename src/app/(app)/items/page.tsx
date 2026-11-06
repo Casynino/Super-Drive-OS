@@ -101,7 +101,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
     { key: "", label: "All pieces", icon: QrCode, tone: "navy", value: total, hint: "Every piece has its own number", always: true },
     { key: "AVAILABLE", label: "In the shop", icon: PackageCheck, tone: "green", value: counts.get("AVAILABLE") ?? 0, hint: share(counts.get("AVAILABLE") ?? 0), always: true },
     { key: "SOLD", label: "Sold", icon: ShoppingCart, tone: "slate", value: counts.get("SOLD") ?? 0, hint: share(counts.get("SOLD") ?? 0), always: true },
-    { key: "WITH_RESELLER", label: "With resellers", icon: Handshake, tone: "blue", value: counts.get("WITH_RESELLER") ?? 0, hint: "Held on trust, not sold yet", always: true },
+    { key: "WITH_RESELLER", label: "With winga", icon: Handshake, tone: "blue", value: counts.get("WITH_RESELLER") ?? 0, hint: "Held on trust, not sold yet", always: true },
     { key: "DAMAGED", label: "Damaged", icon: AlertTriangle, tone: (counts.get("DAMAGED") ?? 0) > 0 ? "red" : "slate", value: counts.get("DAMAGED") ?? 0, hint: "Written off from stock", always: true },
     { key: "MISSING", label: "Missing", icon: PackageX, tone: "yellow", value: counts.get("MISSING") ?? 0, hint: "Marked missing" },
     { key: "DISPOSED", label: "Disposed", icon: Trash2, tone: "slate", value: counts.get("DISPOSED") ?? 0, hint: "Thrown away" },

@@ -138,7 +138,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   if (closingsToReview.length > 0) items.push({ id: "closings", group: "decisions", tone: "red", icon: "closing", title: `${plural(closingsToReview.length, "daily closing", "daily closings")} where the cash did not match`, detail: "Look into the difference and sign it off.", main: m(closingsToReview.reduce((s, c) => s + Math.abs(c.difference.toNumber()), 0)), sub: "difference", href: "/approvals" });
   if (shipmentIssues > 0) items.push({ id: "ship-issues", group: "decisions", tone: "amber", icon: "shipment", title: `${plural(shipmentIssues, "shipment", "shipments")} with damaged or missing goods`, detail: "Find out what went wrong and close the investigation.", href: "/shipments" });
   if (k.debt.overdue > 0) items.push({ id: "overdue", group: "money", tone: "red", icon: "debt", title: "Customers owe money past the due date", detail: o.oldestOwed > 0 ? `The oldest unpaid bill is ${o.oldestOwed} days old.` : "Follow these up before they get older.", main: m(k.debt.overdue), sub: `of ${m(k.debt.value)} owed in all`, href: "/credit" });
-  if (resellerOverdue > 0) items.push({ id: "reseller-overdue", group: "money", tone: "red", icon: "reseller", title: "Resellers have not paid on time", detail: "Money is past the settlement date.", main: m(resellerOverdue), href: "/resellers" });
+  if (resellerOverdue > 0) items.push({ id: "reseller-overdue", group: "money", tone: "red", icon: "reseller", title: "Winga have not paid on time", detail: "Money is past the settlement date.", main: m(resellerOverdue), href: "/resellers" });
   if (!closedToday && hourNow >= 19 && can(user, "closing.approve")) items.push({ id: "not-closed", group: "money", tone: "amber", icon: "clock", title: "The shop has not closed today yet", detail: "The WhatsApp report goes out once the day is closed.", href: "/closing" });
   if (alerts.out.length > 0) items.push({ id: "out", group: "stock", tone: "red", icon: "stock", title: `${plural(alerts.out.length, "product", "products")} out of stock`, detail: names(alerts.out), href: "/inventory?status=out" });
   if (alerts.low.length > 0) items.push({ id: "low", group: "stock", tone: "amber", icon: "stock", title: `${plural(alerts.low.length, "product", "products")} running low`, detail: names(alerts.low), href: "/inventory?status=low" });
@@ -149,7 +149,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
     can(user, "reports.view") && { href: "/reports", label: "Reports", icon: ChartColumn, tone: "emerald" as const },
     (can(user, "returns.approve") || can(user, "expenses.approve") || can(user, "closing.approve")) && { href: "/approvals", label: "Approvals", icon: Inbox, tone: "navy" as const, badge: data.pendingApprovals + (pendingExpenses?._count ?? 0) + closingsToReview.length },
     can(user, "shipments.manage") && { href: "/shipments", label: "Purchase orders", icon: Truck, tone: "amber" as const },
-    can(user, "resellers.view") && { href: "/resellers", label: "Resellers", icon: Handshake, tone: "violet" as const },
+    can(user, "resellers.view") && { href: "/resellers", label: "Winga", icon: Handshake, tone: "violet" as const },
     can(user, "sales.view_all") && { href: "/sales", label: "Sales history", icon: Receipt, tone: "rose" as const },
     can(user, "audit.view") && { href: "/audit", label: "Audit log", icon: ScrollText, tone: "navy" as const },
   ].filter(Boolean) as { href: string; label: string; icon: typeof Package; tone: keyof typeof PILL; badge?: number }[];
@@ -495,7 +495,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
           {shelf && away && (
             <p className="mt-3 flex justify-between border-t border-line pt-3 text-xs text-slate-500">
               <span>On the shelf <strong className="text-slate-800">{Math.round(Number(shelf._sum.quantity ?? 0)).toLocaleString("en-US")}</strong></span>
-              <span>With resellers <strong className="text-slate-800">{Math.round(Number(away._sum.quantity ?? 0)).toLocaleString("en-US")}</strong></span>
+              <span>With winga <strong className="text-slate-800">{Math.round(Number(away._sum.quantity ?? 0)).toLocaleString("en-US")}</strong></span>
             </p>
           )}
         </Section>
@@ -593,9 +593,9 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
             )}
           </Section>
           {extras.resellers && (
-            <Section title="Resellers" action={{ href: "/resellers", label: "Open" }}>
+            <Section title="Winga" action={{ href: "/resellers", label: "Open" }}>
               <dl className="space-y-3 text-sm">
-                <div className="flex items-center justify-between"><dt className="text-slate-600">Active resellers</dt><dd className="font-semibold">{extras.resellers.count}</dd></div>
+                <div className="flex items-center justify-between"><dt className="text-slate-600">Active winga</dt><dd className="font-semibold">{extras.resellers.count}</dd></div>
                 <div className="flex items-center justify-between"><dt className="text-slate-600">Stock they hold</dt><dd className="font-semibold tabular-nums">{m(extras.resellers.held)}</dd></div>
                 <div className="flex items-center justify-between"><dt className="text-slate-600">They owe us</dt><dd className="font-semibold tabular-nums">{m(extras.resellers.owed)}</dd></div>
                 {extras.resellers.overdue > 0 && (

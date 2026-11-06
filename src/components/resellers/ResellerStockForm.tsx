@@ -100,7 +100,7 @@ export default function ResellerStockForm(p: Props) {
         <section className="card card-pad">
           <h2 className="mb-1 text-base font-semibold text-slate-900">{p.variant === "issue" ? "Products to give" : "Products sold"}</h2>
           <p className="mb-3 text-sm text-slate-500">
-            {p.variant === "issue" ? "Search for each product and enter how many the reseller is taking." : "Enter how many of each product the reseller says they sold. The agreed prices are used."}
+            {p.variant === "issue" ? "Search for each product and enter how many the winga is taking." : "Enter how many of each product the winga says they sold. The agreed prices are used."}
           </p>
           <StockLinesEditor
             products={pickable}
@@ -114,7 +114,7 @@ export default function ResellerStockForm(p: Props) {
           />
           {lines.length > 0 && (
             <p className="mt-4 flex items-baseline justify-between rounded-lg bg-navy-50 px-3.5 py-2.5 text-sm text-navy-800">
-              <span>{p.variant === "issue" ? "Value of the stock at the agreed prices (about)" : "The reseller will owe (about)"}</span>
+              <span>{p.variant === "issue" ? "Value of the stock at the agreed prices (about)" : "The winga will owe (about)"}</span>
               <strong className="text-lg tabular-nums">{money(estimate, p.symbol)}</strong>
             </p>
           )}
