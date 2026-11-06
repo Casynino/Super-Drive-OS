@@ -14,7 +14,7 @@ import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "The Ledger" };
+export const metadata = { title: "Ledger" };
 
 const PAGE_SIZE = 40;
 const TZ = "Africa/Dar_es_Salaam";
@@ -159,7 +159,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="The Ledger" description="Money in and out, one line each." />
+      <PageHeader title="Ledger" description="Money in and out, one line each." />
 
       <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
         <KpiCard icon={ArrowDownLeft} tone="green" label="Money in" value={money(moneyIn)} hint="Payments received at sales and on debts" href={link({ dir: dir === "in" ? undefined : "in", page: undefined })} active={dir === "in"} />
