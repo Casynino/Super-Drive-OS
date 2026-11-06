@@ -230,7 +230,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
           </Link>
         }
       >
-        Needs your attention <span className="ml-1.5 rounded-full bg-oil-400 px-2 py-0.5 text-[11px] font-bold tracking-normal text-navy-900">{items.length}</span>
+        Needs your attention <span className="ml-1.5 rounded-full bg-oil-400 px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#0a1424]">{items.length}</span>
       </Heading>
       <AttentionPanel items={items} />
 
