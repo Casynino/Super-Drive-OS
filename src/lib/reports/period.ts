@@ -34,6 +34,15 @@ export async function getProfit(db: Db, expenses: Dec, from?: string, to?: strin
 }
 const restoredValue = (r: { v: Dec | null }[]) => new D(r[0]?.v ?? 0);
 
+/** Sales (after returns) for each day that had any, between two days (inclusive). */
+export async function getSalesPerDay(db: Db, locationId: string, from: string, to: string): Promise<{ day: string; total: Dec; count: number }[]> {
+  const rows = await db.$queryRaw<{ day: string; n: bigint; v: Dec | null }[]>`
+    SELECT (s."createdAt" ${Prisma.raw(TZ)})::date::text AS day, COUNT(*) AS n, SUM(s."total" - s."returnedTotal") AS v
+      FROM "Sale" s WHERE s."status" = 'COMPLETED' AND s."locationId" = ${locationId}
+       AND (s."createdAt" ${Prisma.raw(TZ)})::date BETWEEN ${from}::date AND ${to}::date GROUP BY 1 ORDER BY 1`;
+  return rows.map((r) => ({ day: r.day, total: new D(r.v ?? 0), count: Number(r.n) }));
+}
+
 export type PeriodStats = {
   from: string;
   to: string;

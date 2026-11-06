@@ -10,12 +10,14 @@ import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import { Prisma } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
-import { getClosingPreview, unclosedDays } from "@/lib/cash/closing";
+import { getClosingPreview, unclosedDays, type ClosingSummary } from "@/lib/cash/closing";
+import { getMoneySummary } from "@/lib/cash/summary";
+import { getProfit, getSalesPerDay } from "@/lib/reports/period";
 import { businessDay, defaultLocationId, getAccountBalances, listAccounts } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { recordDepositAction } from "./actions";
 import { submitClosingAction } from "./actions";
 
@@ -49,6 +51,15 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
     db.bankDeposit.aggregate({ where: { ...depositWhere, businessDate: { gte: new Date(`${today.slice(0, 8)}01T00:00:00Z`) } }, _sum: { amount: true } }),
     db.location.findMany({ where: { type: { not: "RESELLER" }, status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
+  const seeProfit = can(user, "dashboard.financials") || can(user, "reports.financial");
+  const monthYmd = `${today.slice(0, 8)}01`;
+  const monthProfit = seeProfit ? await getProfit(db, (await getMoneySummary(db, locationId, { from: monthYmd, to: today })).expenses, monthYmd, today) : null;
+  const daysShown = history.map((c) => c.businessDate.toISOString().slice(0, 10));
+  const liveSales = daysShown.length ? new Map((await getSalesPerDay(db, locationId, daysShown[daysShown.length - 1]!, daysShown[0]!)).map((d) => [d.day, d.total])) : new Map<string, Prisma.Decimal>();
+  // what was sold that day, from the sales records (another shop's days fall back to the figure saved at closing)
+  const soldOf = (c: (typeof history)[number]) => (c.locationId === locationId ? (liveSales.get(c.businessDate.toISOString().slice(0, 10)) ?? new Prisma.Decimal(0)) : new Prisma.Decimal((c.summary as unknown as ClosingSummary).sales.total));
+  const trend = history.slice(0, 14).reverse();
+  const trendPeak = trend.reduce((m, c) => (soldOf(c).gt(m) ? soldOf(c) : m), new Prisma.Decimal(0));
   const last = history[0];
   const cash = accounts.find((a) => a.method === "CASH");
   const bankAccounts = (await listAccounts(db, locationId)).filter((a) => a.method === "BANK");
@@ -72,8 +83,9 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
       )}
 
       {canReview && (
-        <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
+        <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(12.5rem,1fr))]">
           <KpiCard icon={Scale} tone={monthShort && monthShort._count > 0 ? "red" : "green"} label="Cash short this month" value={money(new Prisma.Decimal(monthShort?._sum.difference ?? 0).abs())} hint={monthShort && monthShort._count > 0 ? `On ${monthShort._count} day${monthShort._count === 1 ? "" : "s"}` : "No cash missing"} href={monthShort && monthShort._count > 0 ? "/closing?show=short" : undefined} />
+          {monthProfit && <KpiCard icon={TrendingUp} tone={monthProfit.net.lt(0) ? "red" : "green"} label={monthProfit.net.lt(0) ? "Loss this month" : "Profit this month"} value={money(monthProfit.net.abs())} badge={`${monthProfit.marginPct.toFixed(1)}% of sales`} hint="Sales profit minus expenses" />}
           <KpiCard icon={Banknote} tone="yellow" label="Cash in the till" value={money(cash?.balance ?? 0)} hint="Now" />
           <KpiCard icon={Landmark} tone="navy" label="Banked this month" value={money(monthBanked._sum.amount ?? 0)} hint="Cash taken to the bank" />
           <KpiCard icon={CalendarCheck} tone={last && !last.difference.isZero() ? "red" : "green"} label="Last closing" value={last ? formatDate(last.businessDate) : "—"} hint={last ? (last.difference.isZero() ? "No difference" : last.difference.lt(0) ? `Short ${money(last.difference.abs())}` : `Extra ${money(last.difference)}`) : "No day closed yet"} />
@@ -179,6 +191,30 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
             </div>
           )}
         </div>
+        {trend.length > 1 && trendPeak.gt(0) && (
+          <section className="card mb-4 px-4 py-4 sm:px-5" aria-label="Sales by closed day">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-900">Sold on the last {trend.length} closed days</h3>
+              <p className="text-xs text-slate-500">
+                <span className="mr-1 inline-block h-2 w-2 rounded-full bg-brand-red align-middle" /> cash was short · press a bar to open the day
+              </p>
+            </div>
+            <div className="mt-4 flex h-32 items-end gap-1 sm:gap-1.5">
+              {trend.map((c) => (
+                <Link key={c.id} href={`/closing/${c.id}`} className="group flex h-full min-w-0 flex-1 flex-col justify-end" title={`${formatDate(c.businessDate)}: ${money(soldOf(c))}${c.difference.isZero() ? "" : c.difference.lt(0) ? ` · short ${money(c.difference.abs())}` : ` · extra ${money(c.difference)}`}`}>
+                  <div className={cn("w-full rounded-t-md transition group-hover:opacity-80", c.difference.lt(0) ? "bg-brand-red" : "bg-navy-500")} style={{ height: `${Math.max(soldOf(c).div(trendPeak).mul(100).toNumber(), soldOf(c).gt(0) ? 3 : 0)}%` }} />
+                </Link>
+              ))}
+            </div>
+            <div className="mt-1.5 flex gap-1 sm:gap-1.5">
+              {trend.map((c) => (
+                <span key={c.id} className="min-w-0 flex-1 truncate text-center text-[10px] text-slate-500">
+                  {c.businessDate.toISOString().slice(8, 10)}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
         {shops.length > 1 && (
           <nav className="-mx-1 mb-3 flex flex-wrap gap-1.5 px-1" aria-label="Shop">
             {[{ id: "", name: "All shops" }, ...shops].map((x) => (
@@ -199,6 +235,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                     <th>Day</th>
                     {shops.length > 1 && <th>Shop</th>}
                     <th className="hidden sm:table-cell">Closing</th>
+                    <th className="hidden text-right md:table-cell">Sold</th>
                     <th className="text-right">Expected</th>
                     <th className="text-right">Counted</th>
                     <th>Difference</th>
@@ -216,7 +253,8 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                         </Link>
                       </td>
                       {shops.length > 1 && <td className="whitespace-nowrap">{c.location.name}</td>}
-                      <td className="hidden text-slate-500 sm:table-cell">{c.closingNo}</td>
+                      <td className="hidden whitespace-nowrap text-slate-500 sm:table-cell">{c.closingNo}</td>
+                      <td className="hidden text-right tabular-nums md:table-cell">{money(soldOf(c))}</td>
                       <td className="text-right tabular-nums">{money(c.expectedCash)}</td>
                       <td className="text-right tabular-nums">{money(c.countedCash)}</td>
                       <td>
