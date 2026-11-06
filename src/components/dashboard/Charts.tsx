@@ -55,9 +55,21 @@ export function DonutChart({ data, money, centre, colors = CHART_COLORS, centreL
             <Tooltip formatter={(v) => fmt(Number(v), money)} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
           </PieChart>
         </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-xs text-slate-500">{centreLabel}</span>
-          <span className="text-base font-semibold text-slate-900">{centre}</span>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center leading-tight">
+          {(() => {
+            // the number sits inside the ring on its own line, small enough to fit: "TSh 2,802,000" becomes "Total · TSh" over "2,802,000"
+            const m = centre.match(/^(\D*?)\s*([\d][\d.,]*)\s*(.*)$/);
+            const prefix = m?.[1]?.trim() ?? "";
+            const num = m?.[2] ?? centre;
+            const suffix = m?.[3]?.trim() ?? "";
+            return (
+              <>
+                <span className="text-[10px] uppercase tracking-wide text-slate-500">{prefix ? `${centreLabel} · ${prefix}` : centreLabel}</span>
+                <span className={num.length > 9 ? "text-[13px] font-bold tabular-nums text-slate-900" : "text-base font-bold tabular-nums text-slate-900"}>{num}</span>
+                {suffix && <span className="text-[10px] text-slate-500">{suffix}</span>}
+              </>
+            );
+          })()}
         </div>
       </div>
       {legend && (
