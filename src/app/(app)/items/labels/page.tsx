@@ -94,8 +94,9 @@ export default async function ItemLabelsPage({ searchParams }: { searchParams: P
           {labels.map((it) => (
             <div
               key={it.id}
+              style={{ background: "#fff", color: "#000" }} // a label is always black on white, whatever theme the screen uses
               className={cn(
-                "flex break-inside-avoid items-stretch gap-[2mm] overflow-hidden rounded-md border border-dashed border-slate-300 bg-white p-[2mm] text-black print:rounded-none print:border-transparent",
+                "flex break-inside-avoid items-stretch gap-[2mm] overflow-hidden rounded-md border border-dashed border-slate-300 p-[2mm] print:rounded-none print:border-transparent",
                 layout === "sheet" ? "h-[33.9mm] w-[63.5mm]" : "h-[30mm] w-[50mm] print:break-after-page",
               )}
             >
@@ -106,7 +107,7 @@ export default async function ItemLabelsPage({ searchParams }: { searchParams: P
                 <div>
                   <p className="text-[6.5pt] font-extrabold uppercase tracking-wider text-[#0E3D6E]">Super Drive Oil</p>
                   <p className="mt-[0.6mm] line-clamp-3 text-[8pt] font-bold">{it.product.name}</p>
-                  <p className="text-[6.5pt] text-slate-600">{[it.product.brand?.name, it.product.size].filter(Boolean).join(" · ")}</p>
+                  <p className="text-[6.5pt] text-[#475569]">{[it.product.brand?.name, it.product.size].filter(Boolean).join(" · ")}</p>
                 </div>
                 <p className="font-mono text-[6.5pt] font-bold tracking-tight">{it.itemNo}</p>
               </div>
