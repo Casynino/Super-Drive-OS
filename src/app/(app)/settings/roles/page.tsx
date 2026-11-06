@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import { Plus, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
@@ -20,6 +20,11 @@ export default async function RolesPage() {
         title="Roles & permissions"
         description="Choose exactly what each role can see and do. Changes apply immediately, no code needed."
         back={{ href: "/settings", label: "Settings" }}
+        actions={
+          <Link href="/settings/roles/new" className="btn-primary">
+            <Plus size={16} /> Add a position
+          </Link>
+        }
       />
       <div className="grid gap-4 md:grid-cols-2">
         {roles.map((r) => (

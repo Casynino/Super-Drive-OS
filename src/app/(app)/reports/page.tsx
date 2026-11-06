@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, Download, Info, TrendingUp } from "lucide-react";
+import { AlertTriangle, Download, ExternalLink, FileText, Info, Printer, TrendingUp } from "lucide-react";
 import StatTile from "@/components/dashboard/StatTile";
 import { DonutChart, SalesTrendChart, TopProductsChart } from "@/components/dashboard/Charts";
 import { EmptyState, PageHeader } from "@/components/ui";
@@ -10,6 +10,8 @@ import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { PRESETS, financeAnalytics, insights, inventoryAnalytics, reportRange, salesAnalytics, type Grain } from "@/lib/reports/analytics";
 import { getSupplierBalances } from "@/lib/cash/supplier";
+import { businessDay } from "@/lib/cash/ledger";
+import { shiftDay } from "@/lib/reports/period";
 import { getCurrency } from "@/lib/settings";
 import { ACCOUNT_NAME, TX_LABEL } from "@/lib/cash/ledger";
 import { cn, formatDate } from "@/lib/utils";
@@ -54,7 +56,76 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title="Reports" description={`How the business is doing · ${r.label} (${formatDate(`${r.fromYmd}T00:00:00Z`)} to ${formatDate(`${r.toYmd}T00:00:00Z`)}). Every figure comes from recorded transactions.`} />
+      <PageHeader title="Reports" description={`How the business is doing · ${r.label}`} />
+
+      {(() => {
+        // ready-made reports as paper documents: open them, download them as PDF or print them
+        const today = businessDay();
+        const dow = new Date(`${today}T12:00:00Z`).getUTCDay();
+        const weekStart = shiftDay(today, -((dow + 6) % 7));
+        const monthStart = `${today.slice(0, 8)}01`;
+        const lastMonthEnd = shiftDay(monthStart, -1);
+        const short = (ymd: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${ymd}T12:00:00Z`));
+        const ready = [
+          { label: "This week", from: weekStart, to: today },
+          { label: "Last week", from: shiftDay(weekStart, -7), to: shiftDay(weekStart, -1) },
+          { label: "This month", from: monthStart, to: today },
+          { label: "Last month", from: `${lastMonthEnd.slice(0, 8)}01`, to: lastMonthEnd },
+        ];
+        const href = (from: string, to: string, extra = "") => `/print/report?from=${from}&to=${to}${extra}`;
+        return (
+          <section className="card mb-5 px-4 py-4 sm:px-5" aria-label="Make a report">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                <FileText size={17} /> Make a report
+              </h2>
+              <p className="text-xs text-slate-500">Sales and growth, products, money, expenses, customers and cash on paper</p>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {ready.map((x) => (
+                <div key={x.label} className="rounded-xl border border-line px-3.5 py-3">
+                  <p className="text-sm font-semibold text-slate-900">{x.label}</p>
+                  <p className="text-xs text-slate-500">
+                    {short(x.from)} – {short(x.to)}
+                  </p>
+                  <div className="mt-2.5 flex items-center gap-1.5">
+                    <Link href={href(x.from, x.to)} target="_blank" className="btn-secondary btn-sm">
+                      <ExternalLink size={14} /> Open
+                    </Link>
+                    <Link href={href(x.from, x.to, "&print=1&save=1")} target="_blank" className="btn-secondary btn-sm !px-2" title="Download as PDF" aria-label={`Download ${x.label} as PDF`}>
+                      <Download size={15} />
+                    </Link>
+                    <Link href={href(x.from, x.to, "&print=1")} target="_blank" className="btn-secondary btn-sm !px-2" title="Print" aria-label={`Print ${x.label}`}>
+                      <Printer size={15} />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <form method="get" action="/print/report" target="_blank" className="mt-3 flex flex-wrap items-end gap-3 border-t border-line pt-3">
+              <label className="text-xs text-slate-500">
+                From
+                <input type="date" name="from" defaultValue={weekStart} max={today} className="input mt-1 block" />
+              </label>
+              <label className="text-xs text-slate-500">
+                To
+                <input type="date" name="to" defaultValue={today} max={today} className="input mt-1 block" />
+              </label>
+              <button type="submit" className="btn-secondary">
+                <ExternalLink size={15} /> Open
+              </button>
+              <button type="submit" name="save" value="1" className="btn-secondary !px-3" title="Download as PDF" aria-label="Download as PDF">
+                <Download size={16} />
+              </button>
+              <button type="submit" name="print" value="1" className="btn-secondary !px-3" title="Print" aria-label="Print">
+                <Printer size={16} />
+              </button>
+              <span className="pb-2 text-xs text-slate-500">Any dates you choose</span>
+            </form>
+          </section>
+        );
+      })()}
+
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <nav className="flex gap-1 rounded-xl bg-white p-1 shadow-[0_1px_2px_rgba(15,27,45,0.06)] ring-1 ring-line" aria-label="Report">

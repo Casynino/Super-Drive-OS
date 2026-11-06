@@ -33,24 +33,24 @@ export type DaySheetData = {
   signatures: { preparedBy: string; preparedRole: string; approvedBy: string };
 };
 
-const INK = "#0f172a";
-const MUTED = "#64748b";
-const LINE = "#e5e7eb";
-const NAVY = "#0b2a4d";
-const NAVY2 = "#0E3D6E";
-const GOLD = "#FDC400";
+export const INK = "#0f172a";
+export const MUTED = "#64748b";
+export const LINE = "#e5e7eb";
+export const NAVY = "#0b2a4d";
+export const NAVY2 = "#0E3D6E";
+export const GOLD = "#FDC400";
 const GOLD_TEXT = "#b58900";
-const CREAM = "#faf8f2";
-const CREAM_LINE = "#ece6d6";
+export const CREAM = "#faf8f2";
+export const CREAM_LINE = "#ece6d6";
 const GREEN = "#047857";
 const RED = "#c0141b";
-const SERIF = "Georgia, 'Times New Roman', serif";
+export const SERIF = "Georgia, 'Times New Roman', serif";
 
-const toneColor = (t?: "red" | "green" | "plain") => (t === "red" ? RED : t === "green" ? GREEN : INK);
-const fit = (v: string, base: number) => (v.length > 15 ? base - 3 : v.length > 12 ? base - 1.5 : base);
-const small: CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED };
+export const toneColor = (t?: "red" | "green" | "plain") => (t === "red" ? RED : t === "green" ? GREEN : INK);
+export const fit = (v: string, base: number) => (v.length > 15 ? base - 3 : v.length > 12 ? base - 1.5 : base);
+export const small: CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED };
 
-function Change({ value }: { value?: number | null }) {
+export function Change({ value }: { value?: number | null }) {
   if (value === null || value === undefined) return null;
   const up = value >= 0;
   return (
@@ -60,11 +60,11 @@ function Change({ value }: { value?: number | null }) {
   );
 }
 
-function Keep({ children }: { children: React.ReactNode }) {
+export function Keep({ children }: { children: React.ReactNode }) {
   return <div style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>{children}</div>;
 }
 
-function SectionTitle({ n, title, sub }: { n: string; title: string; sub?: string }) {
+export function SectionTitle({ n, title, sub }: { n: string; title: string; sub?: string }) {
   return (
     <div style={{ marginTop: 18, paddingBottom: 6, borderBottom: `1px solid ${LINE}`, breakAfter: "avoid" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
@@ -76,7 +76,7 @@ function SectionTitle({ n, title, sub }: { n: string; title: string; sub?: strin
   );
 }
 
-function DataTable({ t, empty }: { t: Table; empty: string }) {
+export function DataTable({ t, empty }: { t: Table; empty: string }) {
   if (t.rows.length === 0) return <p style={{ margin: "12px 0 0", fontSize: 13, color: MUTED }}>{empty}</p>;
   const cell = (right?: boolean): CSSProperties => ({ padding: "6px 10px", fontSize: 12, textAlign: right ? "right" : "left", color: INK, fontVariantNumeric: "tabular-nums" });
   return (
@@ -114,7 +114,7 @@ function DataTable({ t, empty }: { t: Table; empty: string }) {
   );
 }
 
-function Tiles({ tiles, cols }: { tiles: Tile[]; cols: number }) {
+export function Tiles({ tiles, cols }: { tiles: Tile[]; cols: number }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 10, marginTop: 12 }}>
       {tiles.map((t) => (

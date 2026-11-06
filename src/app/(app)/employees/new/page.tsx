@@ -1,7 +1,8 @@
+import EmployeeForm from "@/components/employees/EmployeeForm";
 import { PageHeader } from "@/components/ui";
-import EntityForm from "@/components/EntityForm";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
+import { PERMISSIONS } from "@/lib/permissions";
 import { createEmployee } from "../actions";
 
 export const metadata = { title: "Add employee" };
@@ -10,32 +11,15 @@ export default async function NewEmployeePage() {
   const user = await requirePagePermission("employees.manage");
   const roles = await db.role.findMany({
     where: user.isSuperAdmin ? {} : { isSuperAdmin: false },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    orderBy: [{ isSuperAdmin: "desc" }, { name: "asc" }],
+    include: { _count: { select: { permissions: true } } },
   });
 
   return (
     <>
-      <PageHeader title="Add employee" back={{ href: "/employees", label: "Employees" }} />
-      <div className="card card-pad max-w-2xl">
-        <EntityForm
-          action={createEmployee}
-          submitLabel="Create employee"
-          fields={[
-            { name: "name", label: "Full name", required: true },
-            { name: "username", label: "Username", required: true, hint: "Used to sign in. Lowercase, no spaces.", autoComplete: "off" },
-            { name: "email", label: "Email", type: "email", hint: "Optional." },
-            { name: "phone", label: "Phone", hint: "Optional." },
-            {
-              name: "roleId",
-              label: "Role",
-              type: "select",
-              required: true,
-              options: [{ value: "", label: "Choose role…" }, ...roles.map((r) => ({ value: r.id, label: r.name }))],
-            },
-            { name: "password", label: "Temporary password", type: "password", required: true, hint: "At least 8 characters with a letter and a number. They must change it at first sign-in.", autoComplete: "new-password" },
-          ]}
-        />
+      <PageHeader title="Add employee" description="Who they are, their position, and a password for the first sign-in." back={{ href: "/employees", label: "Employees" }} />
+      <div className="card card-pad max-w-3xl">
+        <EmployeeForm action={createEmployee} roles={roles.map((r) => ({ id: r.id, name: r.name, description: r.description ?? "", full: r.isSuperAdmin, permissions: r._count.permissions, total: PERMISSIONS.length }))} />
       </div>
     </>
   );
