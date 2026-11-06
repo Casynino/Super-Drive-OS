@@ -14,7 +14,7 @@ import { untrackedStock } from "@/lib/inventory/items";
 import { labelExistingStockAction } from "./actions";
 import { formatDate, formatDateTime } from "@/lib/utils";
 
-export const metadata = { title: "Items" };
+export const metadata = { title: "All pieces" };
 const PAGE = 50;
 
 type Search = { q?: string; status?: string; product?: string; shipment?: string; page?: string };
@@ -108,7 +108,8 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHeader
-        title="Items"
+        title="All pieces"
+        back={{ href: "/products", label: "Products" }}
         description="Every bottle, gallon or box has its own number and QR code. See how many there are and where they went, find one, print or reprint its label."
         actions={
           <>

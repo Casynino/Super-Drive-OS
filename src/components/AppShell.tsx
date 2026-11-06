@@ -42,8 +42,9 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   // The most specific matching item is the active one (so /settings/roles doesn't also light up /settings).
   const allItems = groups.flatMap((g) => g.items);
   const active = allItems
-    .filter((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
-    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+    .map((i) => ({ href: i.href, len: Math.max(0, ...[i.href, ...(i.also ?? [])].filter((h) => pathname === h || pathname.startsWith(h + "/")).map((h) => h.length)) }))
+    .filter((i) => i.len > 0)
+    .sort((a, b) => b.len - a.len)[0]?.href;
   const activeGroup = groups.find((g) => g.items.some((i) => i.href === active))?.label;
 
   // Accordion: one group open at a time. It starts on the group of the page you are on, and follows you when you go to another page.
