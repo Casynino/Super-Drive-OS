@@ -22,7 +22,7 @@ export default async function NewReceiptPage() {
 
   return (
     <>
-      <PageHeader title="Receive stock" back={{ href: "/inventory/receiving", label: "Stock in" }} />
+      <PageHeader title="Receive stock" back={{ href: "/inventory/receiving", label: "Deliveries" }} />
       {products.length === 0 || locations.length === 0 ? (
         <div className="card">
           <EmptyState

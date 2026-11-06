@@ -326,7 +326,7 @@ export default function ProductForm({ product, categories, brands, units, curren
             </div>
           </details>
         )}
-        <p className="mt-4 rounded-lg bg-navy-50 px-3 py-2 text-sm text-navy-800">Current stock is not typed here. It changes only through stock in, sales and adjustments, so every movement is recorded.</p>
+        <p className="mt-4 rounded-lg bg-navy-50 px-3 py-2 text-sm text-navy-800">Current stock is not typed here. It changes only through deliveries, sales and adjustments, so every movement is recorded.</p>
       </section>
 
       {!disabled && (
