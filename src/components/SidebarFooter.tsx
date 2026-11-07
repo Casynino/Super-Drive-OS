@@ -11,8 +11,9 @@ function initials(name: string) {
 }
 
 /**
- * The bottom of the glass sidebar, like the reference: Notifications (the bell lives here now, there is no top bar on a computer), a Night mode switch, then the signed-in person (avatar with a green dot, name and
- * position) who opens a small menu: My profile, Change password, Sign out. In the narrow rail only the icon and the avatar show.
+ * The bottom of the glass sidebar: two small icons with no words (the bell with the unread count, and the night / light look), then the
+ * signed-in person as initials and the first name only. A small menu opens from it: full name and position, My profile, Change password,
+ * Sign out. In the narrow rail only icons and the initials show.
  */
 export default function SidebarFooter({ name, roleName, logoutAction, unread = 0, rail }: { name: string; roleName: string; logoutAction: () => Promise<void>; unread?: number; rail?: boolean }) {
   const pathname = usePathname();
@@ -40,65 +41,47 @@ export default function SidebarFooter({ name, roleName, logoutAction, unread = 0
     document.documentElement.classList.toggle("dark", next);
     document.cookie = `sd-theme=${next ? "dark" : "light"}; path=/; max-age=31536000; samesite=lax`;
   };
-  const item = "glass-row flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm text-slate-700 hover:text-slate-900";
+  const iconBtn = "glass-row relative grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-600 hover:text-slate-900";
+  const item = "glass-row flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] text-slate-700 hover:text-slate-900";
 
   return (
     <div className={cn("px-3 pb-3", rail && "flex flex-col items-center px-0")}>
       <div className="glass-divider mb-2 w-full" />
-      {rail ? (
-        <Link href="/notifications" title={unread > 0 ? `Notifications (${unread} new)` : "Notifications"} aria-label="Notifications" className="glass-row relative mb-1 grid h-11 w-11 place-items-center rounded-full text-slate-600 hover:text-slate-900">
+      {/* only icons here, no words: the bell (with the unread count) and the night / light look */}
+      <div className={cn(rail ? "mb-1 flex flex-col items-center gap-0.5" : "mb-1 flex items-center gap-1 px-1")}>
+        <Link href="/notifications" title={unread > 0 ? `Notifications (${unread} new)` : "Notifications"} aria-label="Notifications" className={iconBtn}>
           <Bell size={18} />
-          {unread > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-brand-red shadow-[0_0_8px_rgba(237,28,36,0.7)] ring-2 ring-white dark:ring-[#0f1c33]" aria-hidden />}
+          {unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold leading-none text-white">{unread > 9 ? "9+" : unread}</span>}
         </Link>
-      ) : (
-        <Link href="/notifications" className="glass-row flex items-center justify-between gap-3 rounded-lg px-3.5 py-2 text-[13.5px] font-medium text-slate-600 hover:text-slate-900">
-          <span className="flex items-center gap-3">
-            <Bell size={18} className="text-slate-500" />
-            Notifications
-          </span>
-          {unread > 0 && <span className="rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white">{unread > 99 ? "99+" : unread}</span>}
-        </Link>
-      )}
-      {rail ? (
-        <button type="button" onClick={toggleTheme} title={dark ? "Switch to the light look" : "Switch to night mode"} className="glass-row mb-1 grid h-11 w-11 place-items-center rounded-full text-slate-600 hover:text-slate-900" aria-label="Night mode">
+        <button type="button" onClick={toggleTheme} title={dark ? "Switch to the light look" : "Switch to night mode"} aria-label="Night mode" aria-pressed={dark} className={iconBtn}>
           {dark ? <Moon size={18} /> : <Sun size={18} />}
         </button>
-      ) : (
-        <div className="flex items-center justify-between gap-3 rounded-full px-3.5 py-2">
-          <span className="flex items-center gap-3 text-[13.5px] font-medium text-slate-600">
-            {dark ? <Moon size={18} className="text-slate-500" /> : <Sun size={18} className="text-slate-500" />}
-            Night mode
-          </span>
-          <button type="button" role="switch" aria-checked={dark} aria-label="Night mode" onClick={toggleTheme} className="glass-switch relative h-6 w-11 shrink-0 rounded-full transition">
-            <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", dark ? "left-[1.4rem]" : "left-0.5")} />
-          </button>
-        </div>
-      )}
+      </div>
 
       <div className="relative w-full" ref={box}>
-        <button type="button" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-haspopup="menu" className={cn("glass-row flex w-full items-center gap-3 rounded-full text-left", rail ? "justify-center p-1" : "px-2 py-2")} title={rail ? name : undefined}>
+        <button type="button" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-haspopup="menu" className={cn("glass-row flex w-full items-center gap-3 rounded-full text-left", rail ? "justify-center p-1" : "px-2 py-2")} title={name}>
           <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-navy-600 to-navy-800 text-xs font-semibold text-white ring-1 ring-white/25">
             {initials(name)}
           </span>
-          {/* only the initials and the full name (it wraps instead of being cut off) */}
-          {!rail && <span className="min-w-0 flex-1 break-words text-sm font-semibold leading-snug text-slate-900">{name}</span>}
+          {/* only the initials and ONE name (the first); the full name and the position are in the menu that opens from here */}
+          {!rail && <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{name.trim().split(/\s+/)[0]}</span>}
         </button>
 
         {menu && (
-          <div role="menu" className={cn("absolute z-50 w-56 overflow-hidden rounded-2xl border border-line bg-white p-1.5 shadow-[0_16px_40px_-14px_rgba(0,0,0,0.55)]", rail ? "bottom-0 left-full ml-3" : "bottom-full left-0 mb-2")}>
-            <div className="px-3 py-2">
-              <p className="truncate text-sm font-semibold text-slate-900">{name}</p>
-              <p className="truncate text-xs text-slate-500">{roleName}</p>
+          <div role="menu" className={cn("absolute z-50 w-44 overflow-hidden rounded-xl border border-line bg-white p-1 shadow-[0_12px_30px_-12px_rgba(0,0,0,0.55)]", rail ? "bottom-0 left-full ml-3" : "bottom-full left-0 mb-2")}>
+            <div className="px-2.5 pb-1.5 pt-1">
+              <p className="break-words text-[13px] font-semibold leading-snug text-slate-900">{name}</p>
+              <p className="truncate text-[11px] text-slate-500">{roleName}</p>
             </div>
             <Link href="/account" role="menuitem" className={item}>
-              <UserRound size={16} /> My profile
+              <UserRound size={14} /> My profile
             </Link>
             <Link href="/account#password" role="menuitem" className={item}>
-              <KeyRound size={16} /> Change password
+              <KeyRound size={14} /> Change password
             </Link>
             <form action={logoutAction}>
               <button type="submit" role="menuitem" className={cn(item, "text-rose-600 hover:text-rose-600 dark:text-rose-400")}>
-                <LogOut size={16} /> Sign out
+                <LogOut size={14} /> Sign out
               </button>
             </form>
           </div>

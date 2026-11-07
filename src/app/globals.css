@@ -269,6 +269,3 @@ html:not(.dark) .glass-panel {
 .glass-tree > li { position: relative; }
 .glass-tree > li::before { content: ""; position: absolute; left: -1.05rem; top: 50%; width: 0.8rem; height: 0.8rem; border-left: 1px solid var(--glass-line); border-bottom: 1px solid var(--glass-line); border-bottom-left-radius: 0.65rem; transform: translateY(-88%); pointer-events: none; }
 .glass-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--glass-line), transparent); }
-.glass-switch { background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22); }
-html:not(.dark) .glass-switch { background: rgba(14, 61, 110, 0.14); box-shadow: inset 0 0 0 1px rgba(14, 61, 110, 0.2); }
-html.dark .glass-switch[aria-checked="true"], .glass-switch[aria-checked="true"] { background: #FDC400; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4); }

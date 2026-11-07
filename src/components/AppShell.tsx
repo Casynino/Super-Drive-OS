@@ -131,7 +131,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         <Link
           href={item.href}
           aria-current={isActive ? "page" : undefined}
-          className={cn("relative flex items-center gap-3 rounded-lg", child ? "px-3 py-1.5 text-[13px]" : "px-3.5 py-2 text-[13.5px]", isActive ? "glass-active font-medium text-slate-900" : "glass-row text-slate-600 hover:text-slate-900")}
+          className={cn("relative flex items-center gap-3 rounded-lg", child ? "px-3 py-1.5 text-[13px]" : "px-3 py-2 text-[13px]", isActive ? "glass-active font-medium text-slate-900" : "glass-row text-slate-600 hover:text-slate-900")}
         >
           <Icon size={child ? 16 : 18} className={cn("shrink-0", isActive && "text-oil-500")} />
           <span className="min-w-0 flex-1 truncate">{nameOf(item)}</span>
@@ -143,10 +143,10 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
 
   const brand = (compact: boolean) => (
     <Link href="/dashboard" className="flex min-w-0 items-center gap-3" aria-label={`${businessName} home`}>
-      <Image src="/brand/app-192.png" alt="" width={44} height={44} priority className={cn("shrink-0 rounded-full ring-2 ring-oil-400/45", compact ? "h-10 w-10" : "h-11 w-11")} />
+      <Image src="/brand/app-192.png" alt="" width={44} height={44} priority className={cn("shrink-0 rounded-full ring-2 ring-oil-400/45", "h-10 w-10")} />
       {!compact && (
         <span className="min-w-0 leading-tight">
-          <span className="block truncate text-[15px] font-semibold tracking-tight text-slate-900">{businessName}</span>
+          <span className="block truncate text-sm font-semibold tracking-tight text-slate-900">{businessName}</span>
           <span className="mt-0.5 block truncate text-xs text-slate-500">Sales &amp; distribution</span>
         </span>
       )}
@@ -184,7 +184,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         </label>
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2" aria-label="Main">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2" aria-label="Main">
         {term ? (
           results.length > 0 ? (
             <ul className="mt-2 space-y-0.5">{results.map(({ item }) => row(item))}</ul>
@@ -219,7 +219,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
                       type="button"
                       onClick={() => setOpenGroup(isOpen ? null : group.label)}
                       aria-expanded={isOpen}
-                      className={cn("glass-row flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-left text-[13.5px] font-medium hover:text-slate-900", here ? "text-slate-900" : "text-slate-600")}
+                      className={cn("glass-row flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] font-medium hover:text-slate-900", here ? "text-slate-900" : "text-slate-600")}
                     >
                       {Icon && <Icon size={18} className={cn("shrink-0", here ? "text-oil-500" : "text-slate-400")} />}
                       <span className="flex-1">{group.label}</span>
@@ -286,10 +286,10 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   const dateShort = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Africa/Dar_es_Salaam" }).format(new Date()); // phones
 
   return (
-    <div className={cn("min-h-dvh transition-[padding] duration-200 print:pl-0", collapsed ? "lg:pl-[5.9rem]" : "lg:pl-[17.5rem]")}>
+    <div className={cn("min-h-dvh transition-[padding] duration-200 print:pl-0", collapsed ? "lg:pl-[5.9rem]" : "lg:pl-[15.5rem]")}>
       {/* Desktop and tablet: the glass sidebar. The round button on its edge folds it into an icon rail and back. */}
-      <aside className={cn("fixed left-3 top-3 z-30 hidden lg:block print:hidden", collapsed ? "w-[4.5rem]" : "w-64")}>
-        <div className="glass-panel flex max-h-[calc(100dvh-1.5rem)] flex-col">{collapsed ? rail : full(false)}</div>
+      <aside className={cn("fixed left-3 top-3 z-30 hidden lg:block print:hidden", collapsed ? "w-[4.5rem]" : "bottom-3 w-56")}>
+        <div className={cn("glass-panel flex flex-col", collapsed ? "max-h-[calc(100dvh-1.5rem)]" : "h-full")}>{collapsed ? rail : full(false)}</div>
         <div className="group absolute -right-3.5 top-[1.65rem] z-10">
           <button type="button" onClick={() => setRail(!collapsed)} aria-label={collapsed ? "Expand the menu" : "Collapse the menu"} className="grid h-7 w-7 place-items-center rounded-full bg-white text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.4)] ring-1 ring-black/10 transition hover:scale-105">
             {collapsed ? <ChevronRight size={15} strokeWidth={2.5} /> : <ChevronLeft size={15} strokeWidth={2.5} />}
@@ -304,8 +304,8 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} aria-hidden />
-          <aside className="absolute left-3 top-3 w-72 max-w-[85vw]">
-            <div className="glass-panel flex max-h-[calc(100dvh-1.5rem)] flex-col">{full(true)}</div>
+          <aside className="absolute inset-y-3 left-3 w-64 max-w-[85vw]">
+            <div className="glass-panel h-full">{full(true)}</div>
           </aside>
         </div>
       )}
