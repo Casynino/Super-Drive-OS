@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { CheckCircle2, ChevronLeft, ChevronRight, Clock, ReceiptText, Search, Tag, Wallet } from "lucide-react";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
-import { ExpenseDecisionForm, ExpenseForm } from "@/components/cash/ExpenseForms";
+import { ExpenseDecisionForm, RecordExpenseButton } from "@/components/cash/ExpenseForms";
 import { ExpenseStatusBadge } from "@/components/cash/Display";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { Prisma, type ExpenseStatus } from "@/generated/prisma/client";
@@ -143,7 +143,11 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Expenses" description={seeAll ? "Everything the shop spent." : "Money you spent for the shop."} />
+      <PageHeader
+        title="Expenses"
+        description={seeAll ? "Everything the shop spent." : "Money you spent for the shop."}
+        actions={canRecord ? <RecordExpenseButton key={sp.recorded ?? "new"} action={recordExpenseAction} accounts={await listAccounts(db, await defaultLocationId(db))} categories={categories} today={today} submissionKey={randomUUID()} limitText={limitText} /> : undefined}
+      />
 
       {sp.recorded && (
         <div className="mb-4">
@@ -157,17 +161,6 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
             </Alert>
           )}
         </div>
-      )}
-
-      {canRecord && (
-        <section className="card mb-5 px-4 py-4 sm:px-5 sm:py-5" aria-label="Record an expense">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">Record an expense</h2>
-          {categories.length === 0 ? (
-            <Alert kind="info">The owner has not set up expense categories yet (Settings → Expenses).</Alert>
-          ) : (
-            <ExpenseForm key={sp.recorded ?? "new"} action={recordExpenseAction} accounts={await listAccounts(db, await defaultLocationId(db))} categories={categories} today={today} submissionKey={randomUUID()} limitText={limitText} />
-          )}
-        </section>
       )}
 
       <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">

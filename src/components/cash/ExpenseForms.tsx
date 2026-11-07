@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useId, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Camera } from "lucide-react";
+import { ArrowLeft, Camera, ChevronRight, Plus, X } from "lucide-react";
 import { Alert } from "@/components/ui";
 import { type FormAccount } from "@/components/cash/AccountSelect";
 import { Field, SubmitButton, inputClass } from "@/components/FormBits";
@@ -12,18 +12,7 @@ import { cn } from "@/lib/utils";
 type Action = (prev: ActionState, fd: FormData) => Promise<ActionState>;
 const initial: ActionState = {};
 
-/**
- * Quick expense form for the shop person (he records every shop expense): tap what it was for, type the amount, tap where the
- * money came from, save. Date, receipt photo and a note are tucked away; "Details" is optional (the category name is used when empty).
- */
-export function ExpenseForm({
-  action,
-  categories,
-  today,
-  submissionKey,
-  limitText,
-  accounts,
-}: {
+type ExpenseFormProps = {
   action: Action;
   accounts: FormAccount[];
   categories: { id: string; name: string }[];
@@ -31,93 +20,186 @@ export function ExpenseForm({
   submissionKey: string;
   /** e.g. "Up to TSh 20,000 is recorded straight away." */
   limitText: string;
-}) {
+};
+
+/**
+ * "Record expense" button + pop-up for the shop person (he records every shop expense). Two short steps: 1 What (tap the
+ * category), 2 How much (amount, where the money came from, save). Details, receipt photo, note and date are optional.
+ */
+export function RecordExpenseButton(props: ExpenseFormProps) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <>
+      <button type="button" className="btn-primary" onClick={() => setOpen(true)}>
+        <Plus size={18} aria-hidden /> Record expense
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-label="Record an expense" className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-line bg-white shadow-2xl sm:max-w-xl sm:rounded-2xl">
+            <ExpenseForm {...props} onClose={() => setOpen(false)} />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ExpenseForm({ action, categories, today, submissionKey, limitText, accounts, onClose }: ExpenseFormProps & { onClose: () => void }) {
   const [state, formAction] = useActionState(action, initial);
   const uid = useId();
   const fe = state.fieldErrors ?? {};
   const v = state.values ?? {};
   const id = (n: string) => `${uid}-${n}`;
   const [categoryId, setCategoryId] = useState(v.categoryId ?? "");
+  const [step, setStep] = useState<1 | 2>(v.categoryId ? 2 : 1);
   const [accountId, setAccountId] = useState(v.accountId ?? accounts.find((a) => a.method === "CASH")?.id ?? accounts[0]?.id ?? "");
   const [amount, setAmount] = useState((v.amount ?? "").replace(/\D/g, ""));
+  const amountRef = useRef<HTMLInputElement>(null);
+  const category = categories.find((c) => c.id === categoryId);
   const KIND: Record<string, string> = { CASH: "Cash", MOBILE_MONEY: "Mobile money", BANK: "Bank" };
-  const chip = (on: boolean) => cn("rounded-lg border px-3 py-2.5 text-left text-sm font-medium leading-tight transition", on ? "border-navy-600 bg-navy-50 text-navy-800" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50");
+  const kindOf = (a: FormAccount) => ((KIND[a.method] ?? a.method) === a.name ? "" : (KIND[a.method] ?? a.method));
+  const pick = (cid: string) => {
+    setCategoryId(cid);
+    setStep(2);
+    // with a mouse the cursor goes straight to the amount; on a phone the keyboard stays closed until it is tapped
+    if (typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches) setTimeout(() => amountRef.current?.focus(), 30);
+  };
+  const chip = (on: boolean) => cn("rounded-xl border px-3.5 py-3 text-left text-sm font-medium leading-tight transition", on ? "border-navy-600 bg-navy-50 text-navy-800" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50");
+  const stepPill = (n: 1 | 2, label: string) => (
+    <button type="button" onClick={() => (n === 1 || category) && setStep(n)} aria-current={step === n ? "step" : undefined} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition", step === n ? "bg-navy-700 text-white" : "text-slate-500 hover:text-slate-800")}>
+      <span>{n}</span> {label}
+    </button>
+  );
   return (
-    <form action={formAction} noValidate className="space-y-5">
+    <form action={formAction} noValidate className="flex min-h-0 flex-1 flex-col">
       <input type="hidden" name="submissionKey" value={submissionKey} />
       <input type="hidden" name="categoryId" value={categoryId} />
       <input type="hidden" name="accountId" value={accountId} />
       <input type="hidden" name="amount" value={amount} />
-      {state.error && <Alert>{state.error}</Alert>}
 
-      <div>
-        <p className="label" id={id("cat")}>
-          What was it for?<span className="ml-0.5 text-brand-red">*</span>
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" role="radiogroup" aria-labelledby={id("cat")}>
-          {categories.map((c) => (
-            <button key={c.id} type="button" role="radio" aria-checked={c.id === categoryId} onClick={() => setCategoryId(c.id)} className={chip(c.id === categoryId)}>
-              {c.name}
-            </button>
-          ))}
+      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+        <div className="flex items-center gap-1">
+          {stepPill(1, "What")}
+          <span className="text-slate-300">—</span>
+          {stepPill(2, "How much")}
         </div>
-        {fe.categoryId && <p className="field-error mt-1.5">{fe.categoryId}</p>}
+        <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900" aria-label="Close">
+          <X size={18} />
+        </button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Amount" name="amountShown" id={id("amount")} error={fe.amount} required>
-          <div className="relative">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">TSh</span>
-            <input id={id("amount")} inputMode="numeric" autoComplete="off" placeholder="0" value={amount ? Number(amount).toLocaleString("en-US") : ""} onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 12))} className={`${inputClass(fe.amount)} pl-12 text-2xl font-bold tabular-nums`} />
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-5">
+        {state.error && (
+          <div className="mb-4">
+            <Alert>{state.error}</Alert>
           </div>
-        </Field>
-        <Field label="Details (optional)" name="description" id={id("desc")} error={categoryId ? fe.description : undefined}>
-          <input id={id("desc")} name="description" autoComplete="off" defaultValue={v.description ?? ""} placeholder="e.g. Taxi to deliver 4 cartons to Mwenge" className={`${inputClass(categoryId ? fe.description : undefined)} h-[3.25rem]`} />
-        </Field>
-      </div>
+        )}
 
-      <div>
-        <p className="label" id={id("account")}>
-          Paid from
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" role="radiogroup" aria-labelledby={id("account")}>
-          {accounts.map((a) => (
-            <button key={a.id} type="button" role="radio" aria-checked={a.id === accountId} onClick={() => setAccountId(a.id)} className={chip(a.id === accountId)}>
-              <span className="block">{a.name}</span>
-              <span className="block truncate text-[11px] font-normal text-slate-500">
-                {(KIND[a.method] ?? a.method) === a.name ? "" : KIND[a.method] ?? a.method}
-                {a.accountNumber ? `${(KIND[a.method] ?? a.method) === a.name ? "" : " · "}${a.accountNumber}` : ""}
-              </span>
+        {/* 1 What */}
+        <div className={step === 1 ? "" : "hidden"}>
+          <h2 className="text-xl font-semibold text-slate-900">What was it for?</h2>
+          <p className="mb-4 mt-1 text-sm text-slate-500">Tap one.</p>
+          {categories.length === 0 ? (
+            <Alert kind="info">The owner has not set up expense categories yet (Settings → Expenses).</Alert>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2" role="radiogroup" aria-label="What was it for?">
+              {categories.map((c) => (
+                <button key={c.id} type="button" role="radio" aria-checked={c.id === categoryId} onClick={() => pick(c.id)} className={cn(chip(c.id === categoryId), "flex items-center justify-between gap-2 py-3.5 text-base")}>
+                  {c.name}
+                  <ChevronRight size={16} className="shrink-0 text-slate-400" aria-hidden />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 2 How much (kept in the page while you go back, so nothing typed is lost) */}
+        <div className={cn("space-y-5", step === 2 ? "" : "hidden")}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Expense for</p>
+              <p className="truncate text-xl font-semibold text-slate-900">{category?.name ?? "—"}</p>
+            </div>
+            <button type="button" onClick={() => setStep(1)} className="shrink-0 text-sm font-medium text-navy-700 hover:underline">
+              Change
             </button>
-          ))}
+          </div>
+
+          <Field label="How much?" name="amountShown" id={id("amount")} error={fe.amount} required>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">TSh</span>
+              <input ref={amountRef} id={id("amount")} inputMode="numeric" autoComplete="off" placeholder="0" value={amount ? Number(amount).toLocaleString("en-US") : ""} onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 12))} className={`${inputClass(fe.amount)} h-14 pl-14 text-3xl font-bold tabular-nums`} />
+            </div>
+          </Field>
+
+          <div>
+            <p className="label" id={id("account")}>
+              Paid from
+            </p>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby={id("account")}>
+              {accounts.map((a) => (
+                <button key={a.id} type="button" role="radio" aria-checked={a.id === accountId} onClick={() => setAccountId(a.id)} className={chip(a.id === accountId)}>
+                  <span className="block">{a.name}</span>
+                  {(kindOf(a) || a.accountNumber) && (
+                    <span className="block truncate text-[11px] font-normal text-slate-500">
+                      {kindOf(a)}
+                      {a.accountNumber ? `${kindOf(a) ? " · " : ""}${a.accountNumber}` : ""}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {(fe.accountId ?? fe.method) && <p className="field-error mt-1.5">{fe.accountId ?? fe.method}</p>}
+          </div>
+
+          <Field label="Details (optional)" name="description" id={id("desc")} error={fe.description}>
+            <input id={id("desc")} name="description" autoComplete="off" defaultValue={v.description ?? ""} placeholder="e.g. Taxi to deliver 4 cartons to Mwenge" className={inputClass(fe.description)} />
+          </Field>
+
+          <details className="group rounded-lg border border-line px-3 py-2.5" open={Boolean(fe.expenseDate || fe.receipt)}>
+            <summary className="cursor-pointer list-none text-sm font-medium text-slate-600 group-open:mb-3">Add a receipt photo, a note, or change the date</summary>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Date" name="expenseDate" id={id("date")} error={fe.expenseDate}>
+                <input id={id("date")} type="date" name="expenseDate" defaultValue={v.expenseDate ?? today} max={today} className={inputClass(fe.expenseDate)} />
+              </Field>
+              <Field label="Note (optional)" name="notes" id={id("notes")}>
+                <input id={id("notes")} name="notes" autoComplete="off" defaultValue={v.notes ?? ""} className="input" />
+              </Field>
+              <Field label="Receipt photo (optional)" name="receipt" id={id("receipt")} error={fe.receipt} className="sm:col-span-2">
+                <label htmlFor={id("receipt")} className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:border-navy-300 hover:bg-navy-50">
+                  <Camera size={16} />
+                  <input id={id("receipt")} type="file" name="receipt" accept="image/*" className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium" />
+                </label>
+              </Field>
+            </div>
+          </details>
         </div>
-        {(fe.accountId ?? fe.method) && <p className="field-error mt-1.5">{fe.accountId ?? fe.method}</p>}
       </div>
 
-      <details className="group rounded-lg border border-line px-3 py-2.5" open={Boolean(fe.expenseDate || fe.receipt)}>
-        <summary className="cursor-pointer list-none text-sm font-medium text-slate-600 group-open:mb-3">Add a receipt photo, a note, or change the date</summary>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Date" name="expenseDate" id={id("date")} error={fe.expenseDate}>
-            <input id={id("date")} type="date" name="expenseDate" defaultValue={v.expenseDate ?? today} max={today} className={inputClass(fe.expenseDate)} />
-          </Field>
-          <Field label="Note (optional)" name="notes" id={id("notes")}>
-            <input id={id("notes")} name="notes" autoComplete="off" defaultValue={v.notes ?? ""} className="input" />
-          </Field>
-          <Field label="Receipt photo (optional)" name="receipt" id={id("receipt")} error={fe.receipt} hint="A picture of the receipt helps the owner check it." className="sm:col-span-2">
-            <label htmlFor={id("receipt")} className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:border-navy-300 hover:bg-navy-50">
-              <Camera size={16} />
-              <input id={id("receipt")} type="file" name="receipt" accept="image/*" className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium" />
-            </label>
-          </Field>
+      {step === 2 && (
+        <div className="border-t border-line px-4 py-3 sm:px-5">
+          <p className="mb-2.5 text-xs text-slate-500">{limitText}</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setStep(1)} className="btn-secondary shrink-0" aria-label="Back">
+              <ArrowLeft size={16} aria-hidden /> Back
+            </button>
+            <SubmitButton pendingLabel="Saving…" className="btn-primary flex-1">
+              Save expense
+            </SubmitButton>
+          </div>
         </div>
-      </details>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-slate-500">{limitText}</p>
-        <SubmitButton pendingLabel="Saving…" className="btn-primary w-full sm:w-auto sm:min-w-48">
-          Save expense
-        </SubmitButton>
-      </div>
+      )}
     </form>
   );
 }
