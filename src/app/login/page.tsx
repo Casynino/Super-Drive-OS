@@ -31,11 +31,11 @@ export default async function LoginPage() {
       <div className="relative z-10 grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
         {/* Words (wide screens) */}
         <section className="hidden flex-col justify-between p-12 text-white lg:flex">
-          <div className="ls-up ls-brand w-fit" style={delay(0.05)}>
+          <div className="ls-up ls-brand w-fit min-[1360px]:invisible" style={delay(0.05)}>
             <Logo className="h-28 xl:h-36 2xl:h-44" />
           </div>
 
-          <div className="mb-[clamp(190px,32vh,330px)] max-w-lg">
+          <div className="mb-[clamp(190px,32vh,330px)] max-w-lg min-[1360px]:max-w-sm">
             <p className="ls-up mb-4 h-1 w-12 rounded bg-oil-400" style={delay(0.15)} />
             <h2 className="ls-up text-balance text-4xl font-semibold leading-[1.1] tracking-tight" style={delay(0.25)}>
               Sales, stock and credit <span className="text-oil-400">in one place.</span>

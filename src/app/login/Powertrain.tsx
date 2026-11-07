@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 // A V-twin engine cutaway and a rev gauge, animated together: the crank turns, the pistons and rods follow the real
 // crank geometry, the spark flashes at the top of every second stroke, and the needle follows the same engine speed.
@@ -34,7 +34,8 @@ function geo(theta: number, phiDeg: number) {
 
 const rpmAt = (t: number) => Math.min(7.7, Math.max(0.8, 4.1 + 2.7 * Math.sin(t * 0.8) + 0.8 * Math.sin(t * 2.1 + 1)));
 
-export default function Powertrain() {
+// children = something drawn BEHIND the gauge and engine (the sign-in logo)
+export default function Powertrain({ children }: { children?: ReactNode }) {
   const needle = useRef<SVGGElement>(null);
   const readout = useRef<SVGTextElement>(null);
   const crank = useRef<SVGGElement>(null);
@@ -103,6 +104,7 @@ export default function Powertrain() {
 
   return (
     <div className="ls-power">
+      {children}
       <svg className="ls-gauge-svg" viewBox="0 0 300 300" role="presentation" focusable="false">
         <defs>
           <filter id="g-glow" x="-30%" y="-30%" width="160%" height="160%">

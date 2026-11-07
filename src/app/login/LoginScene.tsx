@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import BrandLogo from "@/components/BrandLogo";
 import Powertrain from "./Powertrain";
 import { Pickup, SportsCar, Tanker } from "./Vehicles";
 
@@ -29,7 +30,12 @@ export default function LoginScene() {
     <div className="ls" aria-hidden="true">
       <span className="ls-aurora a" />
       <span className="ls-aurora b" />
-      <Powertrain />
+      <Powertrain>
+        {/* the big logo, standing on the horizon behind the engine (wide screens; phones show it above the card) */}
+        <span className="ls-power-logo ls-brand">
+          <BrandLogo onDark priority />
+        </span>
+      </Powertrain>
       {DOTS.map(([l, d, s], i) => (
         <span key={i} className="ls-dot" style={vars({ "--l": l, "--d": d, "--s": s })} />
       ))}
