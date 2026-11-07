@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { HandCoins, ShoppingBag, Undo2 } from "lucide-react";
+import { ArrowUpRight, HandCoins, ShoppingBag, Undo2 } from "lucide-react";
 import CollectModal from "@/components/pos/CollectModal";
 import ReturnModal from "@/components/pos/ReturnModal";
 import type { TillSummary } from "@/app/(app)/till/actions";
@@ -18,7 +18,7 @@ const quiet = "border-line bg-white text-slate-700 hover:border-navy-200 hover:b
  * Small buttons for a Winga: Sell (opens the till on him), Collect payment and Return goods (pop-ups, nothing leaves the page).
  * Used on the till, the Winga list and the Winga profile.
  */
-export default function WingaActions({ customerId, name, sellHref, canCollect, canReturn, accounts, currency, onDone, emphasizeCollect, short }: { customerId: string; name: string; sellHref?: string; canCollect?: boolean; canReturn?: boolean; accounts: PayAccount[]; currency: { symbol: string; decimals: number }; onDone?: (s: TillSummary) => void; emphasizeCollect?: boolean; short?: boolean }) {
+export default function WingaActions({ customerId, name, sellHref, canCollect, canReturn, accounts, currency, onDone, emphasizeCollect, short, openHref, openLabel, openNewTab }: { customerId: string; name: string; sellHref?: string; canCollect?: boolean; canReturn?: boolean; accounts: PayAccount[]; currency: { symbol: string; decimals: number }; onDone?: (s: TillSummary) => void; emphasizeCollect?: boolean; short?: boolean; openHref?: string; openLabel?: string; openNewTab?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState<"collect" | "return" | null>(null);
   const done = (s: TillSummary) => {
@@ -42,6 +42,11 @@ export default function WingaActions({ customerId, name, sellHref, canCollect, c
           <button type="button" className={cn(base, quiet)} onClick={() => setOpen("return")}>
             <Undo2 size={13} /> {short ? "Return" : "Return goods"}
           </button>
+        )}
+        {openHref && (
+          <Link href={openHref} target={openNewTab ? "_blank" : undefined} rel={openNewTab ? "noopener" : undefined} className={cn(base, quiet)} title="Open the full page: performance, orders, payments">
+            <ArrowUpRight size={13} /> {openLabel ?? "Open"}
+          </Link>
         )}
       </div>
       {canCollect && open === "collect" && <CollectModal open onClose={() => setOpen(null)} customerId={customerId} customerName={name} accounts={accounts} currency={currency} onDone={done} />}

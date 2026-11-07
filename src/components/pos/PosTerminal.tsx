@@ -33,7 +33,7 @@ type Props = {
   accounts: PayAccount[];
   submissionKey: string;
   currency: { code: string; symbol: string; decimals: number };
-  perms: { credit: boolean; discount: boolean; addCustomer: boolean; addWinga?: boolean; collect?: boolean; returns?: boolean; viewWinga?: boolean; creditException: boolean };
+  perms: { credit: boolean; discount: boolean; addCustomer: boolean; addWinga?: boolean; collect?: boolean; returns?: boolean; viewWinga?: boolean; viewCustomer?: boolean; creditException: boolean };
   /** the CTN | PCS switch: cartons are the default, PCS makes new lines start in pieces */
   unitMode: UnitMode;
 };
@@ -614,11 +614,21 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                     </Link>
                   </p>
                 )}
-                {((perms.returns && customer.winga && owes > 0) || (perms.collect && owes > 0)) && (
-                  <div className="mt-2.5">
-                    <WingaActions customerId={customer.id} name={customer.name} canCollect={perms.collect && owes > 0} canReturn={perms.returns && customer.winga === true && owes > 0} accounts={locAccounts} currency={currency} emphasizeCollect={Boolean(customer.late)} onDone={(sum) => refreshCustomer(customer.id, sum)} />
-                  </div>
-                )}
+                <div className="mt-2.5">
+                  <WingaActions
+                    customerId={customer.id}
+                    name={customer.name}
+                    canCollect={perms.collect && owes > 0}
+                    canReturn={perms.returns && customer.winga === true && owes > 0}
+                    accounts={locAccounts}
+                    currency={currency}
+                    emphasizeCollect={Boolean(customer.late)}
+                    onDone={(sum) => refreshCustomer(customer.id, sum)}
+                    openHref={customer.winga ? (customer.wingaId && perms.viewWinga ? `/resellers/${customer.wingaId}` : undefined) : perms.viewCustomer ? `/customers/${customer.id}` : undefined}
+                    openLabel={customer.winga ? "Open Winga" : "Open customer"}
+                    openNewTab={cartCount > 0}
+                  />
+                </div>
               </div>
             )}
 

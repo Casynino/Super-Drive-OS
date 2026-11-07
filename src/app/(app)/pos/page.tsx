@@ -73,6 +73,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
     phone: c.phone,
     type: c.type,
     winga: Boolean(c.reseller),
+    ...(c.reseller ? { wingaId: c.reseller.id } : {}),
     complete: Boolean(c.phone?.trim() && c.idNumber?.trim() && c.businessLocation?.trim()),
     ...(late.get(c.id) ? { late: { amount: late.get(c.id)!.amount.toString(), since: late.get(c.id)!.since.toISOString().slice(0, 10) } } : {}),
     ...(canCredit ? { creditLimit: c.creditLimit.toString(), outstanding: (owed.get(c.id) ?? 0).toString(), openOrders: orderCounts.get(c.id) ?? 0 } : {}),
@@ -122,7 +123,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
           unitMode={await getUnitMode()}
           currency={currency}
           accounts={accounts.map((a) => ({ id: a.id, locationId: a.locationId, method: a.method, name: a.name, accountNumber: a.accountNumber, isDefault: a.isDefault }))}
-          perms={{ credit: canCredit, discount: can(user, "sales.discount"), addCustomer: can(user, "customers.create"), addWinga: can(user, "resellers.operate") || can(user, "resellers.manage"), collect: can(user, "payments.record"), returns: can(user, "returns.create"), viewWinga: can(user, "resellers.view"), creditException: can(user, "credit.approve_exception") }}
+          perms={{ credit: canCredit, discount: can(user, "sales.discount"), addCustomer: can(user, "customers.create"), addWinga: can(user, "resellers.operate") || can(user, "resellers.manage"), collect: can(user, "payments.record"), returns: can(user, "returns.create"), viewWinga: can(user, "resellers.view"), viewCustomer: can(user, "customers.view"), creditException: can(user, "credit.approve_exception") }}
         />
       )}
     </>
