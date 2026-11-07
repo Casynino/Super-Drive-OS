@@ -102,7 +102,8 @@ export type PermissionKey = (typeof PERMISSIONS)[number]["key"];
 
 /**
  * SEPARATION OF DUTIES. These are the shop's day-to-day jobs: selling, taking payments, receiving stock,
- * recording expenses, requesting returns, closing the day. They belong to Sales / Shop and Warehouse / Store (and to a manager
+ * requesting returns, closing the day. (Recording expenses is NOT in this list: the shop person records most of them, but the
+ * owner may record one too, Nino 2026-11-07; the owner's own expenses are approved at once.) They belong to Sales / Shop and Warehouse / Store (and to a manager
  * if the owner chooses). The business owner does NOT get them automatically, even as Super Admin: his job is to
  * buy stock, set prices, watch the numbers, approve and manage people. A Super Admin only holds one of these
  * if it is explicitly granted to his role.
@@ -116,7 +117,6 @@ export const SHOP_FLOOR_PERMISSIONS: ReadonlySet<string> = new Set<PermissionKey
   "shipments.receive",
   "inventory.report_damage",
   "inventory.count",
-  "expenses.create",
   "returns.create",
   "closing.submit",
   "deposits.record",

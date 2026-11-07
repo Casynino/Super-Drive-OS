@@ -49,6 +49,9 @@ describe("can()", () => {
     const owner = { isSuperAdmin: true, permissions: new Set<string>() };
     for (const key of SHOP_FLOOR_PERMISSIONS) expect(can(owner, key as never)).toBe(false);
     expect(can({ isSuperAdmin: true, permissions: new Set(["sales.pos"]) }, "sales.pos")).toBe(true);
+    // recording an expense is the one exception: the owner may do it too (the shop person does most of them)
+    expect(SHOP_FLOOR_PERMISSIONS.has("expenses.create")).toBe(false);
+    expect(can(owner, "expenses.create")).toBe(true);
     // ...but he can still hand those permissions to staff
     expect(canGrant(owner, "sales.pos")).toBe(true);
     expect(canGrant({ isSuperAdmin: false, permissions: new Set() }, "sales.pos")).toBe(false);
