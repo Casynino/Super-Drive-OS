@@ -49,7 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       badges={badges}
       labels={
         // names that fit the shop person's work (the Director keeps "Closing" and the stock "Overview")
-        can(user, "closing.submit") || sellerOnly ? { ...(can(user, "closing.submit") ? { "/closing": "Close & deposit" } : {}), ...(sellerOnly ? { "/inventory": "Stock" } : {}) } : undefined
+        can(user, "closing.submit") || sellerOnly ? { ...(can(user, "closing.submit") ? { "/closing": "Close & deposit" } : {}), ...(sellerOnly ? { "/inventory": "Stock", "/pos": "Home" } : {}) } : undefined
       }
     >
       {children}
