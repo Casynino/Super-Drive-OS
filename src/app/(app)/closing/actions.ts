@@ -62,7 +62,7 @@ export async function submitClosingAction(_prev: ActionState, fd: FormData): Pro
           const diff = r.difference.isZero() ? "no difference" : `${r.difference.gt(0) ? "surplus" : "shortage"} of ${formatMoney(r.difference.abs(), currency)}`;
           await notifyPermission(tx, "closing.approve", {
             type: r.difference.isZero() ? "closing.submitted" : "closing.difference",
-            title: r.difference.isZero() ? `Day closed: ${r.closing.closingNo}` : `Cash ${r.difference.lt(0) ? "short" : "extra"} ${formatMoney(r.difference.abs(), currency)} at ${r.closing.closingNo}`,
+            title: r.difference.isZero() ? `Closing sent: ${r.closing.closingNo}` : `Cash ${r.difference.lt(0) ? "short" : "extra"} ${formatMoney(r.difference.abs(), currency)} at ${r.closing.closingNo}`,
             body: `${user.name} counted ${formatMoney(r.closing.countedCash, currency)}, the system expected ${formatMoney(r.closing.expectedCash, currency)} (${diff}).`,
             link: `/closing/${r.closing.id}`,
           }, user.id);

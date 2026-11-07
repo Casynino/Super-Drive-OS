@@ -23,10 +23,10 @@ import { cn, formatDate } from "@/lib/utils";
 import ClosingsSection, { closingCorrections } from "./ClosingsSection";
 import { recordDepositAction, submitClosingAction } from "./actions";
 
-export const metadata = { title: "End of day" };
+export const metadata = { title: "Closing" };
 
 /**
- * End of day. The shop person's page is short: today's numbers, the cash in the till, and one button that opens the closing pop-up
+ * Closing (count the cash, send it to the boss's account, close; it does not have to be the same day). The shop person's page is short: today's numbers, the cash in the till, and one button that opens the closing pop-up
  * (count, bank, close). The list of closed days is its own page (Past days). The owner's page is the list of every day.
  */
 export default async function ClosingPage({ searchParams }: { searchParams: Promise<{ show?: string; shop?: string; banked?: string }> }) {
@@ -92,17 +92,17 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
     <>
       {canSubmit && preview ? (
         <DayHeader
-          date={new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${today}T00:00:00Z`))}
+          date={preview.closed ? `Closing for ${new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${today}T00:00:00Z`))}` : preview.lastClosedDay ? `Since the last closing · ${formatDate(`${preview.lastClosedDay}T00:00:00Z`)}` : "Your first closing"}
           state={
             preview.closed
               ? { tone: "closed", title: `Closed${closedInfo?.closing ? ` at ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dar_es_Salaam" }).format(closedInfo.closing.submittedAt)}` : ""}`, detail: preview.closed.closingNo }
               : older.length > 0
                 ? { tone: "waiting", title: "Waiting to be closed", detail: `Includes cash from ${older.length === 1 ? formatDate(`${older[0]}T00:00:00Z`) : `${older.length} earlier days`}` }
-                : { tone: "open", title: "The shop is open", detail: "Close the day when you finish" }
+                : { tone: "open", title: "Ready to close", detail: "Close whenever you have counted the cash" }
           }
         />
       ) : (
-        <PageHeader title="End of day" description="Every closed day, with any cash that was short." />
+        <PageHeader title="Closing" description="Every closing, with any cash that was short." />
       )}
 
       {sp.banked && (
@@ -131,8 +131,8 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-0.5 text-emerald-600" size={22} />
                   <div>
-                    <p className="font-semibold text-emerald-900">Today is closed</p>
-                    <p className="text-sm text-emerald-800">{preview.closed.closingNo}. Everything below starts again from zero. New money goes into tomorrow&apos;s closing.</p>
+                    <p className="font-semibold text-emerald-900">Closing done</p>
+                    <p className="text-sm text-emerald-800">{preview.closed.closingNo}. The boss has the report and the money. Everything below starts again from zero; new money goes into the next closing.</p>
                   </div>
                 </div>
                 <Link href={`/closing/${preview.closed.id}`} className="btn-primary">
@@ -146,20 +146,20 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                 <KpiCard icon={Landmark} tone="blue" label="Bank since closing" value={money(sinceBy("BANK"))} hint="Nothing to count" />
               </div>
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-                <section className="card px-4 py-4 sm:px-5" aria-label="How the day closed">
-                  <h2 className="text-sm font-semibold text-slate-900">How the day closed</h2>
+                <section className="card px-4 py-4 sm:px-5" aria-label="How the closing went">
+                  <h2 className="text-sm font-semibold text-slate-900">How the closing went</h2>
                   <dl className="mt-3 space-y-1.5 text-sm">
                     <StatementRow label="Cash counted" value={money(closedInfo.closing?.countedCash ?? 0)} />
-                    <StatementRow sign="−" label="Taken to the bank" value={money(closedInfo.banked)} />
+                    <StatementRow sign="−" label="Sent to the boss's account" value={money(closedInfo.banked)} />
                   </dl>
                   <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
-                    <span className="text-sm font-semibold text-slate-900">Left in the till (tomorrow&apos;s start)</span>
+                    <span className="text-sm font-semibold text-slate-900">Left in the till (the balance)</span>
                     <span className="text-lg font-bold tabular-nums text-slate-900">{money(closedInfo.left)}</span>
                   </div>
                   <p className="mt-2 text-xs text-slate-500">The difference when you counted: {closedInfo.closing ? <Difference value={closedInfo.closing.difference.toString()} currency={currency} /> : "—"}</p>
                   {canDeposit && bankAccounts.length > 0 && (
                     <div className="mt-4 border-t border-line pt-4">
-                      <h3 className="mb-3 text-sm font-semibold text-slate-900">Take more cash to the bank</h3>
+                      <h3 className="mb-3 text-sm font-semibold text-slate-900">Send more cash to the boss's account</h3>
                       <DepositForm key={sp.banked ?? "new"} action={recordDepositAction} submissionKey={randomUUID()} cashBalance={money(cash?.balance ?? 0)} bankAccounts={bankAccounts} />
                     </div>
                   )}
@@ -182,15 +182,15 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
           {!preview.closed && (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr]">
             {!preview.closed && (
-              <section className="card flex flex-col justify-between gap-4 px-5 py-5 xl:col-start-2 xl:row-start-1" aria-label="Close the day">
+              <section className="card flex flex-col justify-between gap-4 px-5 py-5 xl:col-start-2 xl:row-start-1" aria-label="Closing">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Should be in the till</p>
                   <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900">{money(preview.expectedCash)}</p>
-                  <p className="mt-2 text-sm text-slate-500">Count the cash, bank it and close the day. What you count becomes tomorrow&apos;s starting cash.</p>
+                  <p className="mt-2 text-sm text-slate-500">Count the cash, send it to the boss's account and close. What you keep in the till is the balance you start the next time with.</p>
                 </div>
                 <div className="space-y-2">
                   <CloseDayButton className="h-12 w-full text-base" action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={canDeposit} submissionKey={randomUUID()} bankAccounts={bankAccounts} />
-                  <p className="text-xs text-slate-500">A closed day cannot be changed.</p>
+                  <p className="text-xs text-slate-500">A closing cannot be changed. The boss gets the report.</p>
                 </div>
               </section>
             )}
@@ -246,13 +246,13 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
 
             <section className="card overflow-hidden" aria-label="Recent days">
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
-                <h2 className="text-sm font-semibold text-slate-900">Your last closed days</h2>
+                <h2 className="text-sm font-semibold text-slate-900">Your last closings</h2>
                 <Link href="/closing/history" className="text-sm font-medium text-navy-700 hover:underline">
-                  All past days
+                  All past closings
                 </Link>
               </div>
               {recent.length === 0 ? (
-                <p className="border-t border-line px-5 py-10 text-center text-sm text-slate-500">No day closed yet. Each closed day appears here.</p>
+                <p className="border-t border-line px-5 py-10 text-center text-sm text-slate-500">No closing yet. Each closing appears here.</p>
               ) : (
                 <div className="table-wrap border-t border-line">
                   <table className="table">
@@ -365,7 +365,7 @@ function CashStatementCard({ title, summary, expected, money, className }: { tit
     <section className={`card px-4 py-4 sm:px-5 ${className ?? ""}`} aria-label={title}>
       <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
       <dl className="mt-3 space-y-1.5 text-sm">
-        <StatementRow label="Cash from yesterday (closing balance)" value={money(c.opening)} />
+        <StatementRow label="Left at the last closing" value={money(c.opening)} />
         <StatementRow sign="+" label="Cash sales" value={money(c.salesIn)} />
         <StatementRow sign="+" label="Debts collected in cash" value={money(c.collectionsIn)} />
         {Number(c.refundsOut) !== 0 && <StatementRow sign="−" label="Refunds paid" value={money(c.refundsOut)} />}
@@ -373,7 +373,7 @@ function CashStatementCard({ title, summary, expected, money, className }: { tit
         {Number(c.withdrawals) !== 0 && <StatementRow sign="−" label="Taken out by the owner" value={money(c.withdrawals)} />}
         {Number(c.transfers ?? 0) !== 0 && <StatementRow sign={Number(c.transfers) < 0 ? "−" : "+"} label="Moved to or from other accounts" value={money(Math.abs(Number(c.transfers)))} />}
         {Number(c.supplierPayments ?? 0) !== 0 && <StatementRow sign="−" label="Paid to suppliers" value={money(c.supplierPayments ?? "0")} />}
-        {Number(c.depositsOut) !== 0 && <StatementRow sign="−" label="Banked earlier today" value={money(c.depositsOut)} />}
+        {Number(c.depositsOut) !== 0 && <StatementRow sign="−" label="Sent to the bank since" value={money(c.depositsOut)} />}
         {Number(c.corrections) !== 0 && <StatementRow sign={Number(c.corrections) < 0 ? "−" : "+"} label="Corrections by the owner" value={money(Math.abs(Number(c.corrections)))} />}
       </dl>
       <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
@@ -395,7 +395,7 @@ function DayHeader({ date, state }: { date: string; state: { tone: "open" | "wai
     <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{date}</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">End of day</h1>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Closing</h1>
       </div>
       <div className={cn("flex max-w-full items-center gap-3 rounded-xl border px-3 py-2", t.box)}>
         <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", t.icon)}>

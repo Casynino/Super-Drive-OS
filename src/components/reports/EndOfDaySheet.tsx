@@ -155,7 +155,7 @@ export default function EndOfDaySheet({ data: d }: { data: DaySheetData }) {
           </div>
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ fontSize: 10, letterSpacing: "0.25em", color: GOLD, fontWeight: 600 }}>REPORT</div>
-            <div style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 700, marginTop: 2 }}>End of day</div>
+            <div style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 700, marginTop: 2 }}>Closing report</div>
             <div style={{ fontSize: 13.5, marginTop: 5, color: "#e2e8f0" }}>{d.dateText}</div>
             <div style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 10, marginTop: 5, color: "#94a3b8", lineHeight: 1.5 }}>
               <div>{d.number}</div>
@@ -222,7 +222,7 @@ export default function EndOfDaySheet({ data: d }: { data: DaySheetData }) {
         </Keep>
 
         <Keep>
-        <SectionTitle n="05" title="Where the money is" sub="When the day closed, and what went to the bank" />
+        <SectionTitle n="05" title="Where the money is" sub="At the closing, and what was sent to the bank" />
         <Tiles tiles={d.money} cols={4} />
         {d.deposit.empty ? (
           <p style={{ margin: "12px 0 0", fontSize: 12.5, color: MUTED }}>{d.deposit.empty}</p>
@@ -298,7 +298,7 @@ export default function EndOfDaySheet({ data: d }: { data: DaySheetData }) {
           ))}
         </div>
         <div style={{ marginTop: 16, textAlign: "center", fontSize: 10.5, color: MUTED }}>
-          {d.business.name} · End of day · {d.dateText} · {d.number} · figures from the shop system
+          {d.business.name} · Closing · {d.dateText} · {d.number} · figures from the shop system
         </div>
       </div>
     </div>

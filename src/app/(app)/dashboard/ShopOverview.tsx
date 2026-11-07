@@ -55,7 +55,7 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
 
   const onCredit = active.filter((x) => owedOf(x).gt(0));
   const canClose = can(user, "closing.submit");
-  const shopStatus = !canClose ? null : closedToday ? ({ label: "CLOSED", text: "Today is closed. Anything new goes into tomorrow's closing.", tone: "closed" } as const) : olderOpen.length > 0 || hourNow >= 18 ? ({ label: "AWAITING DAILY CLOSING", text: olderOpen.length > 0 ? "An earlier day was never closed. Close the day when you are ready." : "Count the cash and close the day when you finish.", tone: "awaiting" } as const) : ({ label: "OPEN", text: "The shop is open. Close the day when you finish.", tone: "open" } as const);
+  const shopStatus = !canClose ? null : closedToday ? ({ label: "CLOSED", text: "The closing is done. Anything new goes into the next closing.", tone: "closed" } as const) : olderOpen.length > 0 || hourNow >= 18 ? ({ label: "WAITING TO BE CLOSED", text: olderOpen.length > 0 ? "An earlier day was never closed. Close when you are ready." : "Count the cash and close when you finish.", tone: "awaiting" } as const) : ({ label: "OPEN", text: "The shop is open. Close when you finish.", tone: "open" } as const);
   const feed = [
     ...recentReceipts.map((r) => ({ at: r.createdAt, text: `Stock received: ${r.items.map((i) => i.product.name).join(", ")}`, ref: r.receiptNo, href: `/inventory/receiving/${r.id}` })),
     ...recentIssues.map((i) => ({ at: i.createdAt, text: `Stock issued to ${i.reseller.name}`, ref: i.issueNo, href: `/resellers/issues/${i.id}` })),
@@ -107,7 +107,7 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
               )}
               {can(user, "closing.submit") && (
                 <Link href="/closing" className="btn-secondary btn-sm">
-                  Close the day
+                  Closing
                 </Link>
               )}
             </div>

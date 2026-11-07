@@ -20,7 +20,7 @@ import { getCurrency } from "@/lib/settings";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { correctClosingAction } from "../actions";
 
-export const metadata = { title: "End of day report" };
+export const metadata = { title: "Closing report" };
 
 const D = Prisma.Decimal;
 
@@ -88,7 +88,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
 
   return (
     <>
-      <PageHeader title={`End of day · ${formatDate(c.businessDate)}`} back={{ href: "/closing", label: "End of day" }} description={`${c.location.name} · ${c.closingNo} · submitted by ${c.submittedBy.name}, ${formatDateTime(c.submittedAt)}`} actions={<><ClosingStatusBadge status={c.status} difference={c.difference.toString()} /><Link href={`/print/closing/${c.id}?print=1`} target="_blank" className="btn-secondary !px-3" title="Print" aria-label="Print">
+      <PageHeader title={`Closing · ${formatDate(c.businessDate)}`} back={{ href: "/closing", label: "Closing" }} description={`${c.location.name} · ${c.closingNo} · submitted by ${c.submittedBy.name}, ${formatDateTime(c.submittedAt)}`} actions={<><ClosingStatusBadge status={c.status} difference={c.difference.toString()} /><Link href={`/print/closing/${c.id}?print=1`} target="_blank" className="btn-secondary !px-3" title="Print" aria-label="Print">
               <Printer size={16} />
             </Link>
             <Link href={`/print/closing/${c.id}?print=1&save=1`} target="_blank" className="btn-primary !px-3" title="Download as PDF" aria-label="Download as PDF">
@@ -99,7 +99,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
         <div className="mb-4">
           <Alert kind="success">
             <span className="flex items-center gap-2">
-              <CheckCircle2 size={16} /> The day is closed and locked. The owner has been told.
+              <CheckCircle2 size={16} /> The closing is done and locked. The boss has been told.
             </span>
           </Alert>
         </div>
@@ -146,7 +146,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
 
       <section className="card mb-5 px-4 py-4 sm:px-5" aria-label="Where the money is">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-900">Where the money was when the day closed</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Where the money was at the closing</h2>
           <span className="text-sm font-semibold tabular-nums text-slate-900">{money(everything)} in all</span>
         </div>
         <dl className="mt-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">

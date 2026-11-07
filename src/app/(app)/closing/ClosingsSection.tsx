@@ -24,7 +24,7 @@ export async function closingCorrections(nos: string[]) {
 
 /**
  * The list of closed days and the cash taken to the bank. The owner sees every day (with Short / Extra / shop filters); the shop person
- * sees only their own. Used on the owner's End of day page and on the shop person's separate "Past days" page.
+ * sees only their own. Used on the owner's Closing page and on the shop person's separate "Past closings" page.
  */
 export default async function ClosingsSection({ user, show, shop, basePath, kpis = false }: { user: SessionUser; show?: "short" | "extra"; shop?: string; basePath: string; /** the number cards on top (the owner's End of day page has its own) */ kpis?: boolean }) {
   const canReview = can(user, "closing.approve");
@@ -76,16 +76,16 @@ export default async function ClosingsSection({ user, show, shop, basePath, kpis
         <>
           {kpis && (
             <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(12.5rem,1fr))]">
-              <KpiCard icon={CalendarCheck} tone="navy" label="Days closed" value={String(history.length)} hint={history.length === 30 ? "The latest 30 days" : "Shown below"} />
+              <KpiCard icon={CalendarCheck} tone="navy" label="Closings" value={String(history.length)} hint={history.length === 30 ? "The latest 30" : "Shown below"} />
               <KpiCard icon={Receipt} tone="green" label="Sold in these days" value={money(soldTotal)} hint={`About ${money(soldTotal.div(history.length).toDecimalPlaces(0))} a day`} />
               <KpiCard icon={Scale} tone={shortDays.length > 0 ? "red" : "green"} label="Cash short" value={money(shortTotal)} hint={shortDays.length > 0 ? `On ${shortDays.length} day${shortDays.length === 1 ? "" : "s"} · net ${netTotal.lt(0) ? "−" : "+"} ${money(netTotal.abs())}` : "No cash was missing"} />
-              <KpiCard icon={Landmark} tone="blue" label="Taken to the bank" value={money(bankedTotal)} hint={`Spent ${money(spentTotal)} in these days`} />
+              <KpiCard icon={Landmark} tone="blue" label="Sent to the bank" value={money(bankedTotal)} hint={`Spent ${money(spentTotal)} in these days`} />
             </div>
           )}
           <div className="mb-6 grid gap-4 xl:grid-cols-2">
             <section className="card px-4 py-4 sm:px-5" aria-label="Sales per closed day">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-sm font-semibold text-slate-900">Sales per closed day</h2>
+                <h2 className="text-sm font-semibold text-slate-900">Sales per closing</h2>
                 <span className="text-xs text-slate-500">
                   <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ background: "var(--c2)" }} /> red = cash was short
                 </span>
@@ -133,7 +133,7 @@ export default async function ClosingsSection({ user, show, shop, basePath, kpis
         )}
         <div className="card overflow-hidden">
           {history.length === 0 ? (
-            <EmptyState icon={<CalendarCheck size={22} />} title="No closings yet" description="Each closed day appears here." />
+            <EmptyState icon={<CalendarCheck size={22} />} title="No closings yet" description="Each closing appears here." />
           ) : (
             <div className="table-wrap">
               <table className="table">
@@ -230,7 +230,7 @@ export default async function ClosingsSection({ user, show, shop, basePath, kpis
 
       {deposits.length > 0 && (
         <section>
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Taken to the bank</h2>
+          <h2 className="mb-3 text-base font-semibold text-slate-900">Sent to the bank</h2>
           <div className="card overflow-hidden">
             <div className="table-wrap">
               <table className="table">
@@ -239,7 +239,7 @@ export default async function ClosingsSection({ user, show, shop, basePath, kpis
                     <th>Day</th>
                     <th>Into</th>
                     <th>Reference</th>
-                    <th className="hidden md:table-cell">By</th>
+                    <th className="hidden md:table-cell">Sent by</th>
                     <th className="text-right">Amount</th>
                     <th className="hidden sm:table-cell">Slip</th>
                   </tr>
