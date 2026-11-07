@@ -229,7 +229,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       </div>
 
       {/* who is working: on the side, so the log stays the main thing */}
-      <aside className="card overflow-hidden xl:sticky xl:top-20" aria-label="Who is working">
+      <aside className="card overflow-hidden xl:sticky xl:top-6" aria-label="Who is working">
         <div className="border-b border-line px-4 py-3">
           <h2 className="text-base font-semibold text-slate-900">Who is working</h2>
           <p className="text-xs text-slate-500">Press a name to see only their activity</p>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronsUpDown, KeyRound, LogOut, Moon, Sun, UserRound } from "lucide-react";
+import { Bell, ChevronsUpDown, KeyRound, LogOut, Moon, Sun, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function initials(name: string) {
@@ -11,10 +11,10 @@ function initials(name: string) {
 }
 
 /**
- * The bottom of the glass sidebar, like the reference: a Night mode switch, then the signed-in person (avatar with a green dot, name and
+ * The bottom of the glass sidebar, like the reference: Notifications (the bell lives here now, there is no top bar on a computer), a Night mode switch, then the signed-in person (avatar with a green dot, name and
  * position) who opens a small menu: My profile, Change password, Sign out. In the narrow rail only the icon and the avatar show.
  */
-export default function SidebarFooter({ name, roleName, logoutAction, rail }: { name: string; roleName: string; logoutAction: () => Promise<void>; rail?: boolean }) {
+export default function SidebarFooter({ name, roleName, logoutAction, unread = 0, rail }: { name: string; roleName: string; logoutAction: () => Promise<void>; unread?: number; rail?: boolean }) {
   const pathname = usePathname();
   const [dark, setDark] = useState(true);
   const [menu, setMenu] = useState(false);
@@ -45,6 +45,20 @@ export default function SidebarFooter({ name, roleName, logoutAction, rail }: { 
   return (
     <div className={cn("px-3 pb-3", rail && "flex flex-col items-center px-0")}>
       <div className="glass-divider mb-2 w-full" />
+      {rail ? (
+        <Link href="/notifications" title={unread > 0 ? `Notifications (${unread} new)` : "Notifications"} aria-label="Notifications" className="glass-row relative mb-1 grid h-11 w-11 place-items-center rounded-full text-slate-600 hover:text-slate-900">
+          <Bell size={18} />
+          {unread > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-brand-red shadow-[0_0_8px_rgba(237,28,36,0.7)] ring-2 ring-white dark:ring-[#0f1c33]" aria-hidden />}
+        </Link>
+      ) : (
+        <Link href="/notifications" className="glass-row flex items-center justify-between gap-3 rounded-lg px-3.5 py-2 text-[13.5px] font-medium text-slate-600 hover:text-slate-900">
+          <span className="flex items-center gap-3">
+            <Bell size={18} className="text-slate-500" />
+            Notifications
+          </span>
+          {unread > 0 && <span className="rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white">{unread > 99 ? "99+" : unread}</span>}
+        </Link>
+      )}
       {rail ? (
         <button type="button" onClick={toggleTheme} title={dark ? "Switch to the light look" : "Switch to night mode"} className="glass-row mb-1 grid h-11 w-11 place-items-center rounded-full text-slate-600 hover:text-slate-900" aria-label="Night mode">
           {dark ? <Moon size={18} /> : <Sun size={18} />}

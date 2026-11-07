@@ -478,7 +478,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
         </section>
 
         {/* ───────── Right: cart, customer, payment ───────── */}
-        <aside id="pos-cart" className="space-y-4 xl:sticky xl:top-20 xl:self-start">
+        <aside id="pos-cart" className="space-y-4 xl:sticky xl:top-6 xl:self-start">
           <div className="card overflow-hidden">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <h2 className="text-base font-semibold text-slate-900">

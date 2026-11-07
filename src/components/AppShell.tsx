@@ -239,7 +239,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         )}
       </nav>
 
-      <SidebarFooter name={user.name} roleName={user.roleName} logoutAction={logoutAction} />
+      <SidebarFooter name={user.name} roleName={user.roleName} logoutAction={logoutAction} unread={unread} />
     </div>
   );
 
@@ -278,7 +278,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
           </div>
         ))}
       </nav>
-      <SidebarFooter name={user.name} roleName={user.roleName} logoutAction={logoutAction} rail />
+      <SidebarFooter name={user.name} roleName={user.roleName} logoutAction={logoutAction} unread={unread} rail />
     </div>
   );
 
@@ -310,8 +310,8 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         </div>
       )}
 
-      {/* Top bar: the date, the bell and (on a phone) the person */}
-      <div className="pointer-events-none sticky top-0 z-20 px-4 pb-3 pt-3 print:hidden sm:px-6 xl:px-8" style={{ background: "linear-gradient(to bottom, var(--color-surface) 60%, transparent)" }}>
+      {/* Top bar on a phone only: menu button, date, bell, person. On a computer or tablet there is none (Nino 2026-11-08: "we do not need this"): the bell is in the sidebar. */}
+      <div className="pointer-events-none sticky top-0 z-20 px-4 pb-3 pt-3 print:hidden sm:px-6 lg:hidden xl:px-8" style={{ background: "linear-gradient(to bottom, var(--color-surface) 60%, transparent)" }}>
         <header className="pointer-events-auto flex h-14 items-center justify-between gap-3 rounded-2xl border border-line bg-white/90 px-3 shadow-sm backdrop-blur sm:px-4">
           <div className="flex min-w-0 items-center gap-3">
             <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
@@ -336,7 +336,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         </header>
       </div>
 
-      <main className="mx-auto w-full max-w-[1920px] px-4 pb-6 pt-3 sm:px-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
+      <main className="mx-auto w-full max-w-[1920px] px-4 pb-6 pt-3 sm:px-6 lg:pt-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
     </div>
   );
 }

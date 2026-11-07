@@ -288,7 +288,7 @@ export default function ShipmentForm({ action, createProduct, products: initialP
               The buying price should be what it cost you delivered: goods, shipping and duties together.{canPrice ? " New selling prices start when the stock arrives." : ""}
             </p>
           </section>
-          <PackingList lines={lines} products={products} canPrice={canPrice} currencySymbol={currencySymbol} compact onRemove={(id) => setLines((all) => all.filter((l) => l.productId !== id))} className="xl:sticky xl:top-20" />
+          <PackingList lines={lines} products={products} canPrice={canPrice} currencySymbol={currencySymbol} compact onRemove={(id) => setLines((all) => all.filter((l) => l.productId !== id))} className="xl:sticky xl:top-6" />
         </div>
       )}
 
