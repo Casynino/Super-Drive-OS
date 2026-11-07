@@ -159,6 +159,17 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
+      {canRecord && (
+        <section className="card mb-5 px-4 py-4 sm:px-5 sm:py-5" aria-label="Record an expense">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">Record an expense</h2>
+          {categories.length === 0 ? (
+            <Alert kind="info">The owner has not set up expense categories yet (Settings → Expenses).</Alert>
+          ) : (
+            <ExpenseForm key={sp.recorded ?? "new"} action={recordExpenseAction} accounts={await listAccounts(db, await defaultLocationId(db))} categories={categories} today={today} submissionKey={randomUUID()} limitText={limitText} />
+          )}
+        </section>
+      )}
+
       <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
         <KpiCard icon={ReceiptText} tone="red" label="Spent on expenses" value={money(spentTotal)} hint={`${spentCount} paid expense${spentCount === 1 ? "" : "s"}${activePeriod ? ` · ${activePeriod.label.toLowerCase()}` : ""}`} />
         {biggest && <KpiCard icon={Tag} tone="navy" label="Biggest category" value={money(biggest.value)} hint={`${biggest.name} · ${spentTotal.gt(0) ? Math.round(biggest.value.div(spentTotal).mul(100).toNumber()) : 0}% of the spending`} href={link({ category: biggest.id, page: undefined })} />}
@@ -233,22 +244,6 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
           </ul>
           {pendingCount > pendingRows.length && <p className="border-t border-line px-4 py-2.5 text-xs text-slate-500 sm:px-5">Showing the oldest {pendingRows.length}. Use the &ldquo;Waiting for owner&apos;s OK&rdquo; filter below to see them all.</p>}
         </section>
-      )}
-
-      {canRecord && (
-        <details className="card group mb-5">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 text-base font-semibold text-slate-900 sm:px-5">
-            Record an expense
-            <span className="text-sm font-normal text-slate-500 group-open:hidden">{limitText}</span>
-          </summary>
-          <div className="border-t border-line px-4 py-4 sm:px-5">
-            {categories.length === 0 ? (
-              <Alert kind="info">The owner has not set up expense categories yet (Settings → Expenses).</Alert>
-            ) : (
-              <ExpenseForm key={sp.recorded ?? "new"} action={recordExpenseAction} accounts={await listAccounts(db, await defaultLocationId(db))} categories={categories} today={today} submissionKey={randomUUID()} limitText={limitText} />
-            )}
-          </div>
-        </details>
       )}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

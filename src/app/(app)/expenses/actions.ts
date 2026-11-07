@@ -47,7 +47,12 @@ export async function recordExpenseAction(_prev: ActionState, fd: FormData): Pro
         throw e;
       }
     }
-    const description = formString(fd, "description");
+    // "Details" is optional on the quick form: the category name stands in when it is left empty
+    let description = formString(fd, "description");
+    if (!description) {
+      const cat = await db.expenseCategory.findUnique({ where: { id: formString(fd, "categoryId") }, select: { name: true } });
+      if (cat) description = cat.name.length >= 3 ? cat.name : `${cat.name} expense`;
+    }
     try {
       const out = await db.$transaction(
         async (tx) => {
