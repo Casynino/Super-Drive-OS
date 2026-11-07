@@ -430,27 +430,66 @@ html.dark .ls-title {
   }
 }
 
-/* the big logo behind the engine, on the horizon (from 1360 px wide; narrower screens show the logo above the words or above the card) */
+/* Wide screens (1360 px and up): three separate things, nothing on top of anything.
+   - the big logo stands on the far horizon, in the free space between the words and the card
+   - the engine sits in the sky right above it
+   - the rev gauge sits in the top-left corner above the words
+   Numbers: horizon = 64vh from the top; W = width of the engine; the engine is 0.97 W tall; the logo is 1.45 W wide (0.51 of that tall).
+   Narrower screens show the logo above the words or above the card instead. */
 .ls-power .ls-power-logo {
   display: none;
-  position: absolute;
-  left: 50%;
-  width: 136%;
-  translate: -50% 0;
-  z-index: -1;
-  /* its feet stand on the horizon line: horizon = 64vh, column top = 3vh, column height = about 1.67 x its width + gap */
-  bottom: calc(1.67 * min(28cqw, 34vh) - 59.8vh + 6px);
-}
-.ls-power .ls-power-logo img {
-  width: 100% !important;
-  height: auto !important;
 }
 @container (min-width: 1360px) {
   .ls-power {
-    left: 37.5cqw; /* leaves room for the logo between the words and the card */
+    --w: min(22cqw, 32vh);
+    left: calc(37.8cqw + 120px); /* the middle of the free space between words and card */
+    translate: -50% 0;
+    width: var(--w);
+    top: calc(64vh - 20px - 1.705 * var(--w)); /* engine bottom sits 14px above the logo */
+    gap: 0;
+  }
+  .ls-power .ls-gauge-svg {
+    position: absolute;
+    width: min(11.5cqw, 20vh);
+    left: calc(48px - 37.8cqw - 120px + var(--w) / 2);
+    top: calc(5vh - 64vh + 20px + 1.705 * var(--w));
   }
   .ls-power .ls-power-logo {
     display: block;
+    position: absolute;
+    left: 50%;
+    width: 145%;
+    translate: -50% 0;
+    bottom: calc(-14px - 0.735 * var(--w)); /* its feet stand on the horizon line */
+  }
+  .ls-power .ls-power-logo img {
+    width: 100% !important;
+    height: auto !important;
+    -webkit-box-reflect: below 0 linear-gradient(transparent 62%, rgba(255, 255, 255, 0.22)); /* mirror on the road (Chrome, Safari, Edge) */
+  }
+  /* warm light on the horizon right under the logo */
+  .ls-power .ls-power-logo::before {
+    content: "";
+    position: absolute;
+    left: -14%;
+    right: -14%;
+    bottom: -8%;
+    height: 70%;
+    background: radial-gradient(50% 55% at 50% 100%, rgba(253, 196, 0, 0.42), rgba(237, 28, 36, 0.18) 55%, transparent 75%);
+    filter: blur(14px);
+    z-index: -1;
+    animation: ls-horizon-glow 4.5s ease-in-out infinite;
+  }
+}
+@keyframes ls-horizon-glow {
+  50% {
+    opacity: 0.55;
+    transform: scaleX(1.06);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ls-power .ls-power-logo::before {
+    animation: none !important;
   }
 }
 
