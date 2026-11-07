@@ -25,8 +25,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // The shop attendant's home is the POS, so "Home" is not in their menu (POS and Overview are)
+  const sellerOnly = can(user, "sales.pos") && !can(user, "dashboard.view");
   const visibleHrefs = NAV.flatMap((g) => g.items)
-    .filter((i) => i.ready && (i.permissions.length === 0 || canAny(user, i.permissions)) && !(i.hideIfAny && canAny(user, i.hideIfAny)))
+    .filter((i) => i.ready && (i.permissions.length === 0 || canAny(user, i.permissions)) && !(i.hideIfAny && canAny(user, i.hideIfAny)) && !(sellerOnly && i.href === "/dashboard"))
     .map((i) => i.href);
 
   // Counts beside the menu items that need someone to act

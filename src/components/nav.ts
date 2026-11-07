@@ -11,6 +11,7 @@ import {
   Handshake,
   House,
   Landmark,
+  LayoutDashboard,
   Package,
   PackageCheck,
   Receipt,
@@ -55,13 +56,17 @@ export type NavGroup = { label: string; icon?: LucideIcon; items: NavItem[] };
 export const NAV: NavGroup[] = [
   {
     label: "",
-    items: [{ label: "Home", href: "/dashboard", icon: House, permissions: [], ready: true }],
+    items: [
+      // the shop attendant's home IS the POS (Home is hidden for them, see (app)/layout.tsx); the overview of the day is its own page
+      { label: "Home", href: "/dashboard", icon: House, permissions: [], ready: true },
+      { label: "POS", href: "/pos", icon: ShoppingCart, permissions: ["sales.pos"], ready: true },
+      { label: "Overview", href: "/overview", icon: LayoutDashboard, permissions: ["sales.pos"], hideIfAny: ["dashboard.view"], ready: true },
+    ],
   },
   {
     label: "Selling",
     icon: ShoppingCart,
     items: [
-      { label: "POS", href: "/pos", icon: ShoppingCart, permissions: ["sales.pos"], ready: true },
       { label: "Sales", href: "/sales", icon: Receipt, permissions: ["sales.view_own", "sales.view_all"], ready: true },
       { label: "Credit", href: "/credit", icon: HandCoins, permissions: ["credit.view"], ready: true },
       { label: "Winga", href: "/resellers", icon: Handshake, permissions: ["resellers.view"], ready: true },
