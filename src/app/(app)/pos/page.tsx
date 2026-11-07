@@ -71,22 +71,24 @@ export default async function PosPage() {
     ...(canCredit ? { creditLimit: c.creditLimit.toString(), outstanding: (owed.get(c.id) ?? 0).toString() } : {}),
   }));
 
-  // the shop person's home: a short greeting instead of a page title
-  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Africa/Dar_es_Salaam" }).format(new Date())) % 24;
-  const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-
+  // the shop person's home: a small banner like the Director's, with the words in the middle and the shop's real products at the side
   return (
     <>
-      <div className="mb-6 flex items-center gap-4">
-        <span className="hidden h-14 w-1 shrink-0 rounded-full bg-oil-400 sm:block" aria-hidden />
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{hello}</p>
-          <h1 className="mt-1 truncate text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Hello, <span className="text-yellow-600 dark:text-oil-400">{user.name.split(" ")[0]}</span>
+      <section className="relative mb-5 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_220px_at_88%_55%,rgba(47,111,208,0.42),transparent_62%)]" aria-hidden />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(520px_170px_at_50%_0%,rgba(253,196,0,0.10),transparent_72%)]" aria-hidden />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/banner-products.webp" alt="" aria-hidden className="pointer-events-none absolute bottom-0 right-0 hidden h-full w-auto max-w-[32%] select-none object-contain object-right-bottom lg:block" />
+        <div className="relative flex min-h-[7.5rem] flex-col items-center justify-center px-5 py-5 text-center">
+          <h1 className="flex items-center gap-4 text-3xl font-semibold tracking-[0.5em] text-white sm:text-4xl">
+            <span className="hidden h-px w-10 bg-oil-400/60 sm:block" aria-hidden />
+            <span className="pl-[0.5em]">POS</span>
+            <span className="hidden h-px w-10 bg-oil-400/60 sm:block" aria-hidden />
           </h1>
-          <p className="mt-1 text-sm text-slate-500">Tap a product to start a sale.</p>
+          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400">Super Drive Oil</p>
+          <p className="mt-1.5 text-sm text-white/65">Tap a product to start a sale</p>
         </div>
-      </div>
+      </section>
       {posProducts.length === 0 || locations.length === 0 ? (
         <div className="card">
           <EmptyState

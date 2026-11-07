@@ -153,6 +153,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   );
 
   const dateText = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
+  const dateShort = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Africa/Dar_es_Salaam" }).format(new Date()); // phones
 
   return (
     <div className="min-h-dvh lg:pl-[17.5rem] print:pl-0">
@@ -176,7 +177,8 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
             </button>
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-semibold text-slate-900" suppressHydrationWarning>
-                {dateText}
+                <span className="hidden sm:inline">{dateText}</span>
+                <span className="sm:hidden">{dateShort}</span>
               </p>
               <p className="mt-0.5 truncate text-xs text-slate-500">{businessName}</p>
             </div>
