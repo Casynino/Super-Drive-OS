@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { trackPage } from "@/lib/auth/track-page";
 import { useEffect, useState } from "react";
 import { Bell, ChevronDown, LogOut, Menu, X } from "lucide-react";
-import BrandLogo from "@/components/BrandLogo";
 import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import { NAV, type NavItem } from "./nav";
@@ -87,10 +86,9 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         <Link
           href={item.href}
           aria-current={isActive ? "page" : undefined}
-          className={cn("relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition", isActive ? "bg-navy-50 font-medium text-navy-800" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}
+          className={cn("relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13.5px] transition", isActive ? "bg-oil-400/[0.14] font-medium text-slate-900 ring-1 ring-inset ring-oil-400/30" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}
         >
-          {isActive && <span className="absolute inset-y-1.5 -left-[13px] w-[3px] rounded-r bg-oil-400" />}
-          <Icon size={16} className={cn("shrink-0", isActive ? "text-navy-700" : "text-slate-400")} />
+          <Icon size={17} className={cn("shrink-0", isActive ? "text-oil-500" : "text-slate-400")} />
           <span className="min-w-0 flex-1 truncate">{labels?.[item.href] ?? item.label}</span>
           {n > 0 && <span className="shrink-0 rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white">{n > 99 ? "99+" : n}</span>}
         </Link>
@@ -100,16 +98,20 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-line px-4 py-3">
-        <Link href="/dashboard" className="block" aria-label={`${businessName} home`}>
-          <BrandLogo alt={businessName} className="h-12" priority />
+      <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-4">
+        <Link href="/dashboard" className="flex min-w-0 items-center gap-3" aria-label={`${businessName} home`}>
+          <Image src="/brand/app-192.png" alt="" width={44} height={44} priority className="h-11 w-11 shrink-0 rounded-xl ring-1 ring-oil-400/40" />
+          <span className="min-w-0 leading-tight">
+            <span className="block truncate text-[15px] font-semibold tracking-tight text-slate-900">{businessName}</span>
+            <span className="mt-0.5 block truncate text-xs text-slate-500">Sales &amp; distribution</span>
+          </span>
         </Link>
         <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
           <X size={16} />
         </button>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3" aria-label="Main">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Main">
         {groups.map((group) => {
           if (!group.label)
             return (
@@ -129,7 +131,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
                 onClick={() => setOpenGroup(isOpen ? null : group.label)}
                 aria-expanded={isOpen}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.14em] transition",
+                  "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.14em] transition",
                   isOpen ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-100/70 hover:text-slate-800",
                 )}
               >
@@ -150,47 +152,62 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
     </div>
   );
 
+  const dateText = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
+
   return (
-    <div className="min-h-dvh lg:pl-64 print:pl-0">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-line bg-white lg:block print:hidden">{sidebar}</aside>
+    <div className="min-h-dvh lg:pl-[17.5rem] print:pl-0">
+      {/* Desktop sidebar: a floating panel */}
+      <aside className="fixed bottom-3 left-3 top-3 z-30 hidden w-64 overflow-hidden rounded-2xl border border-line bg-white shadow-[0_10px_40px_-16px_rgba(0,0,0,0.45)] lg:block print:hidden">{sidebar}</aside>
 
       {/* Mobile drawer */}
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-navy-950/60" onClick={() => setOpen(false)} aria-hidden />
-          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-white shadow-xl">{sidebar}</aside>
+          <aside className="absolute inset-y-3 left-3 w-72 max-w-[85vw] overflow-hidden rounded-2xl border border-line bg-white shadow-xl">{sidebar}</aside>
         </div>
       )}
 
-      <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-white/95 px-4 backdrop-blur print:hidden sm:px-6">
-        <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
-          <Menu size={18} />
-        </button>
-        <p className="hidden text-sm font-medium text-slate-500 lg:block">{businessName}</p>
-
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          <ThemeToggle />
-          <Link href="/notifications" className="btn-secondary btn-sm relative" title="Notifications">
-            <Bell size={15} />
-            <span className="sr-only">Notifications{unread > 0 ? `, ${unread} unread` : ""}</span>
-            {unread > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
-          </Link>
-          <form action={logoutAction}>
-            <button type="submit" className="btn-secondary btn-sm" title="Sign out">
-              <LogOut size={15} />
-              <span className="hidden sm:inline">Sign out</span>
-              <span className="sr-only sm:hidden">Sign out</span>
+      {/* Top bar: a floating card with the date on the left and the person on the right */}
+      <div className="pointer-events-none sticky top-0 z-20 px-4 pb-3 pt-3 print:hidden sm:px-6 xl:px-8" style={{ background: "linear-gradient(to bottom, var(--color-surface) 60%, transparent)" }}>
+        <header className="pointer-events-auto flex h-16 items-center justify-between gap-3 rounded-2xl border border-line bg-white/90 px-3 shadow-sm backdrop-blur sm:px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
+              <Menu size={18} />
             </button>
-          </form>
-          <Link href="/account" title={`${user.name} · ${user.roleName} — my account and password`} className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-700 text-xs font-semibold text-white ring-2 ring-transparent transition hover:ring-oil-400">
-            {initials(user.name)}
-            <span className="sr-only">My account and password</span>
-          </Link>
-        </div>
-      </header>
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-sm font-semibold text-slate-900" suppressHydrationWarning>
+                {dateText}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-slate-500">{businessName}</p>
+            </div>
+          </div>
 
-      <main className="mx-auto w-full max-w-[1920px] px-4 py-6 sm:px-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+            <ThemeToggle />
+            <Link href="/notifications" className="btn-secondary btn-sm relative" title="Notifications">
+              <Bell size={15} />
+              <span className="sr-only">Notifications{unread > 0 ? `, ${unread} unread` : ""}</span>
+              {unread > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
+            </Link>
+            <Link href="/account" title={`${user.name} · ${user.roleName} — my account and password`} className="flex items-center gap-2.5 rounded-xl border border-line py-1 pl-1 pr-1 transition hover:border-oil-400/60 md:pr-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy-700 text-xs font-semibold text-white ring-2 ring-oil-400/70">{initials(user.name)}</span>
+              <span className="hidden min-w-0 text-left leading-tight md:block">
+                <span className="block max-w-[11rem] truncate text-sm font-semibold text-slate-900">{user.name}</span>
+                <span className="mt-0.5 block max-w-[11rem] truncate text-xs text-yellow-700 dark:text-oil-400">{user.roleName}</span>
+              </span>
+              <span className="sr-only">My account and password</span>
+            </Link>
+            <form action={logoutAction}>
+              <button type="submit" className="btn-secondary btn-sm" title="Sign out">
+                <LogOut size={15} />
+                <span className="sr-only">Sign out</span>
+              </button>
+            </form>
+          </div>
+        </header>
+      </div>
+
+      <main className="mx-auto w-full max-w-[1920px] px-4 pb-6 pt-3 sm:px-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
     </div>
   );
 }
