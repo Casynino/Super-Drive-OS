@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
-import { AlertTriangle, Banknote, CalendarCheck, CheckCircle2, ExternalLink, Landmark, Receipt, Scale, Smartphone, TrendingUp } from "lucide-react";
+import { Banknote, CalendarCheck, CheckCircle2, ExternalLink, Landmark, Receipt, Scale, Smartphone, TrendingUp } from "lucide-react";
 import CloseDayButton from "@/components/cash/CloseDayButton";
 import { DepositForm } from "@/components/cash/CashForms";
 import { Difference } from "@/components/cash/Display";
@@ -19,7 +19,7 @@ import { businessDay, defaultLocationId, getAccountBalances, listAccounts } from
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import ClosingsSection, { closingCorrections } from "./ClosingsSection";
 import { recordDepositAction, submitClosingAction } from "./actions";
 
@@ -90,7 +90,20 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title="End of day" description={canSubmit ? "Count the cash, bank it, close the day." : "Every closed day, with any cash that was short."} />
+      {canSubmit && preview ? (
+        <DayHeader
+          date={new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${today}T00:00:00Z`))}
+          state={
+            preview.closed
+              ? { tone: "closed", text: `Closed${closedInfo?.closing ? ` at ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dar_es_Salaam" }).format(closedInfo.closing.submittedAt)}` : ""} · ${preview.closed.closingNo}` }
+              : older.length > 0
+                ? { tone: "waiting", text: `Waiting to be closed · includes cash from ${older.length === 1 ? formatDate(`${older[0]}T00:00:00Z`) : `${older.length} earlier days`}` }
+                : { tone: "open", text: "Open · close the day when you finish" }
+          }
+        />
+      ) : (
+        <PageHeader title="End of day" description="Every closed day, with any cash that was short." />
+      )}
 
       {sp.banked && (
         <div className="mb-4">
@@ -156,14 +169,6 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
             </>
           ) : (
             <>
-              {older.length > 0 && (
-                <Alert kind="info">
-                  <span className="flex items-start gap-2">
-                    <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                    <span>Cash from {older.length === 1 ? "an earlier day" : "earlier days"} ({older.slice(0, 5).map((d) => formatDate(`${d}T00:00:00Z`)).join(", ")}{older.length > 5 ? ` and ${older.length - 5} more` : ""}) was never closed. It is included below.</span>
-                  </span>
-                </Alert>
-              )}
               <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
                 <KpiCard icon={Receipt} tone="navy" label={`Sold today · ${formatDate(`${today}T00:00:00Z`)}`} value={money(preview.summary.sales.total)} hint={`${preview.summary.sales.count} sale${preview.summary.sales.count === 1 ? "" : "s"}${Number(preview.summary.sales.creditGiven) > 0 ? ` · ${money(preview.summary.sales.creditGiven)} on credit` : ""}`} />
                 <KpiCard icon={Banknote} tone="yellow" label="Cash expected in the till" value={money(preview.expectedCash)} hint={`Start ${money(preview.summary.cash.opening)} + in − out`} />
@@ -376,5 +381,26 @@ function CashStatementCard({ title, summary, expected, money, className }: { tit
         <span className="text-lg font-bold tabular-nums text-slate-900">{money(expected)}</span>
       </div>
     </section>
+  );
+}
+
+/** The top of the shop person's page: the date, the name, and where the day stands (open, waiting to be closed, closed). */
+function DayHeader({ date, state }: { date: string; state: { tone: "open" | "waiting" | "closed"; text: string } }) {
+  const tone = {
+    open: { box: "border-emerald-200 bg-emerald-50 text-emerald-900", dot: "bg-emerald-500" },
+    waiting: { box: "border-amber-200 bg-oil-soft text-yellow-950", dot: "animate-pulse bg-amber-500" },
+    closed: { box: "border-slate-200 bg-slate-100 text-slate-700", dot: "bg-slate-400" },
+  }[state.tone];
+  return (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{date}</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">End of day</h1>
+      </div>
+      <div className={cn("inline-flex max-w-full items-center gap-2.5 rounded-full border px-4 py-2 text-sm font-medium", tone.box)}>
+        <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", tone.dot)} aria-hidden />
+        <span className="min-w-0">{state.text}</span>
+      </div>
+    </div>
   );
 }
