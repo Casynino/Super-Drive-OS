@@ -92,7 +92,7 @@ export default async function AccountPage() {
           </div>
         </div>
 
-        <div className="card card-pad">
+        <div id="password" className="card card-pad scroll-mt-24">
           <h2 className="text-base font-semibold text-slate-900">Change password</h2>
           <p className="mt-1 text-sm text-slate-500">You will be signed out of other devices.</p>
           <ChangePasswordForm />

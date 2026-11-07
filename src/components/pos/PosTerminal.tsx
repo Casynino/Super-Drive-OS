@@ -300,14 +300,15 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
       <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
         {/* ───────── Left: product cards ───────── */}
         <section className="min-w-0">
-          <div className="card card-pad mb-4">
-            <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
-              <div className="relative">
-                <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input className="input h-11 pl-10 text-base" placeholder="Search products…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onSearchKey} aria-label="Search products" autoFocus />
+          <div className="card mb-3 p-2.5">
+            {/* one slim row: search, shop (when there is more than one) and the categories; wraps on a phone */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[12rem] flex-1 basis-56 sm:max-w-xs">
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input className="input h-10 pl-9 text-sm" placeholder="Search products…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onSearchKey} aria-label="Search products" autoFocus />
               </div>
               {locations.length > 1 && (
-                <select className="input h-11" value={locationId} onChange={(e) => setLocationId(e.target.value)} aria-label="Sell from">
+                <select className="input h-10 w-auto max-w-[11rem] text-sm" value={locationId} onChange={(e) => setLocationId(e.target.value)} aria-label="Sell from">
                   {locations.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name}
@@ -315,10 +316,17 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                   ))}
                 </select>
               )}
+              <div className="flex min-w-0 flex-[2_1_10rem] gap-1.5 overflow-x-auto" role="tablist" aria-label="Categories">
+                {[["", "All"], ...categories].map(([id, name]) => (
+                  <button key={id} type="button" role="tab" aria-selected={category === id} onClick={() => setCategory(id!)} className={cn("shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition", category === id ? "border-navy-700 bg-navy-700 text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50")}>
+                    {name}
+                  </button>
+                ))}
+              </div>
             </div>
             {LABELS_ENABLED && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button type="button" className={cn("inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition", scanOpen ? "border-navy-700 bg-navy-700 text-white" : "border-navy-200 bg-navy-50 text-navy-800 hover:bg-navy-100")} onClick={() => setScanOpen((o) => !o)} aria-pressed={scanOpen}>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button type="button" className={cn("inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition", scanOpen ? "border-navy-700 bg-navy-700 text-white" : "border-navy-200 bg-navy-50 text-navy-800 hover:bg-navy-100")} onClick={() => setScanOpen((o) => !o)} aria-pressed={scanOpen}>
                   <ScanBarcode size={18} /> {scanOpen ? "Close scanner" : "Scan to sell"}
                 </button>
                 {scanMsg && (
@@ -329,17 +337,10 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
               </div>
             )}
             {scanOpen && (
-              <div className="mt-3">
+              <div className="mt-2">
                 <CodeScanner onScan={(c) => void onCode(c)} autoStart compact />
               </div>
             )}
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Categories">
-              {[["", "All"], ...categories].map(([id, name]) => (
-                <button key={id} type="button" role="tab" aria-selected={category === id} onClick={() => setCategory(id!)} className={cn("shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition", category === id ? "border-navy-700 bg-navy-700 text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50")}>
-                  {name}
-                </button>
-              ))}
-            </div>
           </div>
 
           {visible.length === 0 ? (

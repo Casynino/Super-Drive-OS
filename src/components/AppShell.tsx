@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { trackPage } from "@/lib/auth/track-page";
 import { useEffect, useState } from "react";
-import { Bell, ChevronDown, LogOut, Menu, X } from "lucide-react";
-import ThemeToggle from "@/components/ThemeToggle";
+import { Bell, ChevronDown, Menu, X } from "lucide-react";
+import UserMenu from "@/components/UserMenu";
 import { cn } from "@/lib/utils";
 import { NAV, type NavItem } from "./nav";
 
@@ -23,15 +23,6 @@ type Props = {
   labels?: Record<string, string>;
   children: React.ReactNode;
 };
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
-}
 
 export default function AppShell({ businessName, user, visibleHrefs, logoutAction, unread, badges, labels, children }: Props) {
   const pathname = usePathname();
@@ -170,41 +161,24 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
 
       {/* Top bar: a floating card with the date on the left and the person on the right */}
       <div className="pointer-events-none sticky top-0 z-20 px-4 pb-3 pt-3 print:hidden sm:px-6 xl:px-8" style={{ background: "linear-gradient(to bottom, var(--color-surface) 60%, transparent)" }}>
-        <header className="pointer-events-auto flex h-16 items-center justify-between gap-3 rounded-2xl border border-line bg-white/90 px-3 shadow-sm backdrop-blur sm:px-4">
+        <header className="pointer-events-auto flex h-14 items-center justify-between gap-3 rounded-2xl border border-line bg-white/90 px-3 shadow-sm backdrop-blur sm:px-4">
           <div className="flex min-w-0 items-center gap-3">
             <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
               <Menu size={18} />
             </button>
-            <div className="min-w-0 leading-tight">
-              <p className="truncate text-sm font-semibold text-slate-900" suppressHydrationWarning>
-                <span className="hidden sm:inline">{dateText}</span>
-                <span className="sm:hidden">{dateShort}</span>
-              </p>
-              <p className="mt-0.5 truncate text-xs text-slate-500">{businessName}</p>
-            </div>
+            <p className="min-w-0 truncate text-sm font-medium text-slate-700" suppressHydrationWarning>
+              <span className="hidden sm:inline">{dateText}</span>
+              <span className="sm:hidden">{dateShort}</span>
+            </p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
-            <ThemeToggle />
-            <Link href="/notifications" className="btn-secondary btn-sm relative" title="Notifications">
-              <Bell size={15} />
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <Link href="/notifications" className="relative grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" title="Notifications">
+              <Bell size={18} />
               <span className="sr-only">Notifications{unread > 0 ? `, ${unread} unread` : ""}</span>
-              {unread > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
+              {unread > 0 && <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
             </Link>
-            <Link href="/account" title={`${user.name} · ${user.roleName} — my account and password`} className="flex items-center gap-2.5 rounded-xl border border-line py-1 pl-1 pr-1 transition hover:border-oil-400/60 md:pr-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-navy-700 text-xs font-semibold text-white ring-2 ring-oil-400/70">{initials(user.name)}</span>
-              <span className="hidden min-w-0 text-left leading-tight md:block">
-                <span className="block max-w-[11rem] truncate text-sm font-semibold text-slate-900">{user.name}</span>
-                <span className="mt-0.5 block max-w-[11rem] truncate text-xs text-yellow-700 dark:text-oil-400">{user.roleName}</span>
-              </span>
-              <span className="sr-only">My account and password</span>
-            </Link>
-            <form action={logoutAction}>
-              <button type="submit" className="btn-secondary btn-sm" title="Sign out">
-                <LogOut size={15} />
-                <span className="sr-only">Sign out</span>
-              </button>
-            </form>
+            <UserMenu name={user.name} roleName={user.roleName} logoutAction={logoutAction} />
           </div>
         </header>
       </div>
