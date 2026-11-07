@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, FileDown, Printer } from "lucide-react";
+import { ExternalLink, FileDown, Printer, X } from "lucide-react";
 import Modal from "@/components/Modal";
 import PickupNoteSheet, { type PickupNoteData } from "@/components/warehouse/PickupNoteSheet";
 import { loadPickupPreview, loadSaleDone, type SaleDone } from "@/app/(app)/till/actions";
@@ -12,11 +12,15 @@ import { cn } from "@/lib/utils";
 const SHEET_W = 559.37;
 const SHEET_H = 793.7;
 
-const act = "inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold transition";
+// solid buttons (nothing shows through them), small, one calm set
+const btn = "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition md:justify-start md:px-3 max-md:px-2";
+const quiet = "bg-[#152a4a] text-[#ffffff] ring-1 ring-white/15 hover:bg-[#1c3560]";
+const xBtn = "grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#152a4a] text-[#ffffff] ring-1 ring-white/20 transition hover:bg-[#1c3560]";
 
 /**
  * After Complete sale: the pickup note itself, its real shape (an A5 sheet with its QR code), shown on the dark screen as paper, with
- * only a few actions under it: Print, Download PDF, Open, and New sale. No card around it, no receipt. The till never leaves the page.
+ * only a few actions beside it: Print, Download PDF, Open, New sale, and a small X that just closes the note. No title text, no card
+ * around it, no receipt. The till never leaves the page.
  * On screen the note wears the system's colours; on paper it prints in its own.
  */
 export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }: { saleId: string | null; currency: { symbol: string; decimals: number }; onNewSale: () => void; onLoaded?: (s: SaleDone) => void }) {
@@ -29,7 +33,13 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
 
   // the sheet is as big as the screen allows (never bigger than real size)
   useEffect(() => {
-    const fit = () => setScale(Math.max(0.4, Math.min(1, (window.innerHeight - 190) / SHEET_H, (window.innerWidth - 28) / SHEET_W)));
+    const fit = () => {
+      const side = window.innerWidth >= 768;
+      // the note is as big as the space left by the actions (beside it on a computer, under it on a phone)
+      const maxW = side ? window.innerWidth - 28 - 188 : window.innerWidth - 28;
+      const maxH = side ? window.innerHeight - 48 : window.innerHeight - 190;
+      setScale(Math.max(0.4, Math.min(1, maxH / SHEET_H, maxW / SHEET_W)));
+    };
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
@@ -54,26 +64,23 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saleId]);
 
-  const owed = sale ? Number(sale.owed) : 0;
   const pickup = sale?.pickup ?? null;
-  const line = sale ? [sale.saleNo, sale.status === "PAID" ? "Paid" : owed > 0 ? `${fmt(owed)} on credit${sale.dueDate ? ` · pay by ${sale.dueDate}` : ""}` : "", fmt(sale.total)].filter(Boolean).join("  ·  ") : "";
-
+  
   return (
     <Modal open={Boolean(saleId)} onClose={onNewSale} label="Sale complete" bare>
-      <div className="flex flex-col items-center gap-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-white">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white">
-            <Check size={14} strokeWidth={3} />
-          </span>
-          <span className="font-semibold">Sale complete</span>
-          {sale && <span className="font-mono text-xs text-white/70">{line}</span>}
+      <div className="flex flex-col items-center gap-3 md:flex-row md:items-start md:justify-center">
+        {/* phone: a small X above the note. It only closes the note: the sale stays completed and nothing is cancelled */}
+        <div className="flex w-full justify-end md:hidden" style={{ maxWidth: SHEET_W * scale }}>
+          <button type="button" onClick={onNewSale} className={xBtn} aria-label="Close the note (the sale stays completed)" title="Close the note. The sale stays completed.">
+            <X size={15} />
+          </button>
         </div>
 
         {error ? (
           <div className="rounded-xl bg-white px-6 py-8 text-sm text-brand-red-dark">{error}</div>
         ) : pickup ? (
           /* the note, as it is on paper */
-          <div style={{ width: SHEET_W * scale, height: SHEET_H * scale }} className="overflow-hidden rounded-sm shadow-[0_18px_50px_rgba(0,0,0,0.55)] ring-1 ring-white/20">
+          <div style={{ width: SHEET_W * scale, height: SHEET_H * scale }} className="shrink-0 overflow-hidden rounded-sm shadow-[0_18px_50px_rgba(0,0,0,0.55)] ring-1 ring-white/20">
             {note ? (
               <div style={{ width: "148mm", height: "210mm", transform: `scale(${scale})`, transformOrigin: "top left" }}>
                 <PickupNoteSheet d={note} preview />
@@ -96,21 +103,28 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {pickup && (
-            <>
-              <Link href={`/print/pickup/${pickup.id}?print=1`} target="_blank" rel="noopener" className={cn(act, "border-white bg-white text-navy-800 hover:bg-slate-100")}>
-                <Printer size={16} /> Print
-              </Link>
-              <Link href={`/print/pickup/${pickup.id}?print=1&save=1`} target="_blank" rel="noopener" className={cn(act, "border-white/40 bg-white/10 text-white hover:bg-white/20")}>
-                <FileDown size={16} /> Download PDF
-              </Link>
-              <Link href={`/print/pickup/${pickup.id}`} target="_blank" rel="noopener" className={cn(act, "border-white/40 bg-white/10 text-white hover:bg-white/20")}>
-                <ExternalLink size={16} /> Open
-              </Link>
-            </>
-          )}
-          <button type="button" autoFocus className={cn(act, "border-navy-600 bg-navy-600 px-6 text-white hover:bg-navy-700")} onClick={onNewSale}>
+        {/* the actions: a small solid panel at the side of the note on a computer or tablet, a row under it on a phone */}
+        <div className="flex w-full flex-col gap-2 rounded-2xl bg-[#0b1a30] p-2 ring-1 ring-white/15 md:w-44" style={{ maxWidth: SHEET_W * scale }}>
+          <div className={cn("gap-2 md:flex md:flex-col", pickup ? "grid grid-cols-3" : "hidden md:flex")}>
+            <button type="button" onClick={onNewSale} className={cn(xBtn, "hidden self-end md:grid")} aria-label="Close the note (the sale stays completed)" title="Close the note. The sale stays completed.">
+              <X size={15} />
+            </button>
+            {pickup && (
+              <>
+                <Link href={`/print/pickup/${pickup.id}?print=1`} target="_blank" rel="noopener" className={cn(btn, "bg-[#ffffff] text-[#0e3d6e] hover:bg-[#e8eef6]")}>
+                  <Printer size={16} /> Print
+                </Link>
+                <Link href={`/print/pickup/${pickup.id}?print=1&save=1`} target="_blank" rel="noopener" className={cn(btn, quiet)}>
+                  <FileDown size={16} /> <span className="md:hidden">PDF</span>
+                  <span className="hidden md:inline">Download PDF</span>
+                </Link>
+                <Link href={`/print/pickup/${pickup.id}`} target="_blank" rel="noopener" className={cn(btn, quiet)}>
+                  <ExternalLink size={16} /> Open
+                </Link>
+              </>
+            )}
+          </div>
+          <button type="button" autoFocus className={cn(btn, "justify-center bg-[#fdc400] px-6 text-[#0e3d6e] hover:brightness-95 md:justify-center")} onClick={onNewSale}>
             New sale
           </button>
         </div>

@@ -369,7 +369,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
       }}
     >
       <input type="hidden" name="payloadJson" value={payload} />
-      <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_420px]">
         {/* ───────── Left: product cards ───────── */}
         <section className="min-w-0">
           <div className="card mb-3 p-2.5">

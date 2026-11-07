@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { trackPage } from "@/lib/auth/track-page";
-import { useEffect, useState } from "react";
-import { Bell, ChevronDown, Menu, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, Menu, Search, X } from "lucide-react";
+import SidebarFooter from "@/components/SidebarFooter";
 import UserMenu from "@/components/UserMenu";
 import { cn } from "@/lib/utils";
 import { NAV, type NavItem } from "./nav";
@@ -24,11 +25,55 @@ type Props = {
   children: React.ReactNode;
 };
 
+const DIM = { color: "var(--glass-text-dim)" } as const;
+
 export default function AppShell({ businessName, user, visibleHrefs, logoutAction, unread, badges, labels, children }: Props) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const [open, setOpen] = useState(false); // the menu on a phone
+  const [collapsed, setCollapsed] = useState(false); // the narrow icon rail on a computer or tablet
+  const [q, setQ] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    setOpen(false);
+    setQ("");
+  }, [pathname]);
+
+  // the rail stays the way the person left it
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("sdoSidebar") === "rail") setCollapsed(true);
+    } catch {
+      /* no storage: it simply starts open */
+    }
+  }, []);
+  const setRail = (next: boolean) => {
+    setCollapsed(next);
+    try {
+      localStorage.setItem("sdoSidebar", next ? "rail" : "open");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Ctrl/Cmd + K goes to the search; [ opens or closes the rail
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if (collapsed) setRail(false);
+        setTimeout(() => searchRef.current?.focus(), 60);
+      } else if (e.key === "[" && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        setRail(!collapsed);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapsed]);
 
   // Back works like in an app: remember the page you came from (see BackLink)
   useEffect(() => {
@@ -51,6 +96,8 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
 
   const visible = new Set(visibleHrefs);
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.ready && visible.has(i.href)) })).filter((g) => g.items.length > 0);
+  const topGroups = groups.filter((g) => !g.label);
+  const folding = groups.filter((g) => g.label);
 
   // The most specific matching item is the active one (so /settings/roles doesn't also light up /settings).
   const allItems = groups.flatMap((g) => g.items);
@@ -66,9 +113,16 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
     if (activeGroup) setOpenGroup(activeGroup);
   }, [activeGroup]);
 
+  const dot = "absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-brand-red shadow-[0_0_8px_rgba(237,28,36,0.7)] ring-2 ring-white dark:ring-[#0f1c33]";
   const count = (item: NavItem) => (item.badge ? badges[item.badge] : 0);
+  const nameOf = (item: NavItem) => labels?.[item.href] ?? item.label;
+  const countBadge = (n: number) => <span className="shrink-0 rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white shadow-[0_0_10px_rgba(237,28,36,0.45)]">{n > 99 ? "99+" : n}</span>;
 
-  const link = (item: NavItem) => {
+  // search: filters the pages the person may open; Enter goes to the first
+  const term = q.trim().toLowerCase();
+  const results = term ? groups.flatMap((g) => g.items.map((item) => ({ item, group: g.label }))).filter(({ item }) => nameOf(item).toLowerCase().includes(term) || item.label.toLowerCase().includes(term)) : [];
+
+  const row = (item: NavItem, child = false) => {
     const isActive = item.href === active;
     const Icon = item.icon;
     const n = count(item);
@@ -77,69 +131,154 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         <Link
           href={item.href}
           aria-current={isActive ? "page" : undefined}
-          className={cn("relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13.5px] transition", isActive ? "bg-oil-400/[0.14] font-medium text-slate-900 ring-1 ring-inset ring-oil-400/30" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}
+          className={cn("relative flex items-center gap-3 rounded-full", child ? "px-3 py-2 text-[13px]" : "px-3.5 py-2.5 text-[13.5px]", isActive ? "glass-active font-medium text-slate-900" : "glass-row text-slate-600 hover:text-slate-900")}
         >
-          <Icon size={17} className={cn("shrink-0", isActive ? "text-oil-500" : "text-slate-400")} />
-          <span className="min-w-0 flex-1 truncate">{labels?.[item.href] ?? item.label}</span>
-          {n > 0 && <span className="shrink-0 rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white">{n > 99 ? "99+" : n}</span>}
+          <Icon size={child ? 16 : 18} className={cn("shrink-0", isActive ? "text-oil-500" : "text-slate-400")} />
+          <span className="min-w-0 flex-1 truncate">{nameOf(item)}</span>
+          {n > 0 && countBadge(n)}
         </Link>
       </li>
     );
   };
 
-  const sidebar = (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-4">
-        <Link href="/dashboard" className="flex min-w-0 items-center gap-3" aria-label={`${businessName} home`}>
-          <Image src="/brand/app-192.png" alt="" width={44} height={44} priority className="h-11 w-11 shrink-0 rounded-xl ring-1 ring-oil-400/40" />
-          <span className="min-w-0 leading-tight">
-            <span className="block truncate text-[15px] font-semibold tracking-tight text-slate-900">{businessName}</span>
-            <span className="mt-0.5 block truncate text-xs text-slate-500">Sales &amp; distribution</span>
-          </span>
-        </Link>
-        <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
-          <X size={16} />
-        </button>
+  const brand = (compact: boolean) => (
+    <Link href="/dashboard" className="flex min-w-0 items-center gap-3" aria-label={`${businessName} home`}>
+      <Image src="/brand/app-192.png" alt="" width={44} height={44} priority className={cn("shrink-0 rounded-full ring-2 ring-oil-400/45", compact ? "h-10 w-10" : "h-11 w-11")} />
+      {!compact && (
+        <span className="min-w-0 leading-tight">
+          <span className="block truncate text-[15px] font-semibold tracking-tight text-slate-900">{businessName}</span>
+          <span className="mt-0.5 block truncate text-xs text-slate-500">Sales &amp; distribution</span>
+        </span>
+      )}
+    </Link>
+  );
+
+  /** the full menu: brand, search, MAIN, WORKSPACE (folding groups with branches), night mode and the person */
+  const full = (drawer: boolean) => (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex items-center justify-between gap-2 px-4 pb-3 pr-7 pt-4">
+        {brand(false)}
+        {drawer && (
+          <button type="button" className="glass-row grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-600" onClick={() => setOpen(false)} aria-label="Close menu">
+            <X size={17} />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Main">
-        {groups.map((group) => {
-          if (!group.label)
-            return (
-              <ul key="top" className="mb-2 space-y-0.5">
-                {group.items.map(link)}
-              </ul>
-            );
-          const Icon = group.icon;
-          const isOpen = openGroup === group.label;
-          const here = group.label === activeGroup;
-          // a red number on a folded group so a waiting approval is never hidden inside it
-          const waiting = group.items.reduce((sum, i) => sum + count(i), 0);
-          return (
-            <div key={group.label}>
-              <button
-                type="button"
-                onClick={() => setOpenGroup(isOpen ? null : group.label)}
-                aria-expanded={isOpen}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.14em] transition",
-                  isOpen ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-100/70 hover:text-slate-800",
-                )}
-              >
-                {Icon && <Icon size={16} className={cn("shrink-0", here ? "text-oil-500" : "text-slate-400")} />}
-                <span className="flex-1">{group.label}</span>
-                {!isOpen && waiting > 0 && <span className="rounded-full bg-brand-red px-1.5 text-[11px] font-bold normal-case leading-[18px] tracking-normal text-white">{waiting > 99 ? "99+" : waiting}</span>}
-                <ChevronDown size={14} className={cn("shrink-0 text-slate-400 transition-transform duration-200", !isOpen && "-rotate-90")} />
-              </button>
-              <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out", isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
-                <div className="overflow-hidden" inert={!isOpen}>
-                  <ul className="ml-[1.15rem] mt-1 space-y-0.5 border-l border-line pb-1 pl-3">{group.items.map(link)}</ul>
-                </div>
-              </div>
+      <div className="px-3 pb-1.5">
+        <label className="glass-field flex items-center gap-2.5 rounded-full px-3.5 py-2.5 text-sm text-slate-500 focus-within:text-slate-900">
+          <Search size={16} className="shrink-0" />
+          <input
+            ref={searchRef}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && results[0]) router.push(results[0].item.href);
+              if (e.key === "Escape") setQ("");
+            }}
+            placeholder="Search pages"
+            aria-label="Search pages"
+            className="min-w-0 flex-1 bg-transparent text-slate-900 outline-none placeholder:text-slate-500"
+          />
+          <kbd className="glass-kbd hidden shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 lg:block">⌘K</kbd>
+        </label>
+      </div>
+
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2" aria-label="Main">
+        {term ? (
+          results.length > 0 ? (
+            <ul className="mt-2 space-y-0.5">{results.map(({ item }) => row(item))}</ul>
+          ) : (
+            <p className="px-4 py-6 text-center text-sm text-slate-500">No page matches “{q.trim()}”.</p>
+          )
+        ) : (
+          <>
+            {topGroups.length > 0 && (
+              <>
+                <p className="px-4 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.18em]" style={DIM}>
+                  Main
+                </p>
+                <ul className="space-y-0.5">{topGroups.flatMap((g) => g.items).map((i) => row(i))}</ul>
+              </>
+            )}
+            {folding.length > 0 && (
+              <p className="px-4 pb-1 pt-4 text-[10.5px] font-semibold uppercase tracking-[0.18em]" style={DIM}>
+                Workspace
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {folding.map((group) => {
+                const Icon = group.icon;
+                const isOpen = openGroup === group.label;
+                const here = group.label === activeGroup;
+                // a red number on a folded group so a waiting item is never hidden inside it
+                const waiting = group.items.reduce((sum, i) => sum + count(i), 0);
+                return (
+                  <div key={group.label}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenGroup(isOpen ? null : group.label)}
+                      aria-expanded={isOpen}
+                      className={cn("glass-row flex w-full items-center gap-3 rounded-full px-3.5 py-2.5 text-left text-[13.5px] font-medium", here ? "text-slate-900" : "text-slate-600")}
+                    >
+                      {Icon && <Icon size={18} className={cn("shrink-0", here ? "text-oil-500" : "text-slate-400")} />}
+                      <span className="flex-1">{group.label}</span>
+                      {!isOpen && waiting > 0 && countBadge(waiting)}
+                      <ChevronDown size={15} className={cn("shrink-0 text-slate-400 transition-transform duration-200", isOpen && "rotate-180")} />
+                    </button>
+                    <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out", isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+                      <div className="overflow-hidden" inert={!isOpen}>
+                        <ul className="glass-tree ml-[1.7rem] mt-1 space-y-0.5 pb-1 pl-3.5">{group.items.map((i) => row(i, true))}</ul>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </>
+        )}
       </nav>
+
+      <SidebarFooter name={user.name} roleName={user.roleName} logoutAction={logoutAction} />
+    </div>
+  );
+
+  /** the narrow rail: only icons, thin lines between the sets, red dots for what waits, night mode and the person */
+  const rail = (
+    <div className="flex min-h-0 flex-1 flex-col items-center">
+      <div className="pb-2 pr-3 pt-4">{brand(true)}</div>
+      <button
+        type="button"
+        onClick={() => {
+          setRail(false);
+          setTimeout(() => searchRef.current?.focus(), 80);
+        }}
+        title="Search pages (Ctrl K)"
+        aria-label="Search pages"
+        className="glass-row mb-1 grid h-11 w-11 shrink-0 place-items-center rounded-full text-slate-600 hover:text-slate-900"
+      >
+        <Search size={18} />
+      </button>
+      <nav className="flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Main">
+        {/* every page is its own icon, a plain link: nothing opens, only a small name appears on hover */}
+        {groups.map((g, gi) => (
+          <div key={g.label || `top-${gi}`} className="flex w-full flex-col items-center">
+            <div className="glass-divider my-1.5 w-7" />
+            {g.items.map((item) => {
+              const isActive = item.href === active;
+              const Icon = item.icon;
+              const n = count(item);
+              return (
+                <Link key={item.href} href={item.href} title={nameOf(item)} aria-label={nameOf(item)} aria-current={isActive ? "page" : undefined} className={cn("relative mb-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-full", isActive ? "glass-active" : "glass-row")}>
+                  <Icon size={17} className={isActive ? "text-oil-500" : "text-slate-500"} />
+                  {n > 0 && <span className={dot} aria-hidden />}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+      <SidebarFooter name={user.name} roleName={user.roleName} logoutAction={logoutAction} rail />
     </div>
   );
 
@@ -147,19 +286,31 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   const dateShort = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Africa/Dar_es_Salaam" }).format(new Date()); // phones
 
   return (
-    <div className="min-h-dvh lg:pl-[17.5rem] print:pl-0">
-      {/* Desktop sidebar: a floating panel */}
-      <aside className="fixed bottom-3 left-3 top-3 z-30 hidden w-64 overflow-hidden rounded-2xl border border-line bg-white shadow-[0_10px_40px_-16px_rgba(0,0,0,0.45)] lg:block print:hidden">{sidebar}</aside>
+    <div className={cn("min-h-dvh transition-[padding] duration-200 print:pl-0", collapsed ? "lg:pl-[5.9rem]" : "lg:pl-[17.5rem]")}>
+      {/* Desktop and tablet: the glass sidebar. The round button on its edge folds it into an icon rail and back. */}
+      <aside className={cn("fixed left-3 top-3 z-30 hidden lg:block print:hidden", collapsed ? "w-[4.5rem]" : "bottom-3 w-64")}>
+        <div className={cn("glass-panel flex flex-col", collapsed ? "max-h-[calc(100dvh-1.5rem)]" : "h-full")}>{collapsed ? rail : full(false)}</div>
+        <div className="group absolute -right-3.5 top-[1.65rem] z-10">
+          <button type="button" onClick={() => setRail(!collapsed)} aria-label={collapsed ? "Expand the menu" : "Collapse the menu"} className="grid h-7 w-7 place-items-center rounded-full bg-white text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.4)] ring-1 ring-black/10 transition hover:scale-105">
+            {collapsed ? <ChevronRight size={15} strokeWidth={2.5} /> : <ChevronLeft size={15} strokeWidth={2.5} />}
+          </button>
+          <span className="pointer-events-none absolute left-9 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 opacity-0 shadow-lg transition group-hover:opacity-100">
+            {collapsed ? "Expand" : "Collapse"} <kbd className="ml-1 rounded bg-slate-100 px-1 text-[10px] text-slate-500">[</kbd>
+          </span>
+        </div>
+      </aside>
 
-      {/* Mobile drawer */}
+      {/* Phone: the same panel slides over the page */}
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-navy-950/60" onClick={() => setOpen(false)} aria-hidden />
-          <aside className="absolute inset-y-3 left-3 w-72 max-w-[85vw] overflow-hidden rounded-2xl border border-line bg-white shadow-xl">{sidebar}</aside>
+          <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} aria-hidden />
+          <aside className="absolute inset-y-3 left-3 w-72 max-w-[85vw]">
+            <div className="glass-panel h-full">{full(true)}</div>
+          </aside>
         </div>
       )}
 
-      {/* Top bar: a floating card with the date on the left and the person on the right */}
+      {/* Top bar: the date, the bell and (on a phone) the person */}
       <div className="pointer-events-none sticky top-0 z-20 px-4 pb-3 pt-3 print:hidden sm:px-6 xl:px-8" style={{ background: "linear-gradient(to bottom, var(--color-surface) 60%, transparent)" }}>
         <header className="pointer-events-auto flex h-14 items-center justify-between gap-3 rounded-2xl border border-line bg-white/90 px-3 shadow-sm backdrop-blur sm:px-4">
           <div className="flex min-w-0 items-center gap-3">
@@ -178,7 +329,9 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
               <span className="sr-only">Notifications{unread > 0 ? `, ${unread} unread` : ""}</span>
               {unread > 0 && <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
             </Link>
-            <UserMenu name={user.name} roleName={user.roleName} logoutAction={logoutAction} />
+            <div className="lg:hidden">
+              <UserMenu name={user.name} roleName={user.roleName} logoutAction={logoutAction} />
+            </div>
           </div>
         </header>
       </div>
