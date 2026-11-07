@@ -625,8 +625,8 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                     emphasizeCollect={Boolean(customer.late)}
                     onDone={(sum) => refreshCustomer(customer.id, sum)}
                     openHref={customer.winga ? (customer.wingaId && perms.viewWinga ? `/resellers/${customer.wingaId}` : undefined) : perms.viewCustomer ? `/customers/${customer.id}` : undefined}
-                    openLabel={customer.winga ? "Open Winga" : "Open customer"}
                     openNewTab={cartCount > 0}
+                    short
                   />
                 </div>
               </div>

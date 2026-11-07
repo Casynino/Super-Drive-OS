@@ -34,17 +34,17 @@ export default function WingaActions({ customerId, name, sellHref, canCollect, c
           </Link>
         )}
         {canCollect && (
-          <button type="button" className={cn(base, emphasizeCollect ? primary : quiet)} onClick={() => setOpen("collect")}>
+          <button type="button" className={cn(base, emphasizeCollect ? primary : quiet)} onClick={() => setOpen("collect")} title="Collect payment: record money he brought">
             <HandCoins size={13} /> {short ? "Collect" : "Collect payment"}
           </button>
         )}
         {canReturn && (
-          <button type="button" className={cn(base, quiet)} onClick={() => setOpen("return")}>
+          <button type="button" className={cn(base, quiet)} onClick={() => setOpen("return")} title="Return goods: he brings back goods he did not sell">
             <Undo2 size={13} /> {short ? "Return" : "Return goods"}
           </button>
         )}
         {openHref && (
-          <Link href={openHref} target={openNewTab ? "_blank" : undefined} rel={openNewTab ? "noopener" : undefined} className={cn(base, quiet)} title="Open the full page: performance, orders, payments">
+          <Link href={openHref} target={openNewTab ? "_blank" : undefined} rel={openNewTab ? "noopener" : undefined} className={cn(base, quiet)} title="Open his full page: performance, orders, payments">
             <ArrowUpRight size={13} /> {openLabel ?? "Open"}
           </Link>
         )}
