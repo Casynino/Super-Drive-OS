@@ -81,7 +81,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
   const method = account?.method ?? methodPick;
   const [partAmount, setPartAmount] = useState("");
   const [reference, setReference] = useState("");
-  const [notes, setNotes] = useState("");
+  const notes = ""; // no note box at the till (Nino 2026-11-08)
   const [discountReason, setDiscountReason] = useState("");
   const [exception, setException] = useState(false);
   const [dueDate, setDueDate] = useState(""); // the day a normal customer says they will pay what is left on credit
@@ -705,16 +705,14 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                 {fe.dueDate && <p className="field-error">{fe.dueDate}</p>}
               </div>
             )}
-            {mode !== "FULL" && customer?.winga && <p className="mb-3 text-xs text-slate-500">Winga take the goods now and must pay within 3 days.</p>}
             {mode !== "FULL" && (
               <div className="mb-3">
                 <label className="label" htmlFor="pos-part">
-                  Pay some now (optional)
+                  Pay now (optional)
                 </label>
-                <p className="mb-1.5 text-xs text-slate-500">On credit the customer pays a little at a time. The rest is collected later on this same order.</p>
                 <input
                   id="pos-part"
-                  className={cn("input", fe.partAmount && "input-error")}
+                  className={cn("input h-10", fe.partAmount && "input-error")}
                   inputMode="decimal"
                   value={partAmount}
                   onChange={(e) => {
@@ -723,7 +721,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                   }}
                   placeholder="0"
                 />
-                {fe.partAmount && <p className="field-error">{fe.partAmount}</p>}
+                {fe.partAmount ? <p className="field-error">{fe.partAmount}</p> : <p className="mt-1 text-xs text-slate-500">{customer?.winga ? "The rest is paid within 3 days." : "The rest is paid later."}</p>}
               </div>
             )}
 
@@ -764,7 +762,6 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                 )}
               </div>
             )}
-            <input className="input mt-3" placeholder="Note (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} aria-label="Sale note" />
           </div>
 
           <div className="card card-pad">
