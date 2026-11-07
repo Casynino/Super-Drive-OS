@@ -2,25 +2,38 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, FileDown, Printer, X } from "lucide-react";
+import { Check, ExternalLink, FileDown, Printer } from "lucide-react";
 import Modal from "@/components/Modal";
 import PickupNoteSheet, { type PickupNoteData } from "@/components/warehouse/PickupNoteSheet";
 import { loadPickupPreview, loadSaleDone, type SaleDone } from "@/app/(app)/till/actions";
 import { cn } from "@/lib/utils";
 
-const Label = ({ children }: { children: React.ReactNode }) => <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{children}</p>;
+// an A5 sheet (148 x 210 mm) in pixels
+const SHEET_W = 559.37;
+const SHEET_H = 793.7;
+
+const act = "inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold transition";
 
 /**
- * The pop-up after Complete sale. It shows the pickup note itself, small (an A5 sheet at half size, with its QR code), and what to do
- * with it: Print, save as PDF, open it. Next to it, the sale in short. New sale at the bottom. The till never leaves the page.
+ * After Complete sale: the pickup note itself, its real shape (an A5 sheet with its QR code), shown on the dark screen as paper, with
+ * only a few actions under it: Print, Download PDF, Open, and New sale. No card around it, no receipt. The till never leaves the page.
  * On screen the note wears the system's colours; on paper it prints in its own.
  */
 export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }: { saleId: string | null; currency: { symbol: string; decimals: number }; onNewSale: () => void; onLoaded?: (s: SaleDone) => void }) {
   const [sale, setSale] = useState<SaleDone | null>(null);
   const [note, setNote] = useState<PickupNoteData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [scale, setScale] = useState(0.8);
   const nf = useMemo(() => new Intl.NumberFormat("en-US", { minimumFractionDigits: currency.decimals, maximumFractionDigits: currency.decimals }), [currency.decimals]);
   const fmt = (v: string | number) => `${currency.symbol} ${nf.format(Number(v))}`;
+
+  // the sheet is as big as the screen allows (never bigger than real size)
+  useEffect(() => {
+    const fit = () => setScale(Math.max(0.4, Math.min(1, (window.innerHeight - 190) / SHEET_H, (window.innerWidth - 28) / SHEET_W)));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
 
   useEffect(() => {
     if (!saleId) return;
@@ -42,114 +55,65 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
   }, [saleId]);
 
   const owed = sale ? Number(sale.owed) : 0;
-  const paid = sale ? Number(sale.paid) : 0;
-  const chip = !sale ? null : sale.status === "PAID" ? { text: "Paid", tone: "bg-emerald-100 text-emerald-800" } : { text: sale.status === "PARTIALLY_PAID" ? "Part paid" : "On credit", tone: "bg-amber-100 text-amber-800" };
   const pickup = sale?.pickup ?? null;
-  const act = "inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition";
+  const line = sale ? [sale.saleNo, sale.status === "PAID" ? "Paid" : owed > 0 ? `${fmt(owed)} on credit${sale.dueDate ? ` · pay by ${sale.dueDate}` : ""}` : "", fmt(sale.total)].filter(Boolean).join("  ·  ") : "";
 
   return (
-    <Modal open={Boolean(saleId)} onClose={onNewSale} label="Sale complete" wide>
-      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-            <Check size={20} strokeWidth={2.5} />
+    <Modal open={Boolean(saleId)} onClose={onNewSale} label="Sale complete" bare>
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-white">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white">
+            <Check size={14} strokeWidth={3} />
           </span>
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold leading-tight text-slate-900">Sale complete</h2>
-            <p className="font-mono text-xs text-slate-500">{sale?.saleNo ?? "…"}</p>
-          </div>
+          <span className="font-semibold">Sale complete</span>
+          {sale && <span className="font-mono text-xs text-white/70">{line}</span>}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {chip && <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", chip.tone)}>{chip.text}</span>}
-          <button type="button" className="btn-secondary btn-sm" onClick={onNewSale} aria-label="Close">
-            <X size={16} />
-          </button>
-        </div>
-      </div>
 
-      {error ? (
-        <p className="px-6 py-10 text-center text-sm text-brand-red-dark">{error}</p>
-      ) : !sale ? (
-        <p className="px-6 py-12 text-center text-sm text-slate-500">Getting the details…</p>
-      ) : (
-        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto px-5 py-5 sm:grid-cols-[auto_1fr] sm:px-6">
-          {pickup && (
-            <div className="mx-auto">
-              {/* the real note, first page, at half size: 148 x 210 mm = about 559 x 794 px, shown at 280 x 397 */}
-              <div className="overflow-hidden rounded-lg border border-line shadow-sm" style={{ width: 280, height: 397 }}>
-                {note ? (
-                  <div style={{ width: "148mm", height: "210mm", transform: "scale(0.5)", transformOrigin: "top left" }}>
-                    <PickupNoteSheet d={note} preview />
-                  </div>
-                ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-slate-500">Getting the note…</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="flex min-w-0 flex-col">
-            <Label>Customer</Label>
-            <p className="mt-0.5 text-sm font-semibold text-slate-900">
-              {sale.customer ?? "Walk-in customer"}
-              {sale.winga && <span className="ml-2 rounded-full bg-oil-400/20 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span>}
-            </p>
-            <p className="mt-0.5 text-xs text-slate-500">
-              {sale.lines.length} product{sale.lines.length === 1 ? "" : "s"}
-            </p>
-
-            <dl className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm">
-              <div className="flex items-baseline justify-between">
-                <dt className="font-semibold text-slate-900">Total</dt>
-                <dd className="text-2xl font-bold tracking-tight text-slate-900">{fmt(sale.total)}</dd>
-              </div>
-              {paid > 0 && (
-                <div className="flex justify-between text-slate-600">
-                  <dt>Paid{sale.method ? ` · ${sale.method}` : ""}</dt>
-                  <dd className="font-medium tabular-nums text-slate-800">{fmt(paid)}</dd>
-                </div>
-              )}
-              {owed > 0 && (
-                <div className="flex justify-between font-medium text-brand-red-dark">
-                  <dt>On credit{sale.dueDate ? ` · pay by ${sale.dueDate}` : ""}</dt>
-                  <dd className="tabular-nums">{fmt(owed)}</dd>
-                </div>
-              )}
-            </dl>
-
-            {pickup ? (
-              <div className="mt-5">
-                <Label>Pickup note</Label>
-                <p className="mb-2 mt-0.5 font-mono text-sm font-semibold text-slate-900">{pickup.noteNo}</p>
-                <Link href={`/print/pickup/${pickup.id}?print=1`} target="_blank" rel="noopener" className={cn(act, "w-full border-navy-700 bg-navy-700 text-white hover:bg-navy-800")}>
-                  <Printer size={16} /> Print note
-                </Link>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <Link href={`/print/pickup/${pickup.id}?print=1&save=1`} target="_blank" rel="noopener" className={cn(act, "border-line bg-white text-slate-700 hover:border-navy-300 hover:bg-slate-50")}>
-                    <FileDown size={16} /> PDF
-                  </Link>
-                  <Link href={`/print/pickup/${pickup.id}`} target="_blank" rel="noopener" className={cn(act, "border-line bg-white text-slate-700 hover:border-navy-300 hover:bg-slate-50")}>
-                    <ExternalLink size={16} /> Open
-                  </Link>
-                </div>
-                <p className="mt-2 text-xs text-slate-500">Give it to the customer. It is also the delivery note.</p>
+        {error ? (
+          <div className="rounded-xl bg-white px-6 py-8 text-sm text-brand-red-dark">{error}</div>
+        ) : pickup ? (
+          /* the note, as it is on paper */
+          <div style={{ width: SHEET_W * scale, height: SHEET_H * scale }} className="overflow-hidden rounded-sm shadow-[0_18px_50px_rgba(0,0,0,0.55)] ring-1 ring-white/20">
+            {note ? (
+              <div style={{ width: "148mm", height: "210mm", transform: `scale(${scale})`, transformOrigin: "top left" }}>
+                <PickupNoteSheet d={note} preview />
               </div>
             ) : (
-              <div className="mt-5 text-xs text-slate-500">
-                Stock is updated. No pickup note: the goods left at once.
-                <Link href={`/sales/${sale.id}/receipt?first=1`} target="_blank" rel="noopener" className="ml-1 font-medium text-navy-700 underline">
-                  Print receipt
-                </Link>
-              </div>
+              <div className="flex h-full items-center justify-center bg-white/10 text-sm text-white/70">Getting the note…</div>
             )}
           </div>
-        </div>
-      )}
+        ) : sale ? (
+          <div className="w-[min(92vw,26rem)] rounded-xl bg-white px-6 py-6 text-center">
+            <p className="text-2xl font-bold text-slate-900">{fmt(sale.total)}</p>
+            <p className="mt-1 text-sm text-slate-600">{sale.customer ?? "Walk-in customer"} · stock is updated</p>
+            <Link href={`/sales/${sale.id}/receipt?first=1`} target="_blank" rel="noopener" className="mt-3 inline-block text-sm font-medium text-navy-700 underline">
+              Print receipt
+            </Link>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center rounded-sm bg-white/10 text-sm text-white/70" style={{ width: SHEET_W * scale, height: SHEET_H * scale }}>
+            Getting the details…
+          </div>
+        )}
 
-      <div className="border-t border-line px-5 py-4 sm:px-6">
-        <button type="button" autoFocus className="btn-primary min-h-11 w-full text-base" onClick={onNewSale}>
-          New sale
-        </button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {pickup && (
+            <>
+              <Link href={`/print/pickup/${pickup.id}?print=1`} target="_blank" rel="noopener" className={cn(act, "border-white bg-white text-navy-800 hover:bg-slate-100")}>
+                <Printer size={16} /> Print
+              </Link>
+              <Link href={`/print/pickup/${pickup.id}?print=1&save=1`} target="_blank" rel="noopener" className={cn(act, "border-white/40 bg-white/10 text-white hover:bg-white/20")}>
+                <FileDown size={16} /> Download PDF
+              </Link>
+              <Link href={`/print/pickup/${pickup.id}`} target="_blank" rel="noopener" className={cn(act, "border-white/40 bg-white/10 text-white hover:bg-white/20")}>
+                <ExternalLink size={16} /> Open
+              </Link>
+            </>
+          )}
+          <button type="button" autoFocus className={cn(act, "border-navy-600 bg-navy-600 px-6 text-white hover:bg-navy-700")} onClick={onNewSale}>
+            New sale
+          </button>
+        </div>
       </div>
     </Modal>
   );

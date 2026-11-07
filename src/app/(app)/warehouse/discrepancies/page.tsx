@@ -17,6 +17,19 @@ export default async function DiscrepanciesPage({ searchParams }: { searchParams
   const sp = await searchParams;
   const showAll = sp.all === "1";
   const records = await loadIssueRecords(db, {}); // quantities only: no costs for anyone here
+  // goods customers brought back damaged: they came back, are not sellable and stay under investigation (quantities and reasons, no money)
+  const damaged = await db.reversalItem.findMany({
+    where: { condition: "DAMAGED", reversal: { status: "COMPLETED" } },
+    orderBy: { reversal: { decidedAt: "desc" } },
+    take: 30,
+    select: {
+      id: true,
+      enteredQty: true,
+      product: { select: { name: true, sku: true } },
+      saleItem: { select: { enteredUnit: { select: { symbol: true } } } },
+      reversal: { select: { reversalNo: true, reason: true, decidedAt: true, requestedBy: { select: { name: true } }, sale: { select: { saleNo: true } } } },
+    },
+  });
   const rows = records.filter((r) => showAll || r.open > 0).sort((a, b) => (b.reportedAt?.getTime() ?? 0) - (a.reportedAt?.getTime() ?? 0));
   const openCount = records.filter((r) => r.open > 0).length;
   const pill = (on: boolean) => cn("rounded-full border px-3 py-1.5 text-sm font-medium transition", on ? "border-navy-600 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900");
@@ -24,7 +37,7 @@ export default async function DiscrepanciesPage({ searchParams }: { searchParams
 
   return (
     <>
-      <PageHeader title="Discrepancies" description="Goods that arrived missing, damaged or different from the order." />
+      <PageHeader title="Discrepancies" description="Goods that arrived missing, damaged or different from the order, and damaged goods customers returned." />
       <div className="mb-4 flex flex-wrap gap-2">
         <Link href="/warehouse/discrepancies" className={pill(!showAll)}>
           Still open <span className="text-xs opacity-80">{openCount}</span>
@@ -33,6 +46,35 @@ export default async function DiscrepanciesPage({ searchParams }: { searchParams
           All <span className="text-xs opacity-80">{records.length}</span>
         </Link>
       </div>
+      {damaged.length > 0 && (
+        <section className="card mb-5 overflow-hidden" aria-label="Damaged goods returned">
+          <div className="border-b border-line px-4 py-3 sm:px-5">
+            <h2 className="text-base font-semibold text-slate-900">Damaged goods returned by customers</h2>
+            <p className="text-xs text-slate-500">They came back, are not for sale, and are under investigation.</p>
+          </div>
+          <ul className="divide-y divide-line text-sm">
+            {damaged.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 py-3 sm:px-5">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-900">
+                    {d.enteredQty.toString()} {d.saleItem.enteredUnit.symbol} · {d.product.name}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {d.reversal.sale.saleNo} · {d.reversal.reversalNo} · “{d.reversal.reason}”
+                  </p>
+                </div>
+                <div className="text-right text-xs text-slate-500">
+                  <span className="badge-yellow">Under investigation</span>
+                  <span className="mt-1 block">
+                    {d.reversal.requestedBy.name}
+                    {d.reversal.decidedAt ? ` · ${formatDateTime(d.reversal.decidedAt)}` : ""}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <div className="card overflow-hidden">
         {rows.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-slate-500">{showAll ? "No discrepancy has been recorded." : "Nothing is open. Every delivery matched, or the Director has decided on the differences."}</p>

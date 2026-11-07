@@ -12,6 +12,15 @@ export const getCurrency = cache(async (): Promise<CurrencyConfig> => {
   return DEFAULT_CURRENCY;
 });
 
+/**
+ * Do returns and cancellations by the shop person need the owner's approval first? (Nino 2026-11-08: no, they happen at once, the
+ * reason is mandatory and the owner is told.) The owner can switch approval back on in Settings → Business.
+ */
+export const getReturnsNeedApproval = cache(async (): Promise<boolean> => {
+  const row = await db.setting.findUnique({ where: { key: "returnsNeedApproval" } });
+  return row?.value === "yes";
+});
+
 export const getBusinessName = cache(async (): Promise<string> => {
   const row = await db.setting.findUnique({ where: { key: "businessName" } });
   return typeof row?.value === "string" ? row.value : "Super Drive Oil";

@@ -18,13 +18,15 @@ type Props = {
   money: { total: number; returned: number; paid: number; refunded: number };
   currency: { symbol: string; decimals: number };
   canApproveNow: boolean;
+  /** how the customer paid (the money goes back the same way) */
+  defaultMethod?: string;
   submissionKey: string;
   cancelHref: string;
 };
 
 const initial: ActionState = {};
 
-export default function ReturnForm({ action, saleId, items, money, currency, canApproveNow, submissionKey: key, cancelHref }: Props) {
+export default function ReturnForm({ action, saleId, items, money, currency, canApproveNow, defaultMethod, submissionKey: key, cancelHref }: Props) {
   const [state, formAction] = useActionState(action, initial);
   const fe = state.fieldErrors ?? {};
   const [submissionKey] = useState(key);
@@ -35,7 +37,7 @@ export default function ReturnForm({ action, saleId, items, money, currency, can
   const [qty, setQty] = useState<Record<string, string>>({});
   const [cond, setCond] = useState<Record<string, "RESELLABLE" | "DAMAGED">>({});
   const [reason, setReason] = useState("");
-  const [method, setMethod] = useState("CASH");
+  const [method, setMethod] = useState(defaultMethod ?? "CASH");
   const [reference, setReference] = useState("");
 
   // What the customer gets back (an estimate; the server works out the exact figure).
@@ -104,7 +106,7 @@ export default function ReturnForm({ action, saleId, items, money, currency, can
                     </div>
                     <select className="input" aria-label={`Condition of ${i.name}`} value={cond[i.id] ?? "RESELLABLE"} onChange={(e) => setCond({ ...cond, [i.id]: e.target.value as "RESELLABLE" | "DAMAGED" })}>
                       <option value="RESELLABLE">Good — back on the shelf</option>
-                      <option value="DAMAGED">Damaged — write off</option>
+                      <option value="DAMAGED">Damaged — not for sale, to investigate</option>
                     </select>
                   </>
                 ) : (

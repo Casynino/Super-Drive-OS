@@ -9,7 +9,7 @@ import { can } from "@/lib/auth/can";
 import { fail, formString, guarded, type ActionState } from "@/lib/action";
 import { notifyPermission, notifyUser } from "@/lib/notifications";
 import { ReversalError, completeReversal, createReversalRequest, rejectReversal, returnedBySaleItem } from "@/lib/sales/reversals";
-import { getCurrency } from "@/lib/settings";
+import { getCurrency, getReturnsNeedApproval } from "@/lib/settings";
 
 const requestSchema = z.object({
   saleId: z.string().min(1),
@@ -40,7 +40,9 @@ export async function requestReversal(_prev: ActionState, fd: FormData): Promise
 
     const sale = await db.sale.findUnique({ where: { id: p.saleId }, select: { id: true, saleNo: true, salespersonId: true } });
     if (!sale || (!can(user, "sales.view_all") && sale.salespersonId !== user.id)) return fail("This sale was not found.");
-    const approveNow = can(user, "returns.approve");
+    // Returns happen at once (Nino 2026-11-08): the reason is mandatory, the owner is told. Unless the owner switched approval on.
+    const approveNow = can(user, "returns.approve") || !(await getReturnsNeedApproval());
+    const byOwner = can(user, "returns.approve");
 
     try {
       const out = await db.$transaction(
@@ -54,6 +56,16 @@ export async function requestReversal(_prev: ActionState, fd: FormData): Promise
           }
           const r = await completeReversal(tx, { reversalId: req.id, approver: user, dp: currency.decimals });
           await writeAudit(tx, { ...base, action: r.saleCancelled ? "sale.cancelled" : "sale.return_completed", reason: p.reason, after: { returnValue: r.returnValue, refund: r.refund, method: p.refundMethod } });
+          // the boss sees every return, with the reason and what went back to the customer
+          if (!byOwner) {
+            await notifyPermission(tx, "returns.approve", { type: "reversal.done", title: `${r.saleCancelled ? "Sale cancelled" : "Goods returned"}: ${sale.saleNo}`, body: `${user.name}: ${p.reason}${r.refund.gt(0) ? ` · refunded ${r.refund.toString()}` : ""}`, link: `/sales/${sale.id}` }, user.id);
+          }
+          // goods that came back damaged: the warehouse and the boss are told, they are under investigation
+          const damaged = p.kind === "RETURN" ? p.lines.filter((l) => l.condition === "DAMAGED") : [];
+          if (damaged.length > 0) {
+            const note = { type: "return.damaged", title: `Damaged goods returned: ${sale.saleNo}`, body: `${user.name}: ${p.reason}. The goods are under investigation.`, link: "/warehouse/discrepancies" };
+            await notifyPermission(tx, "warehouse.operate", note, user.id); // the warehouse team and the owners (an owner passes every permission)
+          }
           return { id: req.id, done: true };
         },
         { timeout: 30000, maxWait: 15000 },

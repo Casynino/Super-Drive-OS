@@ -8,7 +8,7 @@ import { requireUser } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { getCashSettings } from "@/lib/cash/settings";
 import { formatMoney } from "@/lib/money";
-import { getBusinessProfile, getCurrency } from "@/lib/settings";
+import { getBusinessProfile, getCurrency, getReturnsNeedApproval } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { saveCashSettings, saveExpenseCategory, setExpenseCategoryStatus } from "../cash/settings-actions";
 import { saveBrand, saveBusinessProfile, saveCategory, saveLocation, saveUnit, setEntityStatus } from "./actions";
@@ -84,7 +84,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const tab = TABS.find((t) => t.key === sp.tab)?.key ?? "business";
 
-  const [categories, brands, units, locations, profile, currency, activeBaseUse, cashSettings, expenseCategories] = await Promise.all([
+  const [categories, brands, units, locations, profile, currency, activeBaseUse, cashSettings, expenseCategories, returnsNeedApproval] = await Promise.all([
     db.category.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { products: true } } } }),
     db.brand.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { products: true } } } }),
     db.unit.findMany({ orderBy: { name: "asc" } }),
@@ -94,6 +94,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     db.product.groupBy({ by: ["baseUnitId"], where: { status: "ACTIVE" }, _count: { _all: true } }),
     getCashSettings(db),
     db.expenseCategory.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { expenses: true } } } }),
+    getReturnsNeedApproval(),
   ]);
   const baseUse = new Map(activeBaseUse.map((r) => [r.baseUnitId, r._count._all]));
 
@@ -138,6 +139,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 { name: "businessPhone", label: "Phone", value: profile.phone },
                 { name: "businessAddress", label: "Address", value: profile.address },
                 { name: "creditTermsDays", label: "Credit period (days)", value: String(profile.creditTermsDays), hint: "How long customers have to pay a credit sale before it is overdue." },
+                { name: "returnsNeedApproval", label: "Returns and cancellations", type: "select" as const, value: returnsNeedApproval ? "yes" : "no", options: [{ value: "no", label: "Done at once (the owner is told)" }, { value: "yes", label: "The owner must approve first" }], hint: "Goods always go back to the store and the money back to the customer. A reason is always needed." },
                 { name: "paymentAccounts", label: "Payment accounts text (a fallback)", type: "textarea" as const, value: profile.paymentAccountsManual, span: 2 as const, hint: profile.paymentAccountsSource === "accounts" ? "Not used right now: payment reminders copy the bank and mobile-money accounts from Accounts. This text is only used when none of them has a number." : "Payment reminders copy the bank and mobile-money accounts from Accounts once they have numbers. Until then this text is used. Each account on its own lines, with a blank line between accounts." },
               ]}
             />
