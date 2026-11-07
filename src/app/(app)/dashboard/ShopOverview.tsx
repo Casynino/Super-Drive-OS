@@ -104,8 +104,7 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Hello {user.name.split(" ")[0]}</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Overview</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Today</h1>
           <p className="mt-1 text-sm text-slate-500">{new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: TZ }).format(new Date())}</p>
         </div>
         {closingNote &&

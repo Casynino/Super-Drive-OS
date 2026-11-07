@@ -61,7 +61,7 @@ export const NAV: NavGroup[] = [
       // the shop attendant's home IS the POS (Home is hidden for them, see (app)/layout.tsx); the overview of the day is its own page
       { label: "Home", href: "/dashboard", icon: House, permissions: [], ready: true },
       { label: "POS", href: "/pos", icon: ShoppingCart, permissions: ["sales.pos"], ready: true },
-      { label: "Overview", href: "/overview", icon: LayoutDashboard, permissions: ["sales.pos"], hideIfAny: ["dashboard.view"], ready: true },
+      { label: "Today", href: "/overview", icon: LayoutDashboard, permissions: ["sales.pos"], hideIfAny: ["dashboard.view"], ready: true },
     ],
   },
   {
