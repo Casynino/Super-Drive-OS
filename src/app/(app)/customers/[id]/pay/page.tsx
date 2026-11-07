@@ -13,9 +13,10 @@ import { applyCustomerCredit, recordCollection } from "../../../payments/actions
 
 export const metadata = { title: "Record payment" };
 
-export default async function CustomerPayPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CustomerPayPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ sale?: string }> }) {
   await requirePagePermission("payments.record");
   const { id } = await params;
+  const sp = await searchParams;
   const customer = await db.customer.findUnique({ where: { id } });
   if (!customer) notFound();
   const [currency, credit, sales, accounts] = await Promise.all([
@@ -58,7 +59,7 @@ export default async function CustomerPayPage({ params }: { params: Promise<{ id
       </div>
 
       <div className="space-y-8">
-        <CollectPaymentForm mode="collect" action={recordCollection} customerId={id} invoices={invoices} creditAvailable={0} accounts={accounts.map((a) => ({ id: a.id, locationId: a.locationId, method: a.method, name: a.name, accountNumber: a.accountNumber, isDefault: a.isDefault }))} submissionKey={randomUUID()} currency={cur} cancelHref={`/customers/${id}`} />
+        <CollectPaymentForm mode="collect" action={recordCollection} customerId={id} invoices={invoices} creditAvailable={0} accounts={accounts.map((a) => ({ id: a.id, locationId: a.locationId, method: a.method, name: a.name, accountNumber: a.accountNumber, isDefault: a.isDefault }))} submissionKey={randomUUID()} currency={cur} cancelHref={`/customers/${id}`} focusSaleId={invoices.some((i) => i.id === sp.sale) ? sp.sale : undefined} />
 
         {credit.gt(0) && invoices.length > 0 && (
           <section>

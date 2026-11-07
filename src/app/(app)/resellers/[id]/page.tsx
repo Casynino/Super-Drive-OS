@@ -76,9 +76,9 @@ export default async function ResellerPage({ params, searchParams }: { params: P
       <BackLink href="/resellers" className="mb-3 inline-flex items-center gap-1.5 py-1 text-sm font-medium text-slate-500 hover:text-slate-900">
         <ArrowLeft size={15} /> Back
       </BackLink>
-      <section className="card mb-5 p-4 sm:p-5">
-        <div className="flex flex-wrap items-start gap-4">
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-navy-700 text-2xl font-bold text-white" aria-hidden>
+      <section className="card mb-5 overflow-hidden">
+        <div className="flex items-start gap-4 p-4 sm:p-5">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-navy-700 text-2xl font-bold text-white sm:h-16 sm:w-16" aria-hidden>
             {r.name.trim().charAt(0).toUpperCase()}
           </span>
           <div className="min-w-0 flex-1">
@@ -101,34 +101,46 @@ export default async function ResellerPage({ params, searchParams }: { params: P
               </span>
             </p>
           </div>
-          <div className="flex flex-wrap items-start gap-2">
-            {canOperate && r.status === "ACTIVE" && (
-              <Link href={`/resellers/${id}/issue`} className="btn-primary">
-                <ArrowUpFromLine size={16} /> Issue stock
-              </Link>
-            )}
-            {canOperate && (
-              <Link href={`/resellers/${id}/sold`} className="btn-secondary">
-                Record sold
-              </Link>
-            )}
-            {canOperate && (
-              <Link href={`/resellers/${id}/return`} className="btn-secondary">
-                <Undo2 size={16} /> Returns
-              </Link>
-            )}
-            {can(user, "payments.record") && (
-              <Link href={`/customers/${r.customerId}/pay`} className="btn-secondary">
-                <HandCoins size={16} /> Receive money
-              </Link>
-            )}
-            {late.length > 0 && <RemindButton href={remindHref} customerId={r.customerId} saleIds={late.map((i) => i.id)} lastText={remindedText(lastMap.get(r.customerId))} label="Remind to pay" />}
-            {chatNumber && (
-              <a href={`https://wa.me/${chatNumber}`} target="_blank" rel="noopener noreferrer" className="btn-secondary" title="Open a WhatsApp chat">
-                <MessageCircle size={16} /> WhatsApp
-              </a>
-            )}
-          </div>
+        </div>
+        {/* What you do when the Winga comes in: sell to him, take his money, take goods back. The stock he holds comes after. */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-line bg-slate-50/60 px-4 py-3 sm:px-5">
+          {can(user, "sales.pos") && r.status === "ACTIVE" && (
+            <Link href={`/pos?winga=${r.customerId}`} className="btn-primary">
+              Sell
+            </Link>
+          )}
+          {can(user, "payments.record") && (
+            <Link href={`/customers/${r.customerId}/pay`} className="btn-secondary">
+              <HandCoins size={16} /> Collect payment
+            </Link>
+          )}
+          {can(user, "returns.create") && a.outstanding.gt(0) && (
+            <Link href={`/customers/${r.customerId}/return`} className="btn-secondary" title="He brings back goods he took on credit and did not sell">
+              <Undo2 size={16} /> Return goods
+            </Link>
+          )}
+          {(canOperate || late.length > 0 || chatNumber) && <span className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden />}
+          {canOperate && r.status === "ACTIVE" && (
+            <Link href={`/resellers/${id}/issue`} className="btn-secondary btn-sm">
+              <ArrowUpFromLine size={15} /> Issue stock
+            </Link>
+          )}
+          {canOperate && (
+            <Link href={`/resellers/${id}/sold`} className="btn-secondary btn-sm">
+              Record sold
+            </Link>
+          )}
+          {canOperate && (
+            <Link href={`/resellers/${id}/return`} className="btn-secondary btn-sm">
+              Stock returns
+            </Link>
+          )}
+          {late.length > 0 && <RemindButton href={remindHref} customerId={r.customerId} saleIds={late.map((i) => i.id)} lastText={remindedText(lastMap.get(r.customerId))} label="Remind to pay" />}
+          {chatNumber && (
+            <a href={`https://wa.me/${chatNumber}`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm" title="Open a WhatsApp chat">
+              <MessageCircle size={15} /> WhatsApp
+            </a>
+          )}
         </div>
       </section>
 
@@ -151,7 +163,7 @@ export default async function ResellerPage({ params, searchParams }: { params: P
         <StatTile icon={ArrowUpFromLine} tone="navy" label="Stock received" value={m(a.issuedValue)} hint={`${a.issuedQty.toString()} items at the agreed prices`} />
         <StatTile icon={ArrowDownToLine} tone="green" label="Reported sold" value={m(a.soldValue)} hint={`${a.soldQty.toString()} items · ${a.reports} report${a.reports === 1 ? "" : "s"}`} />
         <StatTile icon={Undo2} tone="yellow" label="Stock they still hold" value={m(a.remainingValue)} hint={`${a.remainingQty.toString()} items unsold · ${a.returnedQty.toString()} returned`} />
-        <StatTile icon={HandCoins} tone={a.outstanding.gt(0) ? "red" : "slate"} label="They owe us" value={m(a.outstanding)} hint={`Paid so far ${m(a.collected)}`} />
+        <StatTile icon={HandCoins} tone={a.outstanding.gt(0) ? "red" : "slate"} label="They owe us" value={m(a.outstanding)} hint={`${st.openInvoices} open order${st.openInvoices === 1 ? "" : "s"} · paid so far ${m(a.collected)}`} />
       </div>
 
       <div className="mb-5 grid gap-5 xl:grid-cols-[1fr_340px]">

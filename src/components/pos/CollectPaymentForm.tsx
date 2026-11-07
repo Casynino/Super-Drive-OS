@@ -23,11 +23,13 @@ type Props = {
   submissionKey: string;
   currency: { symbol: string; decimals: number };
   cancelHref: string;
+  /** the order the person came from: the amount typed goes to this order first (up to what it still owes) */
+  focusSaleId?: string;
 };
 
 const initial: ActionState = {};
 
-export default function CollectPaymentForm({ mode, action, customerId, invoices, creditAvailable, accounts = [], submissionKey: key, currency, cancelHref }: Props) {
+export default function CollectPaymentForm({ mode, action, customerId, invoices, creditAvailable, accounts = [], submissionKey: key, currency, cancelHref, focusSaleId }: Props) {
   const [state, formAction] = useActionState(action, initial);
   const fe = state.fieldErrors ?? {};
   const [submissionKey] = useState(key);
@@ -94,7 +96,17 @@ export default function CollectPaymentForm({ mode, action, customerId, invoices,
               <label className="label" htmlFor="amount">
                 Amount received <span className="text-brand-red">*</span>
               </label>
-              <input id="amount" className={cn("input", fe.amount && "input-error")} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
+              <input id="amount" className={cn("input", fe.amount && "input-error")} inputMode="decimal" value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  const focus = focusSaleId ? invoices.find((i) => i.id === focusSaleId) : undefined;
+                  if (focus) {
+                    const take = Math.min(num(e.target.value), Number(focus.owed));
+                    setAlloc(take > 0 ? { [focus.id]: String(take) } : {});
+                  }
+                }}
+                placeholder="0"
+              />
               {fe.amount && <p className="field-error">{fe.amount}</p>}
             </div>
             <div>

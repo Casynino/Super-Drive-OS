@@ -7,7 +7,7 @@ import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { outstandingByCustomer, overdueByCustomer } from "@/lib/sales/outstanding";
+import { openOrdersByCustomer, outstandingByCustomer, overdueByCustomer } from "@/lib/sales/outstanding";
 import { listPrice } from "@/lib/sales/pricing";
 import type { PosCustomer, PosProduct } from "@/lib/sales/types";
 import { listAccounts } from "@/lib/cash/ledger";
@@ -19,11 +19,12 @@ import { getActiveLocations, getStockByLocation } from "../inventory/data";
 
 export const metadata = { title: "Home" };
 
-export default async function PosPage() {
+export default async function PosPage({ searchParams }: { searchParams: Promise<{ winga?: string }> }) {
+  const sp = await searchParams;
   const user = await requirePagePermission("sales.pos");
   const canCredit = can(user, "sales.credit");
 
-  const [products, locations, stockByLocation, customers, owed, late, currency, accounts] = await Promise.all([
+  const [products, locations, stockByLocation, customers, owed, late, orderCounts, currency, accounts] = await Promise.all([
     db.product.findMany({
       where: { status: "ACTIVE" },
       orderBy: { name: "asc" },
@@ -34,6 +35,7 @@ export default async function PosPage() {
     can(user, "customers.view") ? db.customer.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, take: 3000, include: { reseller: { select: { id: true } } } }) : [],
     canCredit ? outstandingByCustomer(db) : new Map(),
     canCredit ? overdueByCustomer(db) : new Map(),
+    canCredit ? openOrdersByCustomer(db) : new Map(),
     getCurrency(),
     listAccounts(db),
   ]);
@@ -73,7 +75,7 @@ export default async function PosPage() {
     winga: Boolean(c.reseller),
     complete: Boolean(c.phone?.trim() && c.idNumber?.trim() && c.businessLocation?.trim()),
     ...(late.get(c.id) ? { late: { amount: late.get(c.id)!.amount.toString(), since: late.get(c.id)!.since.toISOString().slice(0, 10) } } : {}),
-    ...(canCredit ? { creditLimit: c.creditLimit.toString(), outstanding: (owed.get(c.id) ?? 0).toString() } : {}),
+    ...(canCredit ? { creditLimit: c.creditLimit.toString(), outstanding: (owed.get(c.id) ?? 0).toString(), openOrders: orderCounts.get(c.id) ?? 0 } : {}),
   }));
 
   // the shop person's home: a small banner like the Director's, with the words in the middle and the shop's real products at the side
@@ -111,6 +113,7 @@ export default async function PosPage() {
           action={createSale}
           quickAddCustomer={quickCreateCustomer}
           quickAddWinga={quickCreateWinga}
+          initialWingaId={sp.winga}
           products={posProducts}
           locations={locations}
           stockByLocation={stockByLocation}
@@ -119,7 +122,7 @@ export default async function PosPage() {
           unitMode={await getUnitMode()}
           currency={currency}
           accounts={accounts.map((a) => ({ id: a.id, locationId: a.locationId, method: a.method, name: a.name, accountNumber: a.accountNumber, isDefault: a.isDefault }))}
-          perms={{ credit: canCredit, discount: can(user, "sales.discount"), addCustomer: can(user, "customers.create"), addWinga: can(user, "resellers.operate") || can(user, "resellers.manage"), collect: can(user, "payments.record"), returns: can(user, "returns.create"), creditException: can(user, "credit.approve_exception") }}
+          perms={{ credit: canCredit, discount: can(user, "sales.discount"), addCustomer: can(user, "customers.create"), addWinga: can(user, "resellers.operate") || can(user, "resellers.manage"), collect: can(user, "payments.record"), returns: can(user, "returns.create"), viewWinga: can(user, "resellers.view"), creditException: can(user, "credit.approve_exception") }}
         />
       )}
     </>

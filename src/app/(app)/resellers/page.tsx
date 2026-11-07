@@ -31,6 +31,9 @@ export default async function ResellersPage({ searchParams }: { searchParams: Pr
   const currency = await getCurrency();
   const money = (v: Parameters<typeof formatMoney>[0]) => formatMoney(v, currency);
   const canManage = can(user, "resellers.manage");
+  const canSell = can(user, "sales.pos");
+  const canCollect = can(user, "payments.record");
+  const canReturn = can(user, "returns.create");
   const f: FilterKey = FILTERS.some((x) => x.key === sp.f) ? (sp.f as FilterKey) : "all";
   const q = sp.q?.trim().toLowerCase() ?? "";
 
@@ -144,6 +147,15 @@ export default async function ResellersPage({ searchParams }: { searchParams: Pr
                   owesTone={a.overdue.gt(0) ? "red" : a.outstanding.gt(0) ? "normal" : "muted"}
                   owesHint={a.overdue.gt(0) ? `Oldest ${st.oldestLateDays ?? 0} day${st.oldestLateDays === 1 ? "" : "s"} late` : a.outstanding.gt(0) ? (st.nextDueDays === null ? "Open invoices" : st.nextDueDays === 0 ? "Next payment due today" : `Next payment due in ${st.nextDueDays} day${st.nextDueDays === 1 ? "" : "s"}`) : a.reports > 0 ? "All paid up" : "Nothing reported yet"}
                   footer={`Reported sold ${money(a.soldValue)} · ${a.lastPaymentAt ? `last payment ${formatDate(a.lastPaymentAt)}` : "no payment yet"}`}
+                  actions={
+                    a.reseller.status === "ACTIVE"
+                      ? {
+                          sell: canSell ? `/pos?winga=${a.reseller.customerId}` : undefined,
+                          collect: canCollect && a.outstanding.gt(0) ? `/customers/${a.reseller.customerId}/pay` : undefined,
+                          returns: canReturn && a.outstanding.gt(0) ? `/customers/${a.reseller.customerId}/return` : undefined,
+                        }
+                      : undefined
+                  }
                 />
               ))}
             </div>

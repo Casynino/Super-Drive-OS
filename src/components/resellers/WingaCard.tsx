@@ -32,6 +32,7 @@ export default function WingaCard({
   owesTone,
   owesHint,
   footer,
+  actions,
 }: {
   href: string;
   name: string;
@@ -45,9 +46,12 @@ export default function WingaCard({
   owesTone: "red" | "normal" | "muted";
   owesHint: string;
   footer: string;
+  /** where each quick action goes (left out = not shown): money in, goods back, a new sale */
+  actions?: { collect?: string; returns?: string; sell?: string };
 }) {
   return (
-    <Link href={href} className={cn("card group block overflow-hidden border-l-4 transition hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md", EDGE[status.tone])}>
+    <div className={cn("card overflow-hidden border-l-4 transition hover:border-navy-200 hover:shadow-md", EDGE[status.tone])}>
+    <Link href={href} className="group block">
       <div className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -88,5 +92,25 @@ export default function WingaCard({
       </div>
       <p className="border-t border-line bg-slate-50/60 px-4 py-2 text-[11px] text-slate-500 group-hover:text-slate-700">{footer}</p>
     </Link>
+    {actions && (actions.collect || actions.returns || actions.sell) && (
+      <div className="flex flex-wrap gap-2 border-t border-line px-4 py-3">
+        {actions.sell && (
+          <Link href={actions.sell} className="btn-primary btn-sm">
+            Sell
+          </Link>
+        )}
+        {actions.collect && (
+          <Link href={actions.collect} className="btn-secondary btn-sm">
+            Collect payment
+          </Link>
+        )}
+        {actions.returns && (
+          <Link href={actions.returns} className="btn-secondary btn-sm">
+            Return goods
+          </Link>
+        )}
+      </div>
+    )}
+    </div>
   );
 }

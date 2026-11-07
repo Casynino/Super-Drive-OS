@@ -107,6 +107,22 @@ export default async function SalePage({ params, searchParams }: { params: Promi
         </section>
       )}
 
+      {/* A credit order is paid a little at a time: every payment is recorded against this same order */}
+      {!cancelled && sale.customerId && balance.gt(0) && can(user, "payments.record") && (
+        <section className="card mx-auto mb-4 flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-4 print:hidden sm:px-5" aria-label="Collect payment">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Still to be paid</p>
+            <p className="text-xl font-semibold text-brand-red-dark">{money(balance)}</p>
+            <p className="text-xs text-slate-500">
+              Paid so far {money(sale.amountPaid.minus(sale.refundedTotal))} of {money(sale.total.minus(sale.returnedTotal))}. The customer can pay a little at a time.
+            </p>
+          </div>
+          <Link href={`/customers/${sale.customerId}/pay?sale=${sale.id}`} className="btn-primary">
+            Collect payment
+          </Link>
+        </section>
+      )}
+
       <article className="card mx-auto max-w-3xl p-5 sm:p-8 print:max-w-none print:border-0 print:p-0">
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
           <div>

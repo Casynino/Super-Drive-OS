@@ -12,6 +12,15 @@ export async function customerOutstanding(tx: Pick<Tx, "$queryRaw">, customerId:
   return new D((rows[0]?.s ?? 0).toString());
 }
 
+/** How many orders each customer still has unpaid (completed, something still owed): { customerId: count }. */
+export async function openOrdersByCustomer(tx: Pick<Tx, "$queryRaw">) {
+  const rows = await tx.$queryRaw<{ customerId: string; n: bigint | number }[]>`
+    SELECT "customerId", COUNT(*) AS n
+      FROM "Sale" WHERE "customerId" IS NOT NULL AND "status" = 'COMPLETED' AND ${owedSql()} > 0
+     GROUP BY "customerId"`;
+  return new Map(rows.map((r) => [r.customerId, Number(r.n)]));
+}
+
 /** The business "today" (Tanzania), as YYYY-MM-DD: due dates are compared against it. */
 export const businessDay = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
 

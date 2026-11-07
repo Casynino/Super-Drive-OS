@@ -26,6 +26,8 @@ export type PosCustomer = {
   /** only sent to people who may sell on credit */
   creditLimit?: string;
   outstanding?: string;
+  /** unpaid orders (invoices with something still owed) */
+  openOrders?: number;
 };
 
 export type CartLine = {
