@@ -87,7 +87,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         <Link
           href={item.href}
           aria-current={isActive ? "page" : undefined}
-          className={cn("relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition", isActive ? "bg-navy-50 font-semibold text-navy-800" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}
+          className={cn("relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition", isActive ? "bg-navy-50 font-medium text-navy-800" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}
         >
           {isActive && <span className="absolute inset-y-1.5 -left-[13px] w-[3px] rounded-r bg-oil-400" />}
           <Icon size={16} className={cn("shrink-0", isActive ? "text-navy-700" : "text-slate-400")} />

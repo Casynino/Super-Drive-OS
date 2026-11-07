@@ -95,10 +95,10 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
           date={preview.closed ? `Closing for ${new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${today}T00:00:00Z`))}` : preview.lastClosedDay ? `Since the last closing · ${formatDate(`${preview.lastClosedDay}T00:00:00Z`)}` : "Your first closing"}
           state={
             preview.closed
-              ? { tone: "closed", title: `Closed${closedInfo?.closing ? ` at ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dar_es_Salaam" }).format(closedInfo.closing.submittedAt)}` : ""}`, detail: preview.closed.closingNo }
+              ? { tone: "closed", text: `Closed${closedInfo?.closing ? ` at ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Dar_es_Salaam" }).format(closedInfo.closing.submittedAt)}` : ""} · ${preview.closed.closingNo}` }
               : older.length > 0
-                ? { tone: "waiting", title: "Waiting to be closed", detail: `Includes cash from ${older.length === 1 ? formatDate(`${older[0]}T00:00:00Z`) : `${older.length} earlier days`}` }
-                : { tone: "open", title: "Ready to close", detail: "Close whenever you have counted the cash" }
+                ? { tone: "waiting", text: `Includes cash from ${older.length === 1 ? formatDate(`${older[0]}T00:00:00Z`) : `${older.length} earlier days`}` }
+                : { tone: "open", text: "Ready to close" }
           }
         />
       ) : (
@@ -385,7 +385,7 @@ function CashStatementCard({ title, summary, expected, money, className }: { tit
 }
 
 /** The top of the shop person's page: the date, the name, and where the day stands (open, waiting to be closed, closed). */
-function DayHeader({ date, state }: { date: string; state: { tone: "open" | "waiting" | "closed"; title: string; detail: string } }) {
+function DayHeader({ date, state }: { date: string; state: { tone: "open" | "waiting" | "closed"; text: string } }) {
   const t = {
     open: { box: "border-emerald-500/30 bg-emerald-500/[0.07]", icon: "bg-emerald-500/15 text-emerald-500", Icon: DoorOpen },
     waiting: { box: "border-amber-500/35 bg-amber-500/[0.08]", icon: "bg-amber-500/15 text-amber-500", Icon: Clock },
@@ -401,10 +401,7 @@ function DayHeader({ date, state }: { date: string; state: { tone: "open" | "wai
         <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", t.icon)}>
           <t.Icon size={18} aria-hidden />
         </span>
-        <div className="min-w-0 leading-tight">
-          <p className="text-sm font-semibold text-slate-900">{state.title}</p>
-          <p className="mt-0.5 text-xs text-slate-500">{state.detail}</p>
-        </div>
+        <p className="min-w-0 pr-1 text-sm font-medium text-slate-900">{state.text}</p>
       </div>
     </div>
   );
