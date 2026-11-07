@@ -20,6 +20,8 @@ type Props = {
   canDeposit: boolean;
   submissionKey: string;
   bankAccounts: FormAccount[];
+  /** what was collected on mobile money and bank accounts since the last closing (to look at, nothing to count) */
+  collected?: { name: string; amount: number }[];
   className?: string;
 };
 
@@ -48,7 +50,7 @@ export default function CloseDayButton({ className, ...props }: Props) {
 
 type StepKey = "count" | "bank" | "close";
 
-function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey, bankAccounts, onClose }: Props & { onClose: () => void }) {
+function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey, bankAccounts, collected = [], onClose }: Props & { onClose: () => void }) {
   const [state, formAction] = useActionState(action, initial);
   const uid = useId();
   const id = (n: string) => `${uid}-${n}`;
@@ -76,6 +78,8 @@ function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey
   }, [state]);
 
   const money = (n: number) => `${symbol} ${new Intl.NumberFormat("en-US").format(Math.abs(n))}`;
+  const signed = (n: number) => `${n < 0 ? "−" : ""}${symbol} ${new Intl.NumberFormat("en-US").format(Math.abs(n))}`;
+  const collectedTotal = collected.reduce((t, c) => t + c.amount, 0);
   const exp = Number(expected);
   const c = counted === "" ? null : Number(counted);
   const diff = c === null ? null : c - exp;
@@ -137,6 +141,19 @@ function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey
           <div aria-live="polite" className={cn("rounded-lg border px-3.5 py-2.5 text-sm", diffTone)}>
             {diff === null ? "Type what you counted." : diff === 0 ? "Correct. This is what the system expects." : diff < 0 ? `Short by ${money(diff)}. Count again.` : `${money(diff)} extra. Count again.`}
           </div>
+          {collected.length > 0 && (
+            <div className="rounded-xl border border-line px-3.5 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Collected on other accounts · nothing to count</p>
+              <dl className="mt-2 space-y-1 text-sm">
+                {collected.map((c) => (
+                  <div key={c.name} className="flex items-baseline justify-between gap-3">
+                    <dt className="text-slate-600">{c.name}</dt>
+                    <dd className="font-medium tabular-nums text-slate-900">{signed(c.amount)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
           {diff !== null && diff !== 0 && (
             <Field label="What caused it? (optional)" name="notes" id={id("notes")}>
               <input id={id("notes")} name="notes" autoComplete="off" defaultValue={v.notes ?? ""} className="input" placeholder="e.g. wrong change given" />
@@ -231,6 +248,7 @@ function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey
             <SummaryRow label="Cash counted" value={c === null ? "—" : money(c)} />
             <SummaryRow label="The system expected" value={money(exp)} />
             <SummaryRow label="Difference" value={diff === null ? "—" : diff === 0 ? "None" : `${diff < 0 ? "Short" : "Extra"} ${money(diff)}`} tone={diff === null || diff === 0 ? undefined : diff < 0 ? "bad" : "warn"} />
+            {collected.length > 0 && <SummaryRow label="Collected on other accounts" value={signed(collectedTotal)} />}
             {bankable && <SummaryRow label="Deposited into the boss's account" value={dep > 0 ? `${money(dep)} · ${picked?.name ?? "Bank"}` : "Nothing"} />}
             <SummaryRow label="Stays in the till (the balance)" value={c === null ? "—" : money(left ?? 0)} strong />
           </dl>

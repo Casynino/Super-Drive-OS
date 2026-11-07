@@ -11,6 +11,7 @@ import { postDeposit, postManualCash, type ManualKind } from "./deposits";
 import { decideExpense, recordExpense, reverseExpense } from "./expenses";
 import { CashError, accountBalance, businessDay, getAccount, getBalances, postCash } from "./ledger";
 import { correctClosingCount, getClosingPreview, submitClosing, unclosedDays } from "./closing";
+import { getCollectedSinceClosing } from "./collected";
 import { transferMoney } from "./transfer";
 
 const D = (v: string | number) => new Prisma.Decimal(v);
@@ -429,5 +430,34 @@ describe("daily closing", () => {
     expect(r.status).toBe("SUBMITTED");
     const b = await db.$transaction((tx) => getBalances(tx, s.location.id));
     expect(b.map((x) => [x.method, x.balance.toString()])).toEqual([["CASH", "0"], ["MOBILE_MONEY", "50000"], ["BANK", "100000"]]);
+  });
+
+  it("closing never creates or doubles money: the deposit only moves cash, a shortage is booked once, mobile money and bank are untouched, and what was collected starts again from zero", async () => {
+    const s = await shop();
+    await manual(s, "CASH", "OPENING", "100000");
+    await sell(s, 4); // 100,000 in cash
+    await sell(s, 2, { method: "MOBILE_MONEY", reference: "M-1" }); // 50,000 mobile money
+    await sell(s, 4, { method: "BANK", reference: "B-1" }); // 100,000 bank
+    const total = async () => (await db.$transaction((tx) => getBalances(tx, s.location.id))).reduce((t, b) => t.plus(b.balance), D(0)).toString();
+    const collected = () => db.$transaction((tx) => getCollectedSinceClosing(tx, s.location.id, businessDay())).then((r) => r.map((c) => [c.method, c.amount.toString()]));
+    expect(await total()).toBe("350000");
+    expect(await collected()).toEqual([["MOBILE_MONEY", "50000"], ["BANK", "100000"]]); // what the person closing sees, not the balances
+
+    // 5,000 short; 150,000 of the count goes to the bank
+    const r = await close(s, "195000", { deposit: { amount: "150000", bankReference: "S-1", notes: null, slipId: null } });
+    expect(r.difference.toString()).toBe("-5000");
+    expect(await total()).toBe("345000"); // only the 5,000 that really is missing, once
+    expect(await balance(s, "CASH")).toBe("45000"); // counted 195,000 - deposited 150,000
+    expect(await balance(s, "MOBILE_MONEY")).toBe("50000"); // closing does not touch these
+    expect(await balance(s, "BANK")).toBe("250000"); // 100,000 + the 150,000 deposit
+    expect(await collected()).toEqual([["MOBILE_MONEY", "0"], ["BANK", "0"]]); // cleared on the shop's side
+
+    // cash taken to the bank later is money moved, never "collected"
+    await deposit(s, "10000");
+    expect(await total()).toBe("345000");
+    expect(await collected()).toEqual([["MOBILE_MONEY", "0"], ["BANK", "0"]]);
+    // new customer payments after the closing start the next count
+    await sell(s, 1, { method: "MOBILE_MONEY", reference: "M-2" });
+    expect(await collected()).toEqual([["MOBILE_MONEY", "25000"], ["BANK", "0"]]);
   });
 });

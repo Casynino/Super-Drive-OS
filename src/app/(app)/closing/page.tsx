@@ -13,6 +13,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { getClosingPreview, unclosedDays, type ClosingSummary } from "@/lib/cash/closing";
+import { getCollectedSinceClosing } from "@/lib/cash/collected";
 import { getMoneySummary } from "@/lib/cash/summary";
 import { getProductsSold, getProfit, getSalesByHour, getSalesPerDay } from "@/lib/reports/period";
 import { businessDay, defaultLocationId, getAccountBalances, listAccounts } from "@/lib/cash/ledger";
@@ -83,10 +84,11 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
           return { closing, banked: bankedNow, left: closing ? closing.countedCash.minus(bankedNow) : new Prisma.Decimal(0), soldSince: new Prisma.Decimal(since?._sum.total ?? 0).minus(since?._sum.returnedTotal ?? 0), salesSince: since?._count ?? 0 };
         })()
       : null;
-  const sinceBy = (m: "MOBILE_MONEY" | "BANK") => new Prisma.Decimal(preview?.summary.accounts.find((a) => a.method === m)?.in ?? 0);
+  // what was collected on mobile money and bank since the last closing (not the balances: those stay on the Director's side)
+  const collected = canSubmit ? await getCollectedSinceClosing(db, locationId, today) : [];
+  const collectedBy = (m: "MOBILE_MONEY" | "BANK") => collected.filter((c) => c.method === m).reduce((t, c) => t.plus(c.amount), new Prisma.Decimal(0));
   const cash = accounts.find((a) => a.method === "CASH");
   const bankAccounts = (await listAccounts(db, locationId)).filter((a) => a.method === "BANK");
-  const others = accounts.filter((a) => a.method !== "CASH" && a.status === "ACTIVE");
 
   return (
     <>
@@ -142,8 +144,8 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
               <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
                 <KpiCard icon={Banknote} tone="yellow" label="Cash in the till" value={money(preview.expectedCash)} hint={`Carried forward · left at closing ${money(closedInfo.left)}`} />
                 <KpiCard icon={Receipt} tone="navy" label="Sold since closing" value={money(closedInfo.soldSince)} hint={`${closedInfo.salesSince} sale${closedInfo.salesSince === 1 ? "" : "s"}`} />
-                <KpiCard icon={Smartphone} tone="green" label="Mobile money since closing" value={money(sinceBy("MOBILE_MONEY"))} hint="Nothing to count" />
-                <KpiCard icon={Landmark} tone="blue" label="Bank since closing" value={money(sinceBy("BANK"))} hint="Nothing to count" />
+                <KpiCard icon={Smartphone} tone="green" label="Mobile money since closing" value={money(collectedBy("MOBILE_MONEY"))} hint="Nothing to count" />
+                <KpiCard icon={Landmark} tone="blue" label="Bank since closing" value={money(collectedBy("BANK"))} hint="Nothing to count" />
               </div>
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
                 <section className="card px-4 py-4 sm:px-5" aria-label="How the closing went">
@@ -172,8 +174,8 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
               <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
                 <KpiCard icon={Receipt} tone="navy" label={`Sold today · ${formatDate(`${today}T00:00:00Z`)}`} value={money(preview.summary.sales.total)} hint={`${preview.summary.sales.count} sale${preview.summary.sales.count === 1 ? "" : "s"}${Number(preview.summary.sales.creditGiven) > 0 ? ` · ${money(preview.summary.sales.creditGiven)} on credit` : ""}`} />
                 <KpiCard icon={Banknote} tone="yellow" label="Cash expected in the till" value={money(preview.expectedCash)} hint={`Start ${money(preview.summary.cash.opening)} + in − out`} />
-                {others.map((a) => (
-                  <KpiCard key={a.id} icon={a.method === "BANK" ? Landmark : Smartphone} tone={a.method === "BANK" ? "blue" : "green"} label={a.name} value={money(a.balance)} hint={`Received today ${money(a.inToday)} · nothing to count`} />
+                {collected.map((a) => (
+                  <KpiCard key={a.accountId} icon={a.method === "BANK" ? Landmark : Smartphone} tone={a.method === "BANK" ? "blue" : "green"} label={`${a.name} · collected`} value={money(a.amount)} hint="Since the last closing · nothing to count" />
                 ))}
               </div>
             </>
@@ -189,7 +191,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                   <p className="mt-2 text-sm text-slate-500">Count the cash, deposit it into the boss's account and close. What you keep in the till is the balance you start the next time with.</p>
                 </div>
                 <div className="space-y-2">
-                  <CloseDayButton className="h-12 w-full text-base" action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={canDeposit} submissionKey={randomUUID()} bankAccounts={bankAccounts} />
+                  <CloseDayButton className="h-12 w-full text-base" action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={canDeposit} submissionKey={randomUUID()} bankAccounts={bankAccounts} collected={collected.map((c) => ({ name: c.name, amount: Number(c.amount) }))} />
                   <p className="text-xs text-slate-500">A closing cannot be changed. The boss gets the report.</p>
                 </div>
               </section>
