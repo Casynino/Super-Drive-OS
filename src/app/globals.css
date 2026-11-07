@@ -256,18 +256,13 @@ html:not(.dark) .glass-panel {
     rgba(255, 255, 255, 0.66);
   box-shadow: 0 26px 70px -30px rgba(15, 27, 45, 0.4), 0 0 0 1px rgba(15, 27, 45, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
-/* the open page */
-.glass-active {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.07));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42), inset 0 2px 8px rgba(255, 255, 255, 0.1), 0 6px 18px -10px rgba(0, 0, 0, 0.6);
-}
-html:not(.dark) .glass-active {
-  background: linear-gradient(180deg, rgba(14, 61, 110, 0.13), rgba(14, 61, 110, 0.06));
-  box-shadow: inset 0 0 0 1px rgba(14, 61, 110, 0.38), 0 6px 16px -10px rgba(14, 61, 110, 0.5);
-}
-.glass-row { transition: background-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease; }
-.glass-row:hover { background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
-html:not(.dark) .glass-row:hover { background: rgba(14, 61, 110, 0.06); box-shadow: inset 0 0 0 1px rgba(14, 61, 110, 0.14); }
+/* the open page: a flat soft tint, no outline or shadow (Nino: "clean, no big shape") */
+.glass-active { background: rgba(255, 255, 255, 0.1); }
+html:not(.dark) .glass-active { background: rgba(14, 61, 110, 0.08); }
+/* a row under the pointer or just clicked: only a faint tint */
+.glass-row { transition: background-color 0.15s ease, color 0.15s ease; }
+.glass-row:hover { background: rgba(255, 255, 255, 0.06); }
+html:not(.dark) .glass-row:hover { background: rgba(14, 61, 110, 0.05); }
 /* the search box */
 .glass-field { background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
 html:not(.dark) .glass-field { background: rgba(14, 61, 110, 0.05); box-shadow: inset 0 0 0 1px rgba(14, 61, 110, 0.12); }
