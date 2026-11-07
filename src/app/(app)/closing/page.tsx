@@ -248,7 +248,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
                 <h2 className="text-sm font-semibold text-slate-900">Your last closings</h2>
                 <Link href="/closing/history" className="text-sm font-medium text-navy-700 hover:underline">
-                  All past closings
+                  Full deposit history
                 </Link>
               </div>
               {recent.length === 0 ? (

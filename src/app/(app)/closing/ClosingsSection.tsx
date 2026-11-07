@@ -24,7 +24,7 @@ export async function closingCorrections(nos: string[]) {
 
 /**
  * The list of closed days and the cash taken to the bank. The owner sees every day (with Short / Extra / shop filters); the shop person
- * sees only their own. Used on the owner's Closing page and on the shop person's separate "Past closings" page.
+ * sees only their own. Used on the owner's Closing page and on the shop person's separate "Deposit history" page.
  */
 export default async function ClosingsSection({ user, show, shop, basePath, kpis = false }: { user: SessionUser; show?: "short" | "extra"; shop?: string; basePath: string; /** the number cards on top (the owner's End of day page has its own) */ kpis?: boolean }) {
   const canReview = can(user, "closing.approve");
