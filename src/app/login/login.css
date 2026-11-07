@@ -429,3 +429,51 @@ html.dark .ls-title {
     transform: translateX(8cqw);
   }
 }
+
+/* the logo: big, floating gently, with a glow that breathes and a light that passes over the letters now and then */
+.ls-brand {
+  position: relative;
+  line-height: 0;
+}
+.ls-brand img {
+  filter: drop-shadow(0 6px 26px rgba(70, 140, 230, 0.5));
+  animation: ls-logo-float 6.5s ease-in-out infinite, ls-logo-glow 4.5s ease-in-out infinite;
+}
+.ls-brand::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  -webkit-mask: url("/brand/logo-full-dark.png") center / 100% 100% no-repeat;
+  mask: url("/brand/logo-full-dark.png") center / 100% 100% no-repeat;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.85) 50%, transparent 62%);
+  background-size: 260% 100%;
+  background-position: 130% 0;
+  mix-blend-mode: overlay;
+  animation: ls-logo-sweep 5.5s ease-in-out infinite 1.5s;
+  pointer-events: none;
+}
+@keyframes ls-logo-float {
+  50% {
+    transform: translateY(-7px);
+  }
+}
+@keyframes ls-logo-glow {
+  50% {
+    filter: drop-shadow(0 8px 38px rgba(253, 196, 0, 0.5));
+  }
+}
+@keyframes ls-logo-sweep {
+  0% {
+    background-position: 130% 0;
+  }
+  40%,
+  100% {
+    background-position: -30% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ls-brand img,
+  .ls-brand::after {
+    animation: none !important;
+  }
+}

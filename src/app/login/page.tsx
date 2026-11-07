@@ -31,8 +31,8 @@ export default async function LoginPage() {
       <div className="relative z-10 grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
         {/* Words (wide screens) */}
         <section className="hidden flex-col justify-between p-12 text-white lg:flex">
-          <div className="ls-up w-fit" style={delay(0.05)}>
-            <Logo className="h-16" />
+          <div className="ls-up ls-brand w-fit" style={delay(0.05)}>
+            <Logo className="h-28 xl:h-36 2xl:h-44" />
           </div>
 
           <div className="mb-[clamp(190px,32vh,330px)] max-w-lg">
@@ -58,8 +58,8 @@ export default async function LoginPage() {
 
         {/* Sign-in card, floating over the scene */}
         <section className="flex flex-col items-center px-5 py-6 lg:justify-center lg:py-10">
-          <div className="mb-5 self-start lg:hidden">
-            <Logo className="h-10" />
+          <div className="ls-up ls-brand mb-6 self-center lg:hidden" style={delay(0.05)}>
+            <Logo className="h-20 sm:h-28" />
           </div>
           <div className="ls-card ls-up w-full max-w-sm p-7 sm:p-8" style={delay(0.2)}>
             <h1 className="ls-title text-2xl font-semibold tracking-tight text-slate-900">Sign in</h1>
