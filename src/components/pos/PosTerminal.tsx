@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ImageOff, Minus, Plus, ScanBarcode, Search, Trash2, UserPlus, X } from "lucide-react";
 import { posScan } from "@/app/(app)/scan/actions";
 import CodeScanner from "@/components/scan/CodeScanner";
@@ -85,6 +85,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
   const [scanOpen, setScanOpen] = useState(false);
   const [scanMsg, setScanMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const cartRef = useRef<CartLine[]>([]);
+  const listRef = useRef<HTMLUListElement>(null);
   const locationIdRef = useRef("");
   const baseUsedRef = useRef<Map<string, number>>(new Map());
 
@@ -207,6 +208,14 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
       (!term || p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term) || (p.barcode ?? "").toLowerCase().includes(term) || (p.brand ?? "").toLowerCase().includes(term)),
   );
   const unitPrice = (p: PosProduct) => Number(wholesale ? p.units[0]!.wholesale : p.units[0]!.retail);
+  // a newly added product shows at the bottom of the cart list: keep it in view
+  const lineCount = cart.length;
+  const prevLines = useRef(0);
+  useEffect(() => {
+    if (lineCount > prevLines.current) listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+    prevLines.current = lineCount;
+  }, [lineCount]);
+
   function cardState(p: PosProduct) {
     const left = inStock(p.id) - (baseUsed.get(p.id) ?? 0);
     const hasPrice = unitPrice(p) > 0;
@@ -403,77 +412,74 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
             {rows.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-slate-500">Tap a product to add it.</p>
             ) : (
-              <ul className="divide-y divide-slate-100">
+              <ul ref={listRef} className="divide-y divide-slate-100 md:max-h-[min(24rem,48vh)] md:overflow-y-auto">
                 {rows.map((r, i) => {
                   const err = fe[`line.${i}`];
                   const free = inStock(r.p.id);
                   const over = (baseUsed.get(r.p.id) ?? 0) > free;
                   const takenUnits = new Set(cart.filter((x, idx) => x.productId === r.l.productId && idx !== i).map((x) => x.unitId));
+                  const stepBtn = "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50";
                   return (
-                    <li key={`${r.l.productId}:${r.l.unitId}`} className={cn("px-4 py-3", (err || over) && "bg-brand-red-soft/40")}>
-                      <div className="flex gap-3">
-                        <Thumb p={r.p} className="h-14 w-14 shrink-0 rounded-lg border border-line [&_img]:p-0.5" />
+                    <li key={`${r.l.productId}:${r.l.unitId}`} className={cn("px-3 py-2.5", (err || over) && "bg-brand-red-soft/40")}>
+                      {/* line 1: picture, name and what it costs; line 2: the controls (quantity, unit, price) */}
+                      <div className="flex items-center gap-2.5">
+                        <Thumb p={r.p} className="h-10 w-10 shrink-0 rounded-lg border border-line [&_img]:p-0.5" />
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">{r.p.name}</p>
-                            <button type="button" className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-red-dark" onClick={() => setCart((c) => c.filter((_, idx) => idx !== i))} aria-label={`Remove ${r.p.name}`}>
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                          <p className={cn("text-xs", over ? "font-medium text-brand-red-dark" : "text-slate-500")}>
+                          <p className="truncate text-[13px] font-semibold leading-5 text-slate-900" title={r.p.name}>
+                            {r.p.name}
+                          </p>
+                          <p className={cn("truncate text-[11px]", over ? "font-medium text-brand-red-dark" : "text-slate-500")}>
                             {over ? `Only ${trim(free)} in stock here` : `${fmt(r.list)} each`}
                             {!over && r.unit.id !== r.p.baseUnitId && r.baseQty > 0 && ` · uses ${trim(r.baseQty)} ${r.p.units[0]!.symbol}`}
                           </p>
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <div className="flex items-center gap-1">
-                              <button type="button" className="btn-secondary btn-sm px-2" onClick={() => { step(i, -1); normalize(i); }} aria-label="Decrease quantity">
-                                <Minus size={14} />
-                              </button>
-                              <input className="input h-8 w-14 min-w-0 px-1 text-center" inputMode="decimal" value={r.l.quantity} onChange={(e) => patch(i, { quantity: e.target.value })} onBlur={() => normalize(i)} aria-label={`Quantity of ${r.p.name}`} />
-                              <button type="button" className="btn-secondary btn-sm px-2" onClick={() => { step(i, 1); normalize(i); }} aria-label="Increase quantity">
-                                <Plus size={14} />
-                              </button>
-                            </div>
-                            <select className="input h-8 w-auto py-0 pr-8 text-sm" value={r.l.unitId} onChange={(e) => switchUnit(i, e.target.value)} disabled={r.p.units.length === 1 || Boolean(r.l.scanned?.length)} aria-label="Unit">
-                              {r.p.units.filter((u) => (u.id === r.l.unitId || !takenUnits.has(u.id)) && (u.id !== r.p.baseUnitId || r.p.allowPieceSales !== false || r.p.units.length === 1 || u.id === r.l.unitId)).map((u) => (
-                                <option key={u.id} value={u.id}>
-                                  {u.name}
-                                </option>
-                              ))}
-                            </select>
-                            <span className="ml-auto text-right">
-                              <span className="block text-sm font-bold text-slate-900">{fmt(r.lineTotal)}</span>
-                              {r.price < r.list && r.valid && <span className="block text-[11px] text-emerald-700">−{fmt(r.lineList - r.lineTotal)}</span>}
-                            </span>
-                          </div>
-                          {r.l.scanned && r.l.scanned.length > 0 && (
-                            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Scanned items">
-                              {r.l.scanned.map((x) => (
-                                <li key={x.token} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-800">
-                                  {x.itemNo}
-                                  <button type="button" className="rounded-full p-0.5 hover:bg-emerald-100" onClick={() => dropScanned(i, x.token)} aria-label={`Remove ${x.itemNo}`}>
-                                    <X size={11} />
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          {perms.discount && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <label className="text-xs text-slate-500" htmlFor={`pos-price-${i}`}>
-                                Price each
-                              </label>
-                              <input id={`pos-price-${i}`} className="input h-8 w-28 px-2 text-sm" inputMode="decimal" value={r.l.price} placeholder={nf.format(r.list)} onChange={(e) => patch(i, { price: e.target.value })} />
-                            </div>
-                          )}
-                          {r.p.units.length > 1 && r.p.units.some((u) => !cart.some((x) => x.productId === r.l.productId && x.unitId === u.id)) && (
-                            <button type="button" className="mt-1.5 text-xs font-medium text-navy-700 hover:underline" onClick={() => addOtherUnit(i)}>
-                              + Add in another unit
-                            </button>
-                          )}
                         </div>
+                        <span className="shrink-0 text-right">
+                          <span className="block text-sm font-bold text-slate-900">{fmt(r.lineTotal)}</span>
+                          {r.price < r.list && r.valid && <span className="block text-[11px] text-emerald-700">−{fmt(r.lineList - r.lineTotal)}</span>}
+                        </span>
+                        <button type="button" className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-red-dark" onClick={() => setCart((c) => c.filter((_, idx) => idx !== i))} aria-label={`Remove ${r.p.name}`}>
+                          <Trash2 size={15} />
+                        </button>
                       </div>
-                      {(err || r.tooHigh) && <p className="field-error">{err ?? "The price cannot be higher than the list price."}</p>}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-[3.125rem]">
+                        <div className="flex items-center gap-1">
+                          <button type="button" className={stepBtn} onClick={() => { step(i, -1); normalize(i); }} aria-label="Decrease quantity">
+                            <Minus size={13} />
+                          </button>
+                          <input className="input h-7 w-10 min-w-0 px-1 text-center text-sm" inputMode="decimal" value={r.l.quantity} onChange={(e) => patch(i, { quantity: e.target.value })} onBlur={() => normalize(i)} aria-label={`Quantity of ${r.p.name}`} />
+                          <button type="button" className={stepBtn} onClick={() => { step(i, 1); normalize(i); }} aria-label="Increase quantity">
+                            <Plus size={13} />
+                          </button>
+                        </div>
+                        <select className="input h-7 w-auto py-0 pl-2 pr-6 text-[13px]" value={r.l.unitId} onChange={(e) => switchUnit(i, e.target.value)} disabled={r.p.units.length === 1 || Boolean(r.l.scanned?.length)} aria-label="Unit">
+                          {r.p.units.filter((u) => (u.id === r.l.unitId || !takenUnits.has(u.id)) && (u.id !== r.p.baseUnitId || r.p.allowPieceSales !== false || r.p.units.length === 1 || u.id === r.l.unitId)).map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name}
+                            </option>
+                          ))}
+                        </select>
+                        {perms.discount && (
+                          <input id={`pos-price-${i}`} className="input h-7 w-[5.25rem] px-2 text-right text-[13px]" inputMode="decimal" value={r.l.price} placeholder={nf.format(r.list)} title="Price each" onChange={(e) => patch(i, { price: e.target.value })} aria-label={`Price each for ${r.p.name}`} />
+                        )}
+                        {r.p.units.length > 1 && r.p.units.some((u) => !cart.some((x) => x.productId === r.l.productId && x.unitId === u.id)) && (
+                          <button type="button" className="text-[11px] font-medium text-navy-700 hover:underline" title="Add in another unit" onClick={() => addOtherUnit(i)}>
+                            + unit
+                          </button>
+                        )}
+                      </div>
+                      {r.l.scanned && r.l.scanned.length > 0 && (
+                        <ul className="mt-1.5 flex flex-wrap gap-1.5 pl-[3.125rem]" aria-label="Scanned items">
+                          {r.l.scanned.map((x) => (
+                            <li key={x.token} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-800">
+                              {x.itemNo}
+                              <button type="button" className="rounded-full p-0.5 hover:bg-emerald-100" onClick={() => dropScanned(i, x.token)} aria-label={`Remove ${x.itemNo}`}>
+                                <X size={11} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {(err || r.tooHigh) && <p className="field-error pl-[3.125rem]">{err ?? "The price cannot be higher than the list price."}</p>}
                     </li>
                   );
                 })}
