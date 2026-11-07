@@ -706,15 +706,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
 
           <div className="card card-pad">
             <h2 className="mb-3 text-base font-semibold text-slate-900">Payment</h2>
-            {perms.credit && who !== "walkin" && (
-              <div className="mb-3 grid grid-cols-2 gap-1.5 rounded-lg bg-slate-100 p-1 text-sm" role="radiogroup" aria-label="Payment type">
-                {([["FULL", "Paid in full"], ["CREDIT", "On credit"]] as const).map(([v, l]) => (
-                  <button key={v} type="button" role="radio" aria-checked={v === "FULL" ? mode === "FULL" : mode !== "FULL"} onClick={() => { setMode(v); if (v === "FULL") setPartAmount(""); }} className={cn("rounded-md px-2 py-1.5 font-medium transition", (v === "FULL" ? mode === "FULL" : mode !== "FULL") ? "bg-white text-navy-800 shadow-sm" : "text-slate-600 hover:text-slate-900")}>
-                    {l}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* No "paid in full" choice here: a walk-in always pays in full, and a credit customer or a Winga always takes goods on credit (they may pay some now). */}
             {mode !== "FULL" && customer && !customer.winga && (
               <div className="mb-3">
                 <label className="label" htmlFor="pos-due">
