@@ -13,6 +13,8 @@ import { defaultUnitId, type LocationOption } from "@/lib/inventory/types";
 import { largestPack, qtyText, type UnitMode } from "@/lib/qty";
 import AccountButtons from "@/components/cash/AccountButtons";
 import RegisterModal, { type RegisterForm } from "@/components/pos/RegisterModal";
+import SaleDoneModal from "@/components/pos/SaleDoneModal";
+import { useRouter } from "next/navigation";
 import WingaActions from "@/components/pos/WingaActions";
 import type { TillSummary } from "@/app/(app)/till/actions";
 import { PAYMENT_METHODS, type CartLine, type PayAccount, type PosCustomer, type PosProduct } from "@/lib/sales/types";
@@ -63,7 +65,17 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
   // and goes away as soon as the person changes the sale.
   const [seenState, setSeenState] = useState(state);
   const fe = state.fieldErrors ?? {};
-  const [submissionKey] = useState(key); // one key per page visit: a double click cannot create two sales
+  const [submissionKey, setSubmissionKey] = useState(key); // one key per sale: a double click cannot create two sales
+  const router = useRouter();
+  // after Complete sale the till stays here and shows the "Sale complete" pop-up (state.message = the new sale's id)
+  const [doneId, setDoneId] = useState<string | null>(null);
+  const lastDone = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.ok && state.message && state.message !== lastDone.current) {
+      lastDone.current = state.message;
+      setDoneId(state.message);
+    }
+  }, [state]);
 
   const [locationId, setLocationId] = useState(locations.find((l) => l.isDefault)?.id ?? locations[0]!.id);
   const [customers, setCustomers] = useState(initialCustomers);
@@ -300,6 +312,21 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
     setAddOpen(false);
     setPartAmount("");
     setMode(w !== "walkin" && perms.credit ? "CREDIT" : "FULL");
+  };
+  // New sale: everything is cleared, the next customer starts from Walk-in, stock and balances are re-read
+  const newSale = () => {
+    setDoneId(null);
+    setCart([]);
+    chooseWho("walkin");
+    setDueDate("");
+    setException(false);
+    setExceptionReason("");
+    setDiscountReason("");
+    setReference("");
+    setScanMsg(null);
+    setScanOpen(false);
+    setSubmissionKey(crypto.randomUUID());
+    router.refresh();
   };
   const creditList = customers.filter((c) => !c.winga && (!custQ.trim() || c.name.toLowerCase().includes(custQ.trim().toLowerCase()) || (c.phone ?? "").includes(custQ.trim()))).slice(0, 60);
   const matches = custQ.trim() ? customers.filter((c) => !c.winga && (c.name.toLowerCase().includes(custQ.trim().toLowerCase()) || (c.phone ?? "").includes(custQ.trim()))).slice(0, 6) : [];
@@ -823,6 +850,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
           </SubmitButton>
         </div>
       </div>
+      <SaleDoneModal saleId={doneId} currency={currency} onNewSale={newSale} onLoaded={(sd) => sd.customerId && sd.customerSummary && refreshCustomer(sd.customerId, sd.customerSummary)} />
     </form>
   );
 }

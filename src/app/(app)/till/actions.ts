@@ -13,6 +13,8 @@ import { customerOutstanding, customerOverdue } from "@/lib/sales/outstanding";
 import { owedOf } from "@/lib/sales/owed";
 import { ReversalError, completeReversal, createReversalRequest, returnedBySaleItem } from "@/lib/sales/reversals";
 import { getCurrency } from "@/lib/settings";
+import { can } from "@/lib/auth/can";
+import { methodLabel } from "@/lib/sales/types";
 import { formatDate } from "@/lib/utils";
 
 export type TillLine = { id: string; name: string; qty: string; unit: string; unitValue: string };
@@ -20,6 +22,23 @@ export type TillOrder = { id: string; saleNo: string; date: string; dueDate: str
 export type TillSummary = { owed: string; openOrders: number; late?: { amount: string; since: string } };
 export type TillData = { customer: { name: string; winga: boolean }; summary: TillSummary; orders: TillOrder[] };
 export type TillResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
+
+export type SaleDone = {
+  id: string;
+  saleNo: string;
+  total: string;
+  paid: string;
+  owed: string;
+  status: "PAID" | "PARTIALLY_PAID" | "UNPAID";
+  customerId: string | null;
+  customer: string | null;
+  winga: boolean;
+  dueDate: string | null;
+  method: string | null;
+  lines: { name: string; qty: string; unit: string; amount: string }[];
+  pickup: { id: string; noteNo: string } | null;
+  customerSummary: TillSummary | null;
+};
 
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
 
@@ -180,4 +199,40 @@ export async function returnWingaItems(input: z.input<typeof returnSchema>): Pro
   });
   if (!result.ok || !out.saleNos) return { ok: false, error: result.error ?? "Could not take the goods back." };
   return { ok: true, saleNos: out.saleNos, summary: await summaryOf(input.customerId) };
+}
+
+/** What the "Sale complete" pop-up shows for a sale just made at the till. */
+export async function loadSaleDone(saleId: string): Promise<TillResult<{ sale: SaleDone }>> {
+  const out: { sale?: SaleDone } = {};
+  const result = await guarded("sales.pos", async (user) => {
+    const s = await db.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        customer: { select: { id: true, name: true, reseller: { select: { id: true } } } },
+        pickupNote: { select: { id: true, noteNo: true } },
+        items: { orderBy: { id: "asc" }, select: { enteredQty: true, lineTotal: true, product: { select: { name: true } }, enteredUnit: { select: { symbol: true } } } },
+        allocations: { select: { payment: { select: { method: true } } }, take: 1 },
+      },
+    });
+    if (!s || (!can(user, "sales.view_all") && s.salespersonId !== user.id)) return { error: "This sale was not found." };
+    out.sale = {
+      id: s.id,
+      saleNo: s.saleNo,
+      total: s.total.toString(),
+      paid: s.amountPaid.minus(s.refundedTotal).toString(),
+      owed: owedOf(s).toString(),
+      status: s.paymentStatus as SaleDone["status"],
+      customerId: s.customerId,
+      customer: s.customer?.name ?? null,
+      winga: Boolean(s.customer?.reseller),
+      dueDate: s.dueDate ? formatDate(s.dueDate) : null,
+      method: s.allocations[0] ? methodLabel(s.allocations[0].payment.method) : null,
+      lines: s.items.map((i) => ({ name: i.product.name, qty: i.enteredQty.toString(), unit: i.enteredUnit.symbol, amount: i.lineTotal.toString() })),
+      pickup: s.pickupNote,
+      customerSummary: s.customerId ? await summaryOf(s.customerId) : null,
+    };
+    return { ok: true };
+  });
+  if (!result.ok || !out.sale) return { ok: false, error: result.error ?? "Could not load the sale." };
+  return { ok: true, sale: out.sale };
 }

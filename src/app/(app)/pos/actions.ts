@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
@@ -111,6 +110,6 @@ export async function createSale(_prev: ActionState, fd: FormData): Promise<Acti
       throw e;
     }
   });
-  if (result.ok && result.message) redirect(`/sales/${result.message}?created=1`);
+  // The till stays where it is: the screen shows the "Sale complete" pop-up for this sale (message = the sale id).
   return result;
 }
