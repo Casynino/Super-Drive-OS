@@ -17,6 +17,8 @@ export type PosCustomer = {
   name: string;
   phone: string | null;
   type: string;
+  /** a registered Winga: shown with a tag at the till, and their pickup note says so */
+  winga?: boolean;
   /** only sent to people who may sell on credit */
   creditLimit?: string;
   outstanding?: string;

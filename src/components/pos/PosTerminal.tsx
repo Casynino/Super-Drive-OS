@@ -6,7 +6,6 @@ import { posScan } from "@/app/(app)/scan/actions";
 import CodeScanner from "@/components/scan/CodeScanner";
 import { LABELS_ENABLED } from "@/lib/features";
 import { parseItemCode } from "@/lib/item-code";
-import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
 import { defaultUnitId, type LocationOption } from "@/lib/inventory/types";
@@ -18,6 +17,8 @@ import { cn } from "@/lib/utils";
 type Props = {
   action: (prev: ActionState, fd: FormData) => Promise<ActionState>;
   quickAddCustomer: (input: { name: string; phone: string; type: string }) => Promise<{ ok: true; customer: { id: string; name: string; phone: string | null; type: string } } | { ok: false; error: string }>;
+  /** registers a Winga (account + stock location) without leaving the till */
+  quickAddWinga?: (input: { name: string; phone: string }) => Promise<{ ok: true; customer: { id: string; name: string; phone: string | null; type: string } } | { ok: false; error: string }>;
   products: PosProduct[];
   locations: LocationOption[];
   stockByLocation: Record<string, Record<string, string>>;
@@ -26,7 +27,7 @@ type Props = {
   accounts: PayAccount[];
   submissionKey: string;
   currency: { code: string; symbol: string; decimals: number };
-  perms: { credit: boolean; discount: boolean; addCustomer: boolean; creditException: boolean };
+  perms: { credit: boolean; discount: boolean; addCustomer: boolean; addWinga?: boolean; creditException: boolean };
   /** the CTN | PCS switch: cartons are the default, PCS makes new lines start in pieces */
   unitMode: UnitMode;
 };
@@ -57,8 +58,11 @@ function Thumb({ p, className }: { p: PosProduct; className?: string }) {
   );
 }
 
-export default function PosTerminal({ action, quickAddCustomer, products, locations, stockByLocation, customers: initialCustomers, accounts, submissionKey: key, currency, perms, unitMode }: Props) {
+export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, products, locations, stockByLocation, customers: initialCustomers, accounts, submissionKey: key, currency, perms, unitMode }: Props) {
   const [state, formAction] = useActionState(action, initial);
+  // A refusal from the server is shown small, next to the Complete sale button (not as a banner at the top of the page),
+  // and goes away as soon as the person changes the sale.
+  const [seenState, setSeenState] = useState(state);
   const fe = state.fieldErrors ?? {};
   const [submissionKey] = useState(key); // one key per page visit: a double click cannot create two sales
 
@@ -208,6 +212,8 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
       (!term || p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term) || (p.barcode ?? "").toLowerCase().includes(term) || (p.brand ?? "").toLowerCase().includes(term)),
   );
   const unitPrice = (p: PosProduct) => Number(wholesale ? p.units[0]!.wholesale : p.units[0]!.retail);
+  const saleError = state.error && seenState !== state ? state.error : null;
+  useEffect(() => setSeenState(state), [cart, customer, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   // a newly added product shows at the bottom of the cart list: keep it in view
   const lineCount = cart.length;
   const prevLines = useRef(0);
@@ -278,9 +284,11 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
   const saveNewCustomer = () =>
     startAdd(async () => {
       setAddError(null);
-      const r = await quickAddCustomer(newCust);
+      const isWinga = newCust.type === "WINGA" && Boolean(quickAddWinga);
+      if (isWinga && newCust.phone.trim().length < 6) return setAddError("A Winga needs a phone number.");
+      const r = isWinga ? await quickAddWinga!({ name: newCust.name, phone: newCust.phone }) : await quickAddCustomer(newCust);
       if (!r.ok) return setAddError(r.error);
-      const c: PosCustomer = { ...r.customer, ...(perms.credit ? { creditLimit: "0", outstanding: "0" } : {}) };
+      const c: PosCustomer = { ...r.customer, ...(isWinga ? { winga: true } : {}), ...(perms.credit ? { creditLimit: "0", outstanding: "0" } : {}) };
       setCustomers((all) => [...all, c]);
       setCustomer(c);
       setAddOpen(false);
@@ -300,12 +308,6 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
       }}
     >
       <input type="hidden" name="payloadJson" value={payload} />
-      {state.error && (
-        <div className="mb-4">
-          <Alert>{state.error}</Alert>
-        </div>
-      )}
-
       <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
         {/* ───────── Left: product cards ───────── */}
         <section className="min-w-0">
@@ -511,7 +513,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-slate-900">{customer.name}</p>
                   <p className="text-xs text-slate-500">
-                    {customer.phone ?? "No phone"} · {customer.type.charAt(0) + customer.type.slice(1).toLowerCase()}
+                    {customer.phone ?? "No phone"} · {customer.winga ? "Winga" : customer.type.charAt(0) + customer.type.slice(1).toLowerCase()}
                     {wholesale && " · wholesale prices"}
                   </p>
                   {customer.creditLimit !== undefined && (
@@ -532,7 +534,10 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                     {matches.map((c) => (
                       <li key={c.id}>
                         <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setCustomer(c); setCustQ(""); }}>
-                          <span className="truncate font-medium">{c.name}</span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate font-medium">{c.name}</span>
+                            {c.winga && <span className="shrink-0 rounded-full bg-oil-400/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span>}
+                          </span>
                           <span className="shrink-0 text-xs text-slate-500">{c.phone ?? ""}</span>
                         </button>
                       </li>
@@ -549,7 +554,7 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
                 <div className="grid grid-cols-2 gap-2">
                   <input className="input" placeholder="Phone" inputMode="tel" value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} aria-label="New customer phone" />
                   <select className="input" value={newCust.type} onChange={(e) => setNewCust({ ...newCust, type: e.target.value })} aria-label="Customer type">
-                    {TYPE_OPTIONS.map(([v, l]) => (
+                    {(perms.addWinga && quickAddWinga ? [["WINGA", "Winga"], ...TYPE_OPTIONS] : TYPE_OPTIONS).map(([v, l]) => (
                       <option key={v} value={v}>
                         {l}
                       </option>
@@ -663,7 +668,13 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
               <SubmitButton pendingLabel="Completing…" className="btn-primary min-h-12 w-full text-base">
                 Complete sale
               </SubmitButton>
-              {!canSubmit && <p className="hint text-center">{problems[0]}</p>}
+              {saleError ? (
+                <p role="alert" className="mt-2 text-center text-sm font-medium text-brand-red-dark">
+                  {saleError}
+                </p>
+              ) : (
+                !canSubmit && <p className="hint text-center">{problems[0]}</p>
+              )}
             </div>
           </div>
         </aside>
@@ -673,9 +684,8 @@ export default function PosTerminal({ action, quickAddCustomer, products, locati
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,27,45,0.08)] backdrop-blur lg:left-64 xl:hidden">
         <div className="mx-auto flex max-w-xl items-center gap-3">
           <button type="button" className="min-w-0 flex-1 text-left" onClick={() => document.getElementById("pos-cart")?.scrollIntoView({ behavior: "smooth" })}>
-            <p className="text-xs text-slate-500">
-              {cartCount} item{cartCount === 1 ? "" : "s"}
-              {!canSubmit ? ` · ${problems[0]}` : " · tap to review"}
+            <p className={cn("text-xs", saleError ? "font-medium text-brand-red-dark" : "text-slate-500")} role={saleError ? "alert" : undefined}>
+              {saleError ?? `${cartCount} item${cartCount === 1 ? "" : "s"}${!canSubmit ? ` · ${problems[0]}` : " · tap to review"}`}
             </p>
             <p className="truncate text-lg font-bold text-slate-900">{fmt(total)}</p>
           </button>

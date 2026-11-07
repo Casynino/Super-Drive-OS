@@ -214,7 +214,7 @@ export async function loadPickup(db: Pick<Db, "pickupNote">, where: { id?: strin
       completedBy: { select: { name: true } },
       cancelledBy: { select: { name: true } },
       location: { select: { name: true } },
-      sale: { select: { id: true, saleNo: true, status: true, paymentStatus: true, amountPaid: true, total: true, customerId: true, createdAt: true, customer: { select: { name: true } } } },
+      sale: { select: { id: true, saleNo: true, status: true, paymentStatus: true, amountPaid: true, total: true, customerId: true, createdAt: true, customer: { select: { name: true, reseller: { select: { id: true } } } } } },
       items: {
         orderBy: { id: "asc" },
         include: { product: { select: { id: true, name: true, sku: true, baseUnit: { select: { symbol: true } }, units: { select: { factor: true, unit: { select: { symbol: true } } } }, image: { select: { updatedAt: true } } } } },

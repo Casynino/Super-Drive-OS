@@ -21,7 +21,7 @@ export default async function PrintPickupPage({ params, searchParams }: { params
     where: { id },
     include: {
       location: { select: { name: true } },
-      sale: { select: { saleNo: true, salespersonId: true, total: true, createdAt: true, customer: { select: { name: true } }, salesperson: { select: { name: true } }, items: { orderBy: { id: "asc" }, select: { id: true, enteredQty: true, unitPrice: true, lineTotal: true, product: { select: { name: true, sku: true } }, enteredUnit: { select: { symbol: true } } } } } },
+      sale: { select: { saleNo: true, salespersonId: true, total: true, createdAt: true, customer: { select: { name: true, reseller: { select: { id: true } } } }, salesperson: { select: { name: true } }, items: { orderBy: { id: "asc" }, select: { id: true, enteredQty: true, unitPrice: true, lineTotal: true, product: { select: { name: true, sku: true } }, enteredUnit: { select: { symbol: true } } } } } },
     },
   });
   if (!note) notFound();
@@ -45,7 +45,7 @@ export default async function PrintPickupPage({ params, searchParams }: { params
           noteNo: note.noteNo,
           qrSvg: svg,
           saleNo: note.sale.saleNo,
-          customer: note.sale.customer?.name ?? "Walk-in customer",
+          customer: note.sale.customer ? `${note.sale.customer.name}${note.sale.customer.reseller ? " · Winga" : ""}` : "Walk-in customer",
           salesperson: note.sale.salesperson.name,
           when: stamp(note.createdAt),
           payment: AUTH_LABEL[note.auth],

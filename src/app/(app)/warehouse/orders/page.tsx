@@ -42,7 +42,7 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
       orderBy: filter.key === "done" || filter.key === "cancelled" ? { createdAt: "desc" } : { createdAt: "asc" }, // waiting ones: the oldest first
       skip: (page - 1) * PAGE,
       take: PAGE,
-      include: { sale: { select: { saleNo: true, customer: { select: { name: true } }, salesperson: { select: { name: true } } } }, items: { select: { quantity: true, product: { select: { name: true } } } } },
+      include: { sale: { select: { saleNo: true, customer: { select: { name: true, reseller: { select: { id: true } } } }, salesperson: { select: { name: true } } } }, items: { select: { quantity: true, product: { select: { name: true } } } } },
     }),
     db.pickupNote.count({ where }),
     db.pickupNote.groupBy({ by: ["status"], _count: { _all: true } }),
@@ -109,7 +109,10 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
                         {p.noteNo}
                       </Link>
                     </td>
-                    <td className="truncate">{p.sale.customer?.name ?? <span className="text-slate-400">Walk-in</span>}</td>
+                    <td className="truncate">
+                      {p.sale.customer?.name ?? <span className="text-slate-400">Walk-in</span>}
+                      {p.sale.customer?.reseller && <span className="ml-2 rounded-full bg-oil-400/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span>}
+                    </td>
                     <td className="hidden truncate text-slate-600 md:table-cell">{p.sale.salesperson.name}</td>
                     <td className="truncate text-slate-600">
                       {p.items.slice(0, 2).map((i) => i.product.name).join(", ")}

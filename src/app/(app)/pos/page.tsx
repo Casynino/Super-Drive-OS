@@ -14,6 +14,7 @@ import { listAccounts } from "@/lib/cash/ledger";
 import { getCurrency } from "@/lib/settings";
 import { createSale } from "./actions";
 import { quickCreateCustomer } from "../customers/actions";
+import { quickCreateWinga } from "../resellers/actions";
 import { getActiveLocations, getStockByLocation } from "../inventory/data";
 
 export const metadata = { title: "Home" };
@@ -30,7 +31,7 @@ export default async function PosPage() {
     }),
     getActiveLocations(),
     getStockByLocation(),
-    can(user, "customers.view") ? db.customer.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, take: 3000 }) : [],
+    can(user, "customers.view") ? db.customer.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, take: 3000, include: { reseller: { select: { id: true } } } }) : [],
     canCredit ? outstandingByCustomer(db) : new Map(),
     getCurrency(),
     listAccounts(db),
@@ -68,6 +69,7 @@ export default async function PosPage() {
     name: c.name,
     phone: c.phone,
     type: c.type,
+    winga: Boolean(c.reseller),
     ...(canCredit ? { creditLimit: c.creditLimit.toString(), outstanding: (owed.get(c.id) ?? 0).toString() } : {}),
   }));
 
@@ -105,6 +107,7 @@ export default async function PosPage() {
         <PosTerminal
           action={createSale}
           quickAddCustomer={quickCreateCustomer}
+          quickAddWinga={quickCreateWinga}
           products={posProducts}
           locations={locations}
           stockByLocation={stockByLocation}
@@ -113,7 +116,7 @@ export default async function PosPage() {
           unitMode={await getUnitMode()}
           currency={currency}
           accounts={accounts.map((a) => ({ id: a.id, locationId: a.locationId, method: a.method, name: a.name, accountNumber: a.accountNumber, isDefault: a.isDefault }))}
-          perms={{ credit: canCredit, discount: can(user, "sales.discount"), addCustomer: can(user, "customers.create"), creditException: can(user, "credit.approve_exception") }}
+          perms={{ credit: canCredit, discount: can(user, "sales.discount"), addCustomer: can(user, "customers.create"), addWinga: can(user, "resellers.operate") || can(user, "resellers.manage"), creditException: can(user, "credit.approve_exception") }}
         />
       )}
     </>

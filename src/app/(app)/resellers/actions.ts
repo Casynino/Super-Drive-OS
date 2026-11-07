@@ -64,6 +64,35 @@ export async function createResellerAction(_prev: ActionState, fd: FormData): Pr
   return result;
 }
 
+/**
+ * Registers a Winga from the till (Nino 2026-11-08: "we can add Winga there too"). It is the same record the Winga page
+ * makes (account + custody location, credit limit 0, 14 days to settle); only name and phone are asked. Shop-floor right
+ * `resellers.operate` (the Winga page keeps `resellers.manage` for editing and switching off).
+ */
+export async function quickCreateWinga(input: { name: string; phone: string }): Promise<{ ok: true; customer: { id: string; name: string; phone: string | null; type: string } } | { ok: false; error: string }> {
+  const out: { customer?: { id: string; name: string; phone: string | null; type: string } } = {};
+  const result = await guarded("resellers.operate", async (user) => {
+    const name = (input.name ?? "").trim();
+    const phone = (input.phone ?? "").trim();
+    if (await db.reseller.findFirst({ where: { phone }, select: { id: true } })) return fail("A Winga with this phone number is already registered. Search for them instead.");
+    try {
+      const r = await db.$transaction(async (tx) => {
+        const created = await createReseller(tx, { user, name, businessName: "", phone, altPhone: "", address: "", salesLocation: "", idInfo: "", notes: "", settlementDays: "14" });
+        await writeAudit(tx, { user, action: "reseller.create", entityType: "Reseller", entityId: created.id, reference: created.name, after: { phone: created.phone, source: "POS quick add" } });
+        return tx.customer.findUniqueOrThrow({ where: { id: created.customerId }, select: { id: true, name: true, phone: true, type: true } });
+      });
+      refresh();
+      out.customer = r;
+      return { ok: true };
+    } catch (e) {
+      if (e instanceof ResellerError) return fail(Object.values(e.fieldErrors)[0] ?? e.message);
+      throw e;
+    }
+  });
+  if (result.error || !out.customer) return { ok: false, error: result.error ?? "Could not add the Winga." };
+  return { ok: true, customer: out.customer };
+}
+
 export async function updateResellerAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const values = formValues(fd);
   const result = await guarded("resellers.manage", async (user) => {

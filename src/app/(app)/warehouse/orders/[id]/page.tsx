@@ -66,9 +66,22 @@ export default async function CollectionPage({ params, searchParams }: { params:
         <div className="mb-5 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">Scanned. Check the goods against the list below, then confirm.</div>
       ) : null}
 
+      {!block && note.auth !== "PAID" && (
+        <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status">
+          <p className="font-semibold">{note.sale.customer?.reseller ? "Winga order · not fully paid" : "Not fully paid"}</p>
+          <p className="mt-0.5">{note.auth === "CREDIT_APPROVED" ? "This sale is on credit. It was approved at the till and the customer is recorded, so the goods may be handed over." : "Part of this sale is on credit. It was approved at the till and the customer is recorded, so the goods may be handed over."}</p>
+        </div>
+      )}
+
       <section className="card mb-5 px-4 py-4 sm:px-5">
         <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-          {fact("Customer", note.sale.customer?.name ?? "Walk-in")}
+          {fact(
+            "Customer",
+            <span className="inline-flex flex-wrap items-center gap-2">
+              {note.sale.customer?.name ?? "Walk-in"}
+              {note.sale.customer?.reseller && <span className="rounded-full bg-oil-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span>}
+            </span>,
+          )}
           {fact("Sold by", note.createdBy.name)}
           {fact("Payment", AUTH_LABEL[note.auth])}
           {fact("Collection", <span className={STATUS_TEXT[note.status]}>{STATUS_LABEL[note.status]}</span>)}
