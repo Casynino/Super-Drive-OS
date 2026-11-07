@@ -256,18 +256,14 @@ html:not(.dark) .glass-panel {
     rgba(255, 255, 255, 0.66);
   box-shadow: 0 26px 70px -30px rgba(15, 27, 45, 0.4), 0 0 0 1px rgba(15, 27, 45, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
-/* the open page: a flat soft tint, no outline or shadow (Nino: "clean, no big shape") */
-.glass-active { background: rgba(255, 255, 255, 0.1); }
-html:not(.dark) .glass-active { background: rgba(14, 61, 110, 0.08); }
-/* a row under the pointer or just clicked: only a faint tint */
-.glass-row { transition: background-color 0.15s ease, color 0.15s ease; }
-.glass-row:hover { background: rgba(255, 255, 255, 0.06); }
-html:not(.dark) .glass-row:hover { background: rgba(14, 61, 110, 0.05); }
-/* the search box */
-.glass-field { background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
-html:not(.dark) .glass-field { background: rgba(14, 61, 110, 0.05); box-shadow: inset 0 0 0 1px rgba(14, 61, 110, 0.12); }
-.glass-kbd { background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
-html:not(.dark) .glass-kbd { background: rgba(14, 61, 110, 0.07); box-shadow: inset 0 0 0 1px rgba(14, 61, 110, 0.12); }
+/* the open page: no shape at all, only a thin yellow bar on its left (the icon turns yellow in the markup). Nino 2026-11-08: "clean". */
+.glass-active { background: transparent; }
+.glass-active::before { content: ""; position: absolute; left: 0; top: 50%; height: 1.15rem; width: 3px; transform: translateY(-50%); border-radius: 3px; background: #fdc400; }
+/* a row under the pointer or just clicked: the text gets brighter (in the markup), nothing is drawn */
+.glass-row { transition: color 0.15s ease; }
+/* the search: a plain line, no box */
+.glass-field { background: transparent; box-shadow: inset 0 -1px 0 var(--glass-line); }
+.glass-kbd { background: transparent; box-shadow: none; }
 /* a group's pages hang off a thin line with a curved elbow at each one, like branches */
 .glass-tree { position: relative; border-left: 1px solid var(--glass-line); }
 .glass-tree > li { position: relative; }

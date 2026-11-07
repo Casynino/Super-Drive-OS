@@ -131,9 +131,9 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         <Link
           href={item.href}
           aria-current={isActive ? "page" : undefined}
-          className={cn("relative flex items-center gap-3 rounded-full", child ? "px-3 py-2 text-[13px]" : "px-3.5 py-2.5 text-[13.5px]", isActive ? "glass-active font-medium text-slate-900" : "glass-row text-slate-600 hover:text-slate-900")}
+          className={cn("relative flex items-center gap-3 rounded-lg", child ? "px-3 py-1.5 text-[13px]" : "px-3.5 py-2 text-[13.5px]", isActive ? "glass-active font-medium text-slate-900" : "glass-row text-slate-600 hover:text-slate-900")}
         >
-          <Icon size={child ? 16 : 18} className={cn("shrink-0", isActive ? "text-oil-500" : "text-slate-400")} />
+          <Icon size={child ? 16 : 18} className={cn("shrink-0", isActive && "text-oil-500")} />
           <span className="min-w-0 flex-1 truncate">{nameOf(item)}</span>
           {n > 0 && countBadge(n)}
         </Link>
@@ -166,7 +166,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
       </div>
 
       <div className="px-3 pb-1.5">
-        <label className="glass-field flex items-center gap-2.5 rounded-full px-3.5 py-2.5 text-sm text-slate-500 focus-within:text-slate-900">
+        <label className="glass-field flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-500 focus-within:text-slate-900">
           <Search size={16} className="shrink-0" />
           <input
             ref={searchRef}
@@ -219,7 +219,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
                       type="button"
                       onClick={() => setOpenGroup(isOpen ? null : group.label)}
                       aria-expanded={isOpen}
-                      className={cn("glass-row flex w-full items-center gap-3 rounded-full px-3.5 py-2.5 text-left text-[13.5px] font-medium", here ? "text-slate-900" : "text-slate-600")}
+                      className={cn("glass-row flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-left text-[13.5px] font-medium hover:text-slate-900", here ? "text-slate-900" : "text-slate-600")}
                     >
                       {Icon && <Icon size={18} className={cn("shrink-0", here ? "text-oil-500" : "text-slate-400")} />}
                       <span className="flex-1">{group.label}</span>
@@ -269,8 +269,8 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
               const Icon = item.icon;
               const n = count(item);
               return (
-                <Link key={item.href} href={item.href} title={nameOf(item)} aria-label={nameOf(item)} aria-current={isActive ? "page" : undefined} className={cn("relative mb-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-full", isActive ? "glass-active" : "glass-row")}>
-                  <Icon size={17} className={isActive ? "text-oil-500" : "text-slate-500"} />
+                <Link key={item.href} href={item.href} title={nameOf(item)} aria-label={nameOf(item)} aria-current={isActive ? "page" : undefined} className={cn("relative mb-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-full", isActive ? "glass-active text-slate-900" : "glass-row text-slate-500 hover:text-slate-900")}>
+                  <Icon size={17} className={isActive ? "text-oil-500" : ""} />
                   {n > 0 && <span className={dot} aria-hidden />}
                 </Link>
               );
