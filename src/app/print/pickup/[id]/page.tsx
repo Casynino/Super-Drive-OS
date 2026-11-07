@@ -10,7 +10,7 @@ import { getBusinessProfile, getCurrency } from "@/lib/settings";
 import { stamp } from "@/lib/warehouse/pickup";
 import { AUTH_LABEL, STATUS_LABEL } from "@/lib/warehouse/labels";
 
-export const metadata = { title: "Pickup note" };
+export const metadata = { title: "Pickup note · Delivery note" };
 
 /** The pickup note on its own, as paper with its QR code: open it, print it or save it as a PDF. */
 export default async function PrintPickupPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ print?: string; save?: string }> }) {
@@ -36,8 +36,8 @@ export default async function PrintPickupPage({ params, searchParams }: { params
 
   return (
     <div className="print-wrap" style={{ minHeight: "100vh", background: "#e5e7eb", padding: "20px 12px 40px", position: "relative", zIndex: 1 }}>
-      <style>{`*{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4;margin:0}@media print{.print-hide{display:none!important}html,body{background:#fff!important}.print-wrap{background:#fff!important;padding:10mm!important;min-height:0!important}.eod-sheet{border:none!important;border-radius:0!important}}`}</style>
-      <PrintBar auto={sp.print === "1"} save={sp.save === "1"} title={`Pickup note ${note.noteNo}`} />
+      <style>{`*{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A5 portrait;margin:0}@media print{.print-hide{display:none!important}html,body{background:#fff!important}.print-wrap{background:#fff!important;padding:0!important;min-height:0!important}}`}</style>
+      <PrintBar auto={sp.print === "1"} save={sp.save === "1"} title={`Pickup note / delivery note ${note.noteNo}`} />
       <PickupNoteSheet
         d={{
           business: { name: profile.name, address: profile.address, phone: profile.phone },

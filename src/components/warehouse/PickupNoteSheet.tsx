@@ -1,9 +1,10 @@
 import type { CSSProperties } from "react";
-import { CREAM, CREAM_LINE, GOLD, INK, LINE, MUTED, NAVY, NAVY2, SERIF, small } from "@/components/reports/EndOfDaySheet";
+import { GOLD, INK, LINE, MUTED, NAVY, NAVY2, small } from "@/components/reports/EndOfDaySheet";
 
 /**
- * The pickup note as a paper document: branding, the QR code, who and what, the goods to collect, and a place to sign.
- * The QR carries only a secret reference; everything on this page is looked up from the system when it is scanned.
+ * The pickup note as paper, on A5 pages (148 x 210 mm). It is also the DELIVERY NOTE: the goods listed are handed over against it
+ * and signed for. Many products simply continue on the next A5 page (every page carries the number and a QR code, the last page has
+ * the totals and the signatures). The QR carries only a secret reference; everything is looked up when it is scanned.
  */
 export type PickupNoteData = {
   business: { name: string; address: string; phone: string };
@@ -22,106 +23,162 @@ export type PickupNoteData = {
   currencyCode: string;
 };
 
-const root: CSSProperties = { background: "#fff", color: INK, fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", border: `1px solid ${LINE}`, borderRadius: 6, overflow: "hidden", maxWidth: 820, margin: "0 auto", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" };
+// how many product rows fit: first page / later pages, and when that page also carries the totals and signatures
+const FIRST_MORE = 12;
+const FIRST_LAST = 5;
+const NEXT_MORE = 17;
+const NEXT_LAST = 10;
+const ROW_MM = 9.5;
+
+/** Splits the lines over A5 pages. The last page always has room for the totals and the signatures. */
+export function paginate<T>(lines: T[]): T[][] {
+  if (lines.length <= FIRST_LAST) return [lines];
+  const pages: T[][] = [lines.slice(0, FIRST_MORE)];
+  let rest = lines.slice(FIRST_MORE);
+  while (rest.length > NEXT_LAST) {
+    pages.push(rest.slice(0, NEXT_MORE));
+    rest = rest.slice(NEXT_MORE);
+  }
+  pages.push(rest); // may be empty: a last page with only the signatures
+  return pages;
+}
+
+const PAGE: CSSProperties = { width: "148mm", height: "210mm", boxSizing: "border-box", background: "#fff", color: INK, fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", margin: "0 auto 8mm", boxShadow: "0 1px 4px rgba(15,23,42,0.18)" };
+const CSS = `.a5-qr svg{display:block;width:100%;height:100%}@media print{.a5-page{margin:0!important;box-shadow:none!important;break-after:page;page-break-after:always}.a5-page:last-child{break-after:auto;page-break-after:auto}}`;
 
 export default function PickupNoteSheet({ d }: { d: PickupNoteData }) {
+  const pages = paginate(d.lines);
+  const hasPrices = d.total !== null;
+  let counter = 0;
+
   const fact = (label: string, value: string) => (
-    <div>
-      <div style={small}>{label}</div>
-      <div style={{ marginTop: 3, fontSize: 13.5, fontWeight: 600, color: INK }}>{value}</div>
+    <div style={{ minWidth: 0 }}>
+      <div style={{ ...small, fontSize: 7.5 }}>{label}</div>
+      <div style={{ marginTop: 1.5, fontSize: 10, fontWeight: 600, color: INK, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{value}</div>
     </div>
   );
+
+  const th: CSSProperties = { ...small, fontSize: 7.5, padding: "0 1mm" };
+  const tableHead = (
+    <div style={{ display: "grid", gridTemplateColumns: hasPrices ? "6mm 1fr 17mm 21mm 24mm" : "6mm 1fr 24mm", alignItems: "end", height: "7mm", borderBottom: `0.4mm solid ${NAVY}`, margin: "0 8mm" }}>
+      <span style={th}>#</span>
+      <span style={th}>Product</span>
+      <span style={{ ...th, textAlign: "right" }}>Qty</span>
+      {hasPrices && <span style={{ ...th, textAlign: "right" }}>Price</span>}
+      {hasPrices && <span style={{ ...th, textAlign: "right" }}>Total</span>}
+    </div>
+  );
+
   return (
-    <div className="eod-sheet" style={root}>
-      <div style={{ background: `linear-gradient(115deg, ${NAVY} 0%, ${NAVY2} 100%)`, color: "#fff", padding: "20px 30px 16px", borderBottom: `4px solid ${GOLD}` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "flex-start" }}>
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={d.logoSrc} alt="" style={{ height: 54, width: "auto", background: "#fff", borderRadius: 10, padding: 4 }} />
-            <div>
-              <div style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 700, lineHeight: 1.15 }}>{d.business.name}</div>
-              <div style={{ marginTop: 4, fontSize: 9.5, letterSpacing: "0.14em", color: GOLD, fontWeight: 600 }}>STORE WAREHOUSE · DAR ES SALAAM</div>
-              <div style={{ marginTop: 6, fontSize: 11.5, lineHeight: 1.5, color: "#cbd5e1" }}>
-                {d.business.address && <div>{d.business.address}</div>}
-                {d.business.phone && <div>{d.business.phone}</div>}
+    <div className="a5-doc">
+      <style>{CSS}</style>
+      {pages.map((rows, pi) => {
+        const first = pi === 0;
+        const last = pi === pages.length - 1;
+        return (
+          <section key={pi} className="a5-page" style={PAGE}>
+            {first ? (
+              <>
+                <div style={{ padding: "6mm 8mm 3.5mm", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "4mm" }}>
+                  <div style={{ minWidth: 0 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={d.logoSrc} alt="" style={{ height: "11mm", width: "auto", display: "block" }} />
+                    <div style={{ marginTop: "1.8mm", fontSize: 8, lineHeight: 1.4, color: MUTED }}>
+                      {d.business.address && <div>{d.business.address}</div>}
+                      {d.business.phone && <div>{d.business.phone}</div>}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: NAVY2, lineHeight: 1 }}>PICKUP NOTE</div>
+                    <div style={{ marginTop: "1mm", fontSize: 7.5, fontWeight: 700, letterSpacing: "0.16em", color: "#a07c00" }}>ALSO THE DELIVERY NOTE</div>
+                    <div style={{ marginTop: "2mm", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12.5, fontWeight: 700, color: INK }}>{d.noteNo}</div>
+                    <div style={{ marginTop: 0.5, fontSize: 8.5, color: MUTED }}>{d.when}</div>
+                  </div>
+                </div>
+                <div style={{ height: "1.1mm", background: GOLD, margin: "0 8mm" }} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 29mm", gap: "5mm", padding: "4mm 8mm 3.5mm", alignItems: "center" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2.8mm 4mm" }}>
+                    {fact("Customer", d.customer)}
+                    {fact("Sales representative", d.salesperson)}
+                    {fact("Sales transaction", d.saleNo)}
+                    {fact("Payment", d.payment)}
+                    {fact("Collect from", d.where)}
+                    {fact("Status", d.collection)}
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div className="a5-qr" style={{ width: "27mm", height: "27mm", border: `0.3mm solid ${LINE}`, borderRadius: "1.5mm", padding: "1mm", boxSizing: "border-box", margin: "0 auto" }} dangerouslySetInnerHTML={{ __html: d.qrSvg }} />
+                    <div style={{ marginTop: "1mm", fontSize: 7, color: MUTED }}>Scan at the warehouse</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: "6mm 8mm 3mm", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `0.4mm solid ${GOLD}`, margin: "0 0 3mm" }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.04em", color: NAVY2 }}>PICKUP NOTE · DELIVERY NOTE</div>
+                  <div style={{ marginTop: 1, fontFamily: "ui-monospace, Menlo, monospace", fontSize: 10, fontWeight: 700 }}>
+                    {d.noteNo} <span style={{ fontFamily: "inherit", fontWeight: 400, color: MUTED }}>· continued</span>
+                  </div>
+                  <div style={{ marginTop: 0.5, fontSize: 8, color: MUTED }}>{d.customer}</div>
+                </div>
+                <div className="a5-qr" style={{ width: "15mm", height: "15mm", border: `0.3mm solid ${LINE}`, borderRadius: "1mm", padding: "0.6mm", boxSizing: "border-box" }} dangerouslySetInnerHTML={{ __html: d.qrSvg }} />
               </div>
+            )}
+
+            {(rows.length > 0 || first) && tableHead}
+            <div style={{ margin: "0 8mm" }}>
+              {rows.map((l) => {
+                const n = ++counter;
+                return (
+                  <div key={n} style={{ display: "grid", gridTemplateColumns: hasPrices ? "6mm 1fr 17mm 21mm 24mm" : "6mm 1fr 24mm", alignItems: "center", height: `${ROW_MM}mm`, borderBottom: `0.2mm solid ${LINE}`, background: n % 2 === 0 ? "#fafafa" : "#fff", fontSize: 9.5 }}>
+                    <span style={{ padding: "0 1mm", color: MUTED, fontSize: 8.5 }}>{n}</span>
+                    <span style={{ padding: "0 1mm", minWidth: 0 }}>
+                      <span style={{ display: "block", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
+                      <span style={{ display: "block", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 7, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.sku}</span>
+                    </span>
+                    <span style={{ padding: "0 1mm", textAlign: "right", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{l.qty}</span>
+                    {hasPrices && <span style={{ padding: "0 1mm", textAlign: "right", fontVariantNumeric: "tabular-nums", color: MUTED, fontSize: 8.5 }}>{l.unitPrice}</span>}
+                    {hasPrices && <span style={{ padding: "0 1mm", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{l.total}</span>}
+                  </div>
+                );
+              })}
             </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 10, letterSpacing: "0.25em", color: GOLD, fontWeight: 600 }}>PICKUP NOTE</div>
-            <div style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 24, fontWeight: 700, marginTop: 2 }}>{d.noteNo}</div>
-            <div style={{ fontSize: 12.5, marginTop: 5, color: "#e2e8f0" }}>{d.when}</div>
-          </div>
-        </div>
-      </div>
+            {!last && <div style={{ margin: "2mm 8mm 0", fontSize: 8, color: MUTED, textAlign: "right" }}>Continued on the next page…</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 170px", gap: 24, padding: "20px 30px", borderBottom: `1px solid ${LINE}`, alignItems: "center" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "16px 22px" }}>
-          {fact("Customer", d.customer)}
-          {fact("Sales representative", d.salesperson)}
-          {fact("Sales transaction", d.saleNo)}
-          {fact("Payment", d.payment)}
-          {fact("Collection", d.collection)}
-          {fact("Collect from", d.where)}
-        </div>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, padding: 8, lineHeight: 0 }} dangerouslySetInnerHTML={{ __html: d.qrSvg }} />
-          <div style={{ marginTop: 6, fontSize: 10, color: MUTED }}>Scan at the warehouse</div>
-        </div>
-      </div>
+            {last && (
+              <div style={{ marginTop: "auto", padding: "0 8mm 13mm" }}>
+                {hasPrices && (
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "3mm" }}>
+                    <div style={{ minWidth: "55mm", display: "flex", justifyContent: "space-between", gap: "6mm", borderTop: `0.4mm solid ${NAVY}`, paddingTop: "1.6mm", fontSize: 10.5, fontWeight: 800 }}>
+                      <span>Total ({d.currencyCode})</span>
+                      <span style={{ fontVariantNumeric: "tabular-nums" }}>{d.total}</span>
+                    </div>
+                  </div>
+                )}
+                <div style={{ background: "#faf8f2", border: "0.25mm solid #ece6d6", borderRadius: "1.5mm", padding: "2.2mm 3mm", fontSize: 7.8, lineHeight: 1.45, color: INK }}>
+                  This note is also the <strong>delivery note</strong>. The warehouse scans the QR code, checks the goods against this list and hands them over. The customer signs to confirm the goods were received in the right quantities and in good order. A note can be used once.
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6mm", marginTop: "8mm" }}>
+                  {["Released by (warehouse)", "Received by (customer)"].map((label) => (
+                    <div key={label} style={{ borderTop: `0.3mm dashed ${MUTED}`, paddingTop: "1.2mm" }}>
+                      <div style={{ ...small, fontSize: 7.5, letterSpacing: "0.06em" }}>{label}</div>
+                      <div style={{ marginTop: "1mm", fontSize: 7, color: MUTED }}>Name · signature · date</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-      <div style={{ padding: "6px 30px 18px" }}>
-        <div style={{ ...small, margin: "12px 0 6px" }}>Goods to collect</div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-          <thead>
-            <tr style={{ borderBottom: `2px solid ${INK}` }}>
-              <th style={{ textAlign: "left", padding: "6px 4px", ...small }}>Product</th>
-              <th style={{ textAlign: "right", padding: "6px 4px", ...small }}>Quantity</th>
-              {d.total !== null && <th style={{ textAlign: "right", padding: "6px 4px", ...small }}>Unit price</th>}
-              {d.total !== null && <th style={{ textAlign: "right", padding: "6px 4px", ...small }}>Total</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {d.lines.map((l, i) => (
-              <tr key={i} style={{ borderBottom: `1px solid ${LINE}`, background: i % 2 ? "#fafafa" : "#fff" }}>
-                <td style={{ padding: "8px 4px" }}>
-                  <div style={{ fontWeight: 600 }}>{l.name}</div>
-                  <div style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 10, color: MUTED }}>{l.sku}</div>
-                </td>
-                <td style={{ padding: "8px 4px", textAlign: "right", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{l.qty}</td>
-                {d.total !== null && <td style={{ padding: "8px 4px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: MUTED }}>{l.unitPrice}</td>}
-                {d.total !== null && <td style={{ padding: "8px 4px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{l.total}</td>}
-              </tr>
-            ))}
-          </tbody>
-          {d.total !== null && (
-            <tfoot>
-              <tr>
-                <td colSpan={3} style={{ padding: "9px 4px", textAlign: "right", fontWeight: 700 }}>
-                  Total ({d.currencyCode})
-                </td>
-                <td style={{ padding: "9px 4px", textAlign: "right", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{d.total}</td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
-
-      <div style={{ background: CREAM, borderTop: `1px solid ${CREAM_LINE}`, padding: "14px 30px 12px", breakInside: "avoid" }}>
-        <div style={{ fontSize: 11.5, color: INK, lineHeight: 1.5 }}>
-          Take this note to the Store Warehouse. The attendant scans the QR code, checks the goods against this list and hands them over. A note can be used once: after the goods are collected it cannot be used again.
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 28, marginTop: 24 }}>
-          {["Released by (warehouse) · date & signature", "Collected by · name, date & signature"].map((l) => (
-            <div key={l} style={{ borderTop: `1px dashed ${MUTED}`, paddingTop: 5, ...small, letterSpacing: "0.06em", fontSize: 9.5 }}>
-              {l}
+            <div style={{ position: "absolute", left: "8mm", right: "8mm", bottom: "5mm", display: "flex", justifyContent: "space-between", fontSize: 7, color: MUTED, borderTop: `0.2mm solid ${LINE}`, paddingTop: "1.2mm" }}>
+              <span>
+                {d.business.name} · {d.noteNo} · sale {d.saleNo}
+              </span>
+              <span>
+                Page {pi + 1} of {pages.length}
+              </span>
             </div>
-          ))}
-        </div>
-        <div style={{ marginTop: 12, textAlign: "center", fontSize: 10.5, color: MUTED }}>
-          {d.business.name} · {d.noteNo} · sale {d.saleNo}
-        </div>
-      </div>
+          </section>
+        );
+      })}
     </div>
   );
 }

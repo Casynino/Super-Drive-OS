@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExternalLink, FileDown, Printer } from "lucide-react";
 import BackLink from "@/components/BackLink";
 import { notFound, redirect } from "next/navigation";
 import { Alert } from "@/components/ui";
@@ -83,47 +84,9 @@ export default async function SalePage({ params, searchParams }: { params: Promi
           </Alert>
         </div>
       )}
-      {sale.pickupNote && (
-        <section className="card mb-4 flex flex-wrap items-center justify-between gap-3 px-4 py-4 print:hidden sm:px-5" aria-label="Pickup note">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Pickup note</p>
-            <p className="font-mono text-lg font-semibold text-slate-900">{sale.pickupNote.noteNo}</p>
-            <p className="text-sm text-slate-600">
-              {sale.pickupNote.status === "COMPLETED" ? "Collected" : sale.pickupNote.status === "CANCELLED" ? "Cancelled" : sale.pickupNote.status === "PARTIAL" ? "Partly collected" : sale.pickupNote.status === "READY" ? "Ready for collection" : "Waiting at the warehouse"}
-              . Take it to the Store Warehouse to collect the goods.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href={`/print/pickup/${sale.pickupNote.id}`} target="_blank" className="btn-primary">
-              Open the note
-            </Link>
-            <Link href={`/print/pickup/${sale.pickupNote.id}?print=1&save=1`} target="_blank" className="btn-secondary">
-              Download PDF
-            </Link>
-            <Link href={`/print/pickup/${sale.pickupNote.id}?print=1`} target="_blank" className="btn-secondary">
-              Print
-            </Link>
-          </div>
-        </section>
-      )}
-
-      {/* A credit order is paid a little at a time: every payment is recorded against this same order */}
-      {!cancelled && sale.customerId && balance.gt(0) && can(user, "payments.record") && (
-        <section className="card mx-auto mb-4 flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-4 print:hidden sm:px-5" aria-label="Collect payment">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Still to be paid</p>
-            <p className="text-xl font-semibold text-brand-red-dark">{money(balance)}</p>
-            <p className="text-xs text-slate-500">
-              Paid so far {money(sale.amountPaid.minus(sale.refundedTotal))} of {money(sale.total.minus(sale.returnedTotal))}. The customer can pay a little at a time.
-            </p>
-          </div>
-          <Link href={`/customers/${sale.customerId}/pay?sale=${sale.id}`} className="btn-primary">
-            Collect payment
-          </Link>
-        </section>
-      )}
-
-      <article className="card mx-auto max-w-3xl p-5 sm:p-8 print:max-w-none print:border-0 print:p-0">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_21rem] print:block">
+        <div className="min-w-0 space-y-5">
+      <article className="card p-5 sm:p-8 print:max-w-none print:border-0 print:p-0">
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-slate-900">{profile.name}</h1>
@@ -187,7 +150,7 @@ export default async function SalePage({ params, searchParams }: { params: Promi
           </table>
         </div>
 
-        <dl className="ml-auto mt-3 max-w-xs space-y-1.5 border-t border-line pt-4 text-sm">
+        <dl className="ml-auto mt-3 max-w-sm space-y-1.5 border-t border-line pt-4 text-sm">
           <div className="flex justify-between text-slate-600">
             <dt>Subtotal</dt>
             <dd>{money(sale.subtotal)}</dd>
@@ -232,30 +195,8 @@ export default async function SalePage({ params, searchParams }: { params: Promi
         {sale.notes && <p className="mt-5 text-sm text-slate-600">Note: {sale.notes}</p>}
         <p className="mt-8 text-center text-xs text-slate-500">Thank you for choosing {profile.name}.</p>
       </article>
-
-      {(sale.creditApprovedBy || showProfit || sale.discountReason) && (
-        <section className="card card-pad mx-auto mt-5 max-w-3xl text-sm print:hidden">
-          <h2 className="mb-2 text-base font-semibold text-slate-900">Internal details</h2>
-          {sale.creditApprovedBy && (
-            <p className="text-slate-700">
-              Credit limit exception approved by <span className="font-medium">{sale.creditApprovedBy.name}</span>: {sale.creditExceptionReason}
-            </p>
-          )}
-          {sale.discountReason && (
-            <p className="text-slate-700">
-              Discount of <span className="font-medium">{money(sale.discountTotal)}</span> given: {sale.discountReason}
-            </p>
-          )}
-          {showProfit && (
-            <p className="mt-1 text-slate-700">
-              Cost of goods {money(sale.cogsTotal)} · Gross profit <span className="font-medium">{money(sale.total.minus(sale.cogsTotal))}</span>
-            </p>
-          )}
-        </section>
-      )}
-
       {sale.reversals.length > 0 && (
-        <section className="card mx-auto mt-5 max-w-3xl overflow-hidden print:hidden">
+        <section className="card overflow-hidden print:hidden">
           <h2 className="border-b border-line px-5 py-3 text-base font-semibold text-slate-900">Returns and cancellations</h2>
           <ul className="divide-y divide-slate-100 text-sm">
             {sale.reversals.map((r) => (
@@ -289,6 +230,78 @@ export default async function SalePage({ params, searchParams }: { params: Promi
           </ul>
         </section>
       )}
+        </div>
+
+        <aside className="order-first space-y-4 xl:order-none print:hidden">
+          {/* money: what it came to, what was paid, what is left; a credit order is paid a little at a time against this same order */}
+          <section className="card overflow-hidden" aria-label="Payment">
+            <div className="border-b border-line px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{cancelled ? "Cancelled sale" : balance.gt(0) ? "Still to be paid" : "Paid in full"}</p>
+              <p className={`mt-0.5 text-2xl font-bold tracking-tight ${cancelled ? "text-slate-500" : balance.gt(0) ? "text-brand-red-dark" : "text-emerald-600"}`}>{money(balance.gt(0) || cancelled ? balance : sale.total.minus(sale.returnedTotal))}</p>
+              {!cancelled && sale.dueDate && balance.gt(0) && <p className="text-xs text-slate-500">Due {formatDate(sale.dueDate)}</p>}
+            </div>
+            <dl className="space-y-1.5 px-4 py-3 text-sm">
+              <div className="flex justify-between text-slate-600">
+                <dt>Total</dt>
+                <dd className="font-medium tabular-nums text-slate-900">{money(sale.total.minus(sale.returnedTotal))}</dd>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <dt>Paid so far</dt>
+                <dd className="font-medium tabular-nums text-slate-900">{money(sale.amountPaid.minus(sale.refundedTotal))}</dd>
+              </div>
+            </dl>
+            {!cancelled && sale.customerId && balance.gt(0) && can(user, "payments.record") && (
+              <div className="border-t border-line px-4 py-3">
+                <Link href={`/customers/${sale.customerId}/pay?sale=${sale.id}`} className="btn-primary w-full justify-center">
+                  Collect payment
+                </Link>
+                <p className="mt-1.5 text-center text-xs text-slate-500">The customer can pay a little at a time.</p>
+              </div>
+            )}
+          </section>
+
+          {sale.pickupNote && (
+            <section className="card px-4 py-4" aria-label="Pickup note">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Pickup note · delivery note</p>
+              <p className="mt-0.5 font-mono text-lg font-semibold text-slate-900">{sale.pickupNote.noteNo}</p>
+              <p className="text-sm text-slate-600">{sale.pickupNote.status === "COMPLETED" ? "Collected" : sale.pickupNote.status === "CANCELLED" ? "Cancelled" : sale.pickupNote.status === "PARTIAL" ? "Partly collected" : sale.pickupNote.status === "READY" ? "Ready for collection" : "Waiting at the warehouse"}</p>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <Link href={`/print/pickup/${sale.pickupNote.id}?print=1`} target="_blank" className="flex flex-col items-center gap-1 rounded-xl border border-navy-700 bg-navy-700 px-2 py-2.5 text-xs font-semibold text-white transition hover:bg-navy-800">
+                  <Printer size={17} /> Print
+                </Link>
+                <Link href={`/print/pickup/${sale.pickupNote.id}?print=1&save=1`} target="_blank" className="flex flex-col items-center gap-1 rounded-xl border border-line bg-white px-2 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-navy-300 hover:bg-slate-50">
+                  <FileDown size={17} /> PDF
+                </Link>
+                <Link href={`/print/pickup/${sale.pickupNote.id}`} target="_blank" className="flex flex-col items-center gap-1 rounded-xl border border-line bg-white px-2 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-navy-300 hover:bg-slate-50">
+                  <ExternalLink size={17} /> Open
+                </Link>
+              </div>
+            </section>
+          )}
+
+          {(sale.creditApprovedBy || showProfit || sale.discountReason) && (
+            <section className="card card-pad text-sm print:hidden">
+              <h2 className="mb-2 text-base font-semibold text-slate-900">Internal details</h2>
+              {sale.creditApprovedBy && (
+                <p className="text-slate-700">
+                  Credit limit exception approved by <span className="font-medium">{sale.creditApprovedBy.name}</span>: {sale.creditExceptionReason}
+                </p>
+              )}
+              {sale.discountReason && (
+                <p className="text-slate-700">
+                  Discount of <span className="font-medium">{money(sale.discountTotal)}</span> given: {sale.discountReason}
+                </p>
+              )}
+              {showProfit && (
+                <p className="mt-1 text-slate-700">
+                  Cost of goods {money(sale.cogsTotal)} · Gross profit <span className="font-medium">{money(sale.total.minus(sale.cogsTotal))}</span>
+                </p>
+              )}
+            </section>
+          )}
+
+        </aside>
+      </div>
     </>
   );
 }
