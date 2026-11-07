@@ -20,6 +20,8 @@ type ExpenseFormProps = {
   submissionKey: string;
   /** e.g. "Up to TSh 20,000 is recorded straight away." */
   limitText: string;
+  /** the owner may add a type that is not on the list ("Something else") */
+  canAddType?: boolean;
 };
 
 /**
@@ -55,29 +57,47 @@ export function RecordExpenseButton(props: ExpenseFormProps) {
   );
 }
 
-function ExpenseForm({ action, categories, today, submissionKey, limitText, accounts, onClose }: ExpenseFormProps & { onClose: () => void }) {
+function ExpenseForm({ action, categories, today, submissionKey, limitText, accounts, canAddType, onClose }: ExpenseFormProps & { onClose: () => void }) {
   const [state, formAction] = useActionState(action, initial);
   const uid = useId();
   const fe = state.fieldErrors ?? {};
   const v = state.values ?? {};
   const id = (n: string) => `${uid}-${n}`;
   const [categoryId, setCategoryId] = useState(v.categoryId ?? "");
-  const [step, setStep] = useState<1 | 2>(v.categoryId ? 2 : 1);
+  const [newType, setNewType] = useState(v.newCategoryName ?? ""); // a type that is not on the list yet (owner)
+  const [adding, setAdding] = useState(false);
+  const [step, setStep] = useState<1 | 2>(v.categoryId || v.newCategoryName ? 2 : 1);
   const [accountId, setAccountId] = useState(v.accountId ?? accounts.find((a) => a.method === "CASH")?.id ?? accounts[0]?.id ?? "");
   const [amount, setAmount] = useState((v.amount ?? "").replace(/\D/g, ""));
   const amountRef = useRef<HTMLInputElement>(null);
   const category = categories.find((c) => c.id === categoryId);
+  const typeName = category?.name ?? (newType.trim() || "");
   const KIND: Record<string, string> = { CASH: "Cash", MOBILE_MONEY: "Mobile money", BANK: "Bank" };
   const kindOf = (a: FormAccount) => ((KIND[a.method] ?? a.method) === a.name ? "" : (KIND[a.method] ?? a.method));
-  const pick = (cid: string) => {
-    setCategoryId(cid);
+  const goStep2 = () => {
     setStep(2);
     // with a mouse the cursor goes straight to the amount; on a phone the keyboard stays closed until it is tapped
     if (typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches) setTimeout(() => amountRef.current?.focus(), 30);
   };
+  const pick = (cid: string) => {
+    setCategoryId(cid);
+    setNewType("");
+    goStep2();
+  };
+  // a new name that already exists in the list simply picks that one
+  const useNewType = () => {
+    const name = newType.replace(/\s+/g, " ").trim();
+    if (name.length < 2) return;
+    const same = categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (same) return pick(same.id);
+    setCategoryId("");
+    setNewType(name);
+    setAdding(false);
+    goStep2();
+  };
   const chip = (on: boolean) => cn("rounded-xl border px-3.5 py-3 text-left text-sm font-medium leading-tight transition", on ? "border-navy-600 bg-navy-50 text-navy-800" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50");
   const stepPill = (n: 1 | 2, label: string) => (
-    <button type="button" onClick={() => (n === 1 || category) && setStep(n)} aria-current={step === n ? "step" : undefined} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition", step === n ? "bg-navy-700 text-white" : "text-slate-500 hover:text-slate-800")}>
+    <button type="button" onClick={() => (n === 1 || typeName) && setStep(n)} aria-current={step === n ? "step" : undefined} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition", step === n ? "bg-navy-700 text-white" : "text-slate-500 hover:text-slate-800")}>
       <span>{n}</span> {label}
     </button>
   );
@@ -85,6 +105,7 @@ function ExpenseForm({ action, categories, today, submissionKey, limitText, acco
     <form action={formAction} noValidate className="flex min-h-0 flex-1 flex-col">
       <input type="hidden" name="submissionKey" value={submissionKey} />
       <input type="hidden" name="categoryId" value={categoryId} />
+      <input type="hidden" name="newCategoryName" value={categoryId ? "" : newType.trim()} />
       <input type="hidden" name="accountId" value={accountId} />
       <input type="hidden" name="amount" value={amount} />
 
@@ -120,6 +141,24 @@ function ExpenseForm({ action, categories, today, submissionKey, limitText, acco
                   <ChevronRight size={16} className="shrink-0 text-slate-400" aria-hidden />
                 </button>
               ))}
+              {canAddType &&
+                (adding ? (
+                  <div className="col-span-full flex flex-col gap-2 rounded-xl border border-dashed border-navy-400 p-3 min-[420px]:flex-row min-[420px]:items-center">
+                    <input autoFocus value={newType} onChange={(e) => setNewType(e.target.value.slice(0, 60))} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), useNewType())} placeholder="Name the new type, e.g. Car wash" aria-label="Name of the new type of expense" className="input min-w-0 flex-1" />
+                    <div className="flex gap-2">
+                      <button type="button" onClick={useNewType} disabled={newType.trim().length < 2} className="btn-primary flex-1 min-[420px]:flex-none">
+                        Next
+                      </button>
+                      <button type="button" onClick={() => (setAdding(false), setNewType(""))} className="btn-secondary">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setAdding(true)} className="col-span-full flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3.5 py-3 text-left text-base font-medium text-navy-700 transition hover:border-navy-400 hover:bg-navy-50">
+                    <Plus size={16} aria-hidden /> Something else — add a new type
+                  </button>
+                ))}
             </div>
           )}
         </div>
@@ -129,7 +168,10 @@ function ExpenseForm({ action, categories, today, submissionKey, limitText, acco
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Expense for</p>
-              <p className="truncate text-xl font-semibold text-slate-900">{category?.name ?? "—"}</p>
+              <p className="truncate text-xl font-semibold text-slate-900">
+                {typeName || "—"}
+                {!category && typeName && <span className="ml-2 rounded-full bg-navy-50 px-2 py-0.5 align-middle text-[11px] font-semibold text-navy-700">New type</span>}
+              </p>
             </div>
             <button type="button" onClick={() => setStep(1)} className="shrink-0 text-sm font-medium text-navy-700 hover:underline">
               Change

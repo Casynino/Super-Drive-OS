@@ -146,7 +146,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
       <PageHeader
         title="Expenses"
         description={seeAll ? "Everything the shop spent." : "Money you spent for the shop."}
-        actions={canRecord ? <RecordExpenseButton key={sp.recorded ?? "new"} action={recordExpenseAction} accounts={await listAccounts(db, await defaultLocationId(db))} categories={categories} today={today} submissionKey={randomUUID()} limitText={limitText} /> : undefined}
+        actions={canRecord ? <RecordExpenseButton key={sp.recorded ?? "new"} action={recordExpenseAction} accounts={await listAccounts(db, await defaultLocationId(db))} categories={categories} today={today} submissionKey={randomUUID()} limitText={limitText} canAddType={can(user, "settings.manage")} /> : undefined}
       />
 
       {sp.recorded && (

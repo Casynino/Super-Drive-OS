@@ -20,6 +20,7 @@ const refresh = () => {
   revalidatePath("/dashboard");
   revalidatePath("/cash");
   revalidatePath("/closing");
+  revalidatePath("/settings");
 };
 
 // ───────────── Record an expense (the attendant) ─────────────
@@ -47,18 +48,37 @@ export async function recordExpenseAction(_prev: ActionState, fd: FormData): Pro
         throw e;
       }
     }
+    // "Something else": a type that is not on the list yet (the owner only, same right as Settings → Expenses)
+    const newTypeName = formString(fd, "newCategoryName").replace(/\s+/g, " ").trim();
+    const pickedId = formString(fd, "categoryId");
+    if (!pickedId && newTypeName) {
+      if (!can(user, "settings.manage")) return fail("Only the owner can add a new type of expense. Pick one from the list.", { categoryId: "Pick one from the list." }, values);
+      if (newTypeName.length < 2 || newTypeName.length > 60) return fail("Name the new type in 2 to 60 letters.", { categoryId: "Name the new type in 2 to 60 letters." }, values);
+    }
     // "Details" is optional on the quick form: the category name stands in when it is left empty
     let description = formString(fd, "description");
     if (!description) {
-      const cat = await db.expenseCategory.findUnique({ where: { id: formString(fd, "categoryId") }, select: { name: true } });
-      if (cat) description = cat.name.length >= 3 ? cat.name : `${cat.name} expense`;
+      const name = !pickedId && newTypeName ? newTypeName : (await db.expenseCategory.findUnique({ where: { id: pickedId }, select: { name: true } }))?.name;
+      if (name) description = name.length >= 3 ? name : `${name} expense`;
     }
     try {
       const out = await db.$transaction(
         async (tx) => {
+          let categoryId = pickedId;
+          if (!categoryId && newTypeName) {
+            const same = await tx.expenseCategory.findFirst({ where: { name: { equals: newTypeName, mode: "insensitive" } } });
+            if (same) {
+              if (same.status !== "ACTIVE") throw new CashError("That type is switched off in Settings → Expenses.", { categoryId: "That type is switched off." });
+              categoryId = same.id;
+            } else {
+              const row = await tx.expenseCategory.create({ data: { name: newTypeName } });
+              await writeAudit(tx, { user, action: "expense_category.create", entityType: "ExpenseCategory", entityId: row.id, reference: row.name, after: { name: row.name, from: "record expense" } });
+              categoryId = row.id;
+            }
+          }
           const att = receipt ? await saveAttachment(tx, { kind: "EXPENSE_RECEIPT", data: receipt, userId: user.id }) : null;
           const r = await recordExpense(tx, {
-            user, categoryId: formString(fd, "categoryId"), description, amount: formString(fd, "amount"), method, accountId, expenseDate: formString(fd, "expenseDate"),
+            user, categoryId, description, amount: formString(fd, "amount"), method, accountId, expenseDate: formString(fd, "expenseDate"),
             notes: formString(fd, "notes") || null, receiptId: att?.id ?? null, submissionKey, currencyDecimals: currency.decimals,
             approvalLimit: settings.expenseApprovalLimit, canApprove: can(user, "expenses.approve"),
           });
