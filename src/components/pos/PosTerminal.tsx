@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   action: (prev: ActionState, fd: FormData) => Promise<ActionState>;
-  quickAddCustomer: (input: { name: string; phone: string; type: string; idNumber?: string; place?: string }) => Promise<{ ok: true; customer: { id: string; name: string; phone: string | null; type: string } } | { ok: false; error: string }>;
+  quickAddCustomer: (input: { name: string; phone: string; type: string; idNumber?: string; place?: string; forCredit?: boolean }) => Promise<{ ok: true; customer: { id: string; name: string; phone: string | null; type: string } } | { ok: false; error: string }>;
   /** registers a Winga (account + stock location) without leaving the till */
   quickAddWinga?: (input: { name: string; phone: string; idInfo: string; businessName?: string; place?: string }) => Promise<{ ok: true; customer: { id: string; name: string; phone: string | null; type: string } } | { ok: false; error: string }>;
   products: PosProduct[];
@@ -72,6 +72,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
   const [customer, setCustomer] = useState<PosCustomer | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [mode, setMode] = useState<"FULL" | "CREDIT" | "PART">("FULL");
+  const [who, setWho] = useState<"walkin" | "credit" | "winga">("walkin"); // a walk-in needs nothing written down
   const [accountPick, setAccountPick] = useState("");
   const [methodPick, setMethodPick] = useState<PayAccount["method"]>("CASH"); // only used when no accounts are set up yet
   const locAccounts = accounts.filter((a) => a.locationId === locationId);
@@ -136,7 +137,9 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
   const problems: string[] = [];
   if (cart.length === 0) problems.push("Add a product");
   else if (rows.some((r) => !r.valid)) problems.push("Fix the quantities or prices");
-  if (mode !== "FULL" && !customer) problems.push("Choose a customer");
+  if (mode !== "FULL" && !customer) problems.push(who === "winga" ? "Choose the Winga" : "Choose a registered customer");
+  if (mode !== "FULL" && customer && !customer.winga && customer.complete === false) problems.push("Complete the customer's details first");
+  if (mode !== "FULL" && customer?.winga && customer.late) problems.push("The Winga must pay what is overdue first");
   if (mode === "PART" && !(partNum > 0 && partNum < total)) problems.push("Enter a part payment below the total");
   if (mode !== "FULL" && customer && !customer.winga && !dueDate) problems.push("Choose the day the customer will pay");
   if (discount > 0 && discountReason.trim().length < 3) problems.push("Say why the discount was given");
@@ -286,23 +289,35 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
   const [newCust, setNewCust] = useState({ name: "", phone: "", type: "RETAIL", idInfo: "", business: "", place: "" });
   const [addError, setAddError] = useState<string | null>(null);
   const [adding, startAdd] = useTransition();
-  const matches = custQ.trim() ? customers.filter((c) => c.name.toLowerCase().includes(custQ.trim().toLowerCase()) || (c.phone ?? "").includes(custQ.trim())).slice(0, 6) : [];
-  // A Winga always takes goods on credit: choosing one puts the sale on credit (the person can still change it).
+  // Who is buying: a walk-in (nothing written down, pays in full), a registered credit customer, or a Winga.
+  const chooseWho = (w: "walkin" | "credit" | "winga") => {
+    setWho(w);
+    setCustomer(null);
+    setCustQ("");
+    setAddOpen(false);
+    setAddError(null);
+    setPartAmount("");
+    setMode(w !== "walkin" && perms.credit ? "CREDIT" : "FULL");
+  };
+  const matches = custQ.trim() ? customers.filter((c) => !c.winga && (c.name.toLowerCase().includes(custQ.trim().toLowerCase()) || (c.phone ?? "").includes(custQ.trim()))).slice(0, 6) : [];
+  // Choosing a credit customer or a Winga puts the sale on credit (the person can still change it to paid in full).
   const pickCustomer = (c: PosCustomer) => {
     setCustomer(c);
     setCustQ("");
-    if (c.winga && perms.credit) setMode("CREDIT");
+    if (perms.credit) setMode("CREDIT");
   };
   const wingaList = customers.filter((c) => c.winga && (!custQ.trim() || c.name.toLowerCase().includes(custQ.trim().toLowerCase()) || (c.phone ?? "").includes(custQ.trim())));
   const saveNewCustomer = () =>
     startAdd(async () => {
       setAddError(null);
-      const isWinga = newCust.type === "WINGA" && Boolean(quickAddWinga);
-      if (isWinga && newCust.phone.trim().length < 6) return setAddError("A Winga needs a phone number.");
-      if (isWinga && newCust.idInfo.trim().length < 4) return setAddError("A Winga needs an ID number.");
-      const r = isWinga ? await quickAddWinga!({ name: newCust.name, phone: newCust.phone, idInfo: newCust.idInfo, businessName: newCust.business, place: newCust.place }) : await quickAddCustomer({ name: newCust.name, phone: newCust.phone, type: newCust.type, idNumber: newCust.idInfo, place: newCust.place });
+      const isWinga = who === "winga" && Boolean(quickAddWinga);
+      // fully registered: name, phone, ID number and place
+      if (newCust.phone.trim().length < 6) return setAddError("Enter the phone number.");
+      if (newCust.idInfo.trim().length < 4) return setAddError("Enter the ID number.");
+      if (!newCust.place.trim()) return setAddError(isWinga ? "Enter where the Winga sells." : "Enter where the customer lives or works.");
+      const r = isWinga ? await quickAddWinga!({ name: newCust.name, phone: newCust.phone, idInfo: newCust.idInfo, businessName: newCust.business, place: newCust.place }) : await quickAddCustomer({ name: newCust.name, phone: newCust.phone, type: newCust.type, idNumber: newCust.idInfo, place: newCust.place, forCredit: true });
       if (!r.ok) return setAddError(r.error);
-      const c: PosCustomer = { ...r.customer, ...(isWinga ? { winga: true } : {}), ...(perms.credit ? { creditLimit: "0", outstanding: "0" } : {}) };
+      const c: PosCustomer = { ...r.customer, complete: true, ...(isWinga ? { winga: true } : {}), ...(perms.credit ? { creditLimit: "0", outstanding: "0" } : {}) };
       setCustomers((all) => [...all, c]);
       pickCustomer(c);
       setAddOpen(false);
@@ -516,13 +531,25 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
           <div className="card card-pad">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-900">Customer</h2>
-              {perms.addCustomer && !addOpen && (
+              {who !== "walkin" && perms.addCustomer && !customer && !addOpen && (who === "credit" || (perms.addWinga && quickAddWinga)) && (
                 <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-navy-700 hover:underline" onClick={() => setAddOpen(true)}>
-                  <UserPlus size={14} /> New customer
+                  <UserPlus size={14} /> {who === "winga" ? "New Winga" : "New credit customer"}
                 </button>
               )}
             </div>
-            {customer ? (
+
+            {/* Who is buying: most people are walk-ins and need nothing written down */}
+            <div className="mb-3 grid grid-cols-3 gap-1.5 rounded-lg bg-slate-100 p-1 text-sm" role="radiogroup" aria-label="Who is buying">
+              {([["walkin", "Walk-in"], ["credit", perms.credit ? "Credit customer" : "Customer"], ["winga", "Winga"]] as const).map(([v, l]) => (
+                <button key={v} type="button" role="radio" aria-checked={who === v} onClick={() => chooseWho(v)} className={cn("rounded-md px-2 py-1.5 font-medium transition", who === v ? "bg-white text-navy-800 shadow-sm" : "text-slate-600 hover:text-slate-900")}>
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            {who === "walkin" && <p className="text-sm text-slate-500">No name or details needed. Walk-in customers pay in full.</p>}
+
+            {who !== "walkin" && customer && (
               <div className="flex items-start justify-between gap-2 rounded-lg border border-line bg-slate-50/70 px-3 py-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-slate-900">{customer.name}</p>
@@ -532,7 +559,16 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
                   </p>
                   {customer.creditLimit !== undefined && (
                     <p className="text-xs text-slate-500">
-                      Owes {fmt(owes)} · {limit > 0 ? `limit ${fmt(limit)}` : customer.winga ? "no limit" : "limit none"}
+                      Owes {fmt(owes)} · {limit > 0 ? `limit ${fmt(limit)}` : customer.winga ? "no limit, pays within 3 days" : "limit none"}
+                    </p>
+                  )}
+                  {customer.late && <p className="mt-1 text-xs font-medium text-brand-red-dark">Overdue {fmt(Number(customer.late.amount))} since {customer.late.since}. {customer.winga ? "He must pay before he can take more goods." : ""}</p>}
+                  {!customer.winga && customer.complete === false && (
+                    <p className="mt-1 text-xs font-medium text-brand-red-dark">
+                      Not fully registered: phone, ID number and place are needed for credit.{" "}
+                      <Link href={`/customers/${customer.id}`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className="underline">
+                        Complete the details
+                      </Link>
                     </p>
                   )}
                 </div>
@@ -552,82 +588,90 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
                   </button>
                 </div>
               </div>
-            ) : (
+            )}
+
+            {who === "credit" && !customer && (
               <div className="relative">
-                <input className="input" placeholder="Walk-in customer (search to choose one)" value={custQ} onChange={(e) => setCustQ(e.target.value)} aria-label="Search customers" />
+                <input className="input" placeholder="Search a registered customer" value={custQ} onChange={(e) => setCustQ(e.target.value)} aria-label="Search customers" />
                 {matches.length > 0 && (
                   <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-line bg-white py-1 shadow-lg">
                     {matches.map((c) => (
                       <li key={c.id}>
                         <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => pickCustomer(c)}>
-                          <span className="flex min-w-0 items-center gap-2">
-                            <span className="truncate font-medium">{c.name}</span>
-                            {c.winga && <span className="shrink-0 rounded-full bg-oil-400/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span>}
-                          </span>
+                          <span className="truncate font-medium">{c.name}</span>
                           <span className="shrink-0 text-xs text-slate-500">{c.phone ?? ""}</span>
                         </button>
                       </li>
                     ))}
                   </ul>
                 )}
+                {custQ.trim() && matches.length === 0 && <p className="mt-1.5 text-xs text-slate-500">No registered customer found.{perms.addCustomer ? " Use New credit customer to register one fully." : ""}</p>}
               </div>
             )}
-            {!customer && wingaList.length > 0 && (
-              <div className="mt-3">
-                <p className="label">Winga</p>
-                <ul className="max-h-52 divide-y divide-line overflow-y-auto rounded-lg border border-line md:max-h-64">
-                  {wingaList.map((w) => {
-                    const o = Number(w.outstanding ?? 0);
-                    return (
-                      <li key={w.id} className="flex items-center gap-2 px-3 py-2">
-                        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => pickCustomer(w)}>
-                          <span className="block truncate text-sm font-medium text-slate-900">{w.name}</span>
-                          <span className={cn("block text-xs", o > 0 ? "font-medium text-brand-red-dark" : "text-slate-500")}>{w.outstanding === undefined ? w.phone ?? "" : o > 0 ? `Owes ${fmt(o)}` : "Owes nothing"}</span>
-                        </button>
-                        {perms.returns && o > 0 && (
-                          <Link href={`/customers/${w.id}/return`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className="btn-secondary btn-sm shrink-0" title="He brings back goods he did not sell">
-                            Return
-                          </Link>
-                        )}
-                        {perms.collect && o > 0 && (
-                          <Link href={`/customers/${w.id}/pay`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className="btn-secondary btn-sm shrink-0" title="He brings money">
-                            Collect
-                          </Link>
-                        )}
-                        <button type="button" className="btn-primary btn-sm shrink-0" onClick={() => pickCustomer(w)}>
-                          Sell
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+
+            {who === "winga" && !customer && (
+              <div>
+                {wingaList.length > 0 ? (
+                  <ul className="max-h-52 divide-y divide-line overflow-y-auto rounded-lg border border-line md:max-h-64">
+                    {wingaList.map((w) => {
+                      const o = Number(w.outstanding ?? 0);
+                      const lateAmt = w.late ? Number(w.late.amount) : 0;
+                      return (
+                        <li key={w.id} className="flex items-center gap-2 px-3 py-2">
+                          <button type="button" className="min-w-0 flex-1 text-left" onClick={() => pickCustomer(w)}>
+                            <span className="block truncate text-sm font-medium text-slate-900">{w.name}</span>
+                            <span className={cn("block text-xs", o > 0 ? "font-medium text-brand-red-dark" : "text-slate-500")}>
+                              {w.outstanding === undefined ? (w.phone ?? "") : lateAmt > 0 ? `Overdue ${fmt(lateAmt)} · pay first` : o > 0 ? `Owes ${fmt(o)}` : "Owes nothing"}
+                            </span>
+                          </button>
+                          {perms.returns && o > 0 && (
+                            <Link href={`/customers/${w.id}/return`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className="btn-secondary btn-sm shrink-0" title="He brings back goods he did not sell">
+                              Return
+                            </Link>
+                          )}
+                          {perms.collect && o > 0 && (
+                            <Link href={`/customers/${w.id}/pay`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className={cn("btn-sm shrink-0", lateAmt > 0 ? "btn-primary" : "btn-secondary")} title="He brings money">
+                              Collect
+                            </Link>
+                          )}
+                          <button type="button" className="btn-primary btn-sm shrink-0" onClick={() => pickCustomer(w)} disabled={lateAmt > 0} title={lateAmt > 0 ? "He must pay what is overdue first" : undefined}>
+                            Sell
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-slate-500">No Winga registered yet.</p>
+                )}
               </div>
             )}
             {fe.customer && <p className="field-error">{fe.customer}</p>}
 
-            {addOpen && (
+            {addOpen && who !== "walkin" && (
               <div className="mt-3 space-y-2.5 rounded-lg border border-line p-3">
-                <input className="input" placeholder="Customer / business name" value={newCust.name} onChange={(e) => setNewCust({ ...newCust, name: e.target.value })} aria-label="New customer name" />
+                <p className="text-xs font-medium text-slate-600">{who === "winga" ? "Register a Winga" : "Register a credit customer"}: full details are needed</p>
+                <input className="input" placeholder={who === "winga" ? "Winga's name *" : "Customer / business name *"} value={newCust.name} onChange={(e) => setNewCust({ ...newCust, name: e.target.value })} aria-label="New customer name" />
                 <div className="grid grid-cols-2 gap-2">
-                  <input className="input" placeholder="Phone" inputMode="tel" value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} aria-label="New customer phone" />
-                  <select className="input" value={newCust.type} onChange={(e) => setNewCust({ ...newCust, type: e.target.value })} aria-label="Customer type">
-                    {(perms.addWinga && quickAddWinga ? [["WINGA", "Winga"], ...TYPE_OPTIONS] : TYPE_OPTIONS).map(([v, l]) => (
-                      <option key={v} value={v}>
-                        {l}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {/* A customer who will take credit gives the same details as a Winga: name, phone, ID number and place */}
-                <div className="grid grid-cols-2 gap-2">
-                  <input className="input" placeholder={newCust.type === "WINGA" ? "ID number *" : "ID number (for credit)"} value={newCust.idInfo} onChange={(e) => setNewCust({ ...newCust, idInfo: e.target.value })} aria-label="ID number" />
-                  <input className="input" placeholder={newCust.type === "WINGA" ? "Where they sell (place)" : "Place (for credit)"} value={newCust.place} onChange={(e) => setNewCust({ ...newCust, place: e.target.value })} aria-label="Place" />
-                  {newCust.type === "WINGA" && <input className="input col-span-2" placeholder="Business name (if any)" value={newCust.business} onChange={(e) => setNewCust({ ...newCust, business: e.target.value })} aria-label="Winga business name" />}
+                  <input className="input" placeholder="Phone *" inputMode="tel" value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} aria-label="New customer phone" />
+                  <input className="input" placeholder="ID number *" value={newCust.idInfo} onChange={(e) => setNewCust({ ...newCust, idInfo: e.target.value })} aria-label="ID number" />
+                  <input className="input" placeholder={who === "winga" ? "Where they sell *" : "Place (lives / works) *"} value={newCust.place} onChange={(e) => setNewCust({ ...newCust, place: e.target.value })} aria-label="Place" />
+                  {who === "winga" ? (
+                    <input className="input" placeholder="Business name (if any)" value={newCust.business} onChange={(e) => setNewCust({ ...newCust, business: e.target.value })} aria-label="Winga business name" />
+                  ) : (
+                    <select className="input" value={newCust.type} onChange={(e) => setNewCust({ ...newCust, type: e.target.value })} aria-label="Customer type">
+                      {TYPE_OPTIONS.map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 {addError && <p className="field-error">{addError}</p>}
                 <div className="flex gap-2">
                   <button type="button" className="btn-primary btn-sm" disabled={adding || newCust.name.trim().length < 2} onClick={saveNewCustomer}>
-                    {adding ? "Adding…" : newCust.type === "WINGA" ? "Add Winga" : "Add customer"}
+                    {adding ? "Adding…" : who === "winga" ? "Add Winga" : "Add customer"}
                   </button>
                   <button type="button" className="btn-secondary btn-sm" onClick={() => setAddOpen(false)}>
                     Cancel
@@ -639,10 +683,10 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
 
           <div className="card card-pad">
             <h2 className="mb-3 text-base font-semibold text-slate-900">Payment</h2>
-            {perms.credit && (
-              <div className="mb-3 grid grid-cols-3 gap-1.5 rounded-lg bg-slate-100 p-1 text-sm" role="radiogroup" aria-label="Payment type">
-                {([["FULL", "Paid in full"], ["PART", "Part payment"], ["CREDIT", "On credit"]] as const).map(([v, l]) => (
-                  <button key={v} type="button" role="radio" aria-checked={mode === v} onClick={() => setMode(v)} className={cn("rounded-md px-2 py-1.5 font-medium transition", mode === v ? "bg-white text-navy-800 shadow-sm" : "text-slate-600 hover:text-slate-900")}>
+            {perms.credit && who !== "walkin" && (
+              <div className="mb-3 grid grid-cols-2 gap-1.5 rounded-lg bg-slate-100 p-1 text-sm" role="radiogroup" aria-label="Payment type">
+                {([["FULL", "Paid in full"], ["CREDIT", "On credit"]] as const).map(([v, l]) => (
+                  <button key={v} type="button" role="radio" aria-checked={v === "FULL" ? mode === "FULL" : mode !== "FULL"} onClick={() => { setMode(v); if (v === "FULL") setPartAmount(""); }} className={cn("rounded-md px-2 py-1.5 font-medium transition", (v === "FULL" ? mode === "FULL" : mode !== "FULL") ? "bg-white text-navy-800 shadow-sm" : "text-slate-600 hover:text-slate-900")}>
                     {l}
                   </button>
                 ))}
@@ -657,7 +701,26 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
                 {fe.dueDate && <p className="field-error">{fe.dueDate}</p>}
               </div>
             )}
-            {mode !== "FULL" && customer?.winga && <p className="mb-3 text-xs text-slate-500">Winga take the goods now and pay within their pay period.</p>}
+            {mode !== "FULL" && customer?.winga && <p className="mb-3 text-xs text-slate-500">Winga take the goods now and must pay within 3 days.</p>}
+            {mode !== "FULL" && (
+              <div className="mb-3">
+                <label className="label" htmlFor="pos-part">
+                  Paid now (optional)
+                </label>
+                <input
+                  id="pos-part"
+                  className={cn("input", fe.partAmount && "input-error")}
+                  inputMode="decimal"
+                  value={partAmount}
+                  onChange={(e) => {
+                    setPartAmount(e.target.value);
+                    setMode(Number(e.target.value) > 0 ? "PART" : "CREDIT"); // some money now, the rest on credit
+                  }}
+                  placeholder="0"
+                />
+                {fe.partAmount && <p className="field-error">{fe.partAmount}</p>}
+              </div>
+            )}
 
             {mode !== "CREDIT" && (
               <>
@@ -675,15 +738,6 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
                 )}
                 {method !== "CASH" && <input className="input mt-2.5" placeholder="Transaction reference (optional)" value={reference} onChange={(e) => setReference(e.target.value)} aria-label="Payment reference" />}
               </>
-            )}
-            {mode === "PART" && (
-              <div className="mt-3">
-                <label className="label" htmlFor="pos-part">
-                  Amount paid now
-                </label>
-                <input id="pos-part" className={cn("input", fe.partAmount && "input-error")} inputMode="decimal" value={partAmount} onChange={(e) => setPartAmount(e.target.value)} placeholder="0" />
-                {fe.partAmount && <p className="field-error">{fe.partAmount}</p>}
-              </div>
             )}
             {(fe.method || fe.payment || fe.accountId) && <p className="field-error">{fe.method ?? fe.payment ?? fe.accountId}</p>}
 

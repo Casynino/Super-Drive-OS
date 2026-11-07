@@ -111,12 +111,18 @@ export async function saveCustomer(_prev: ActionState, fd: FormData): Promise<Ac
 export type QuickCustomer = { id: string; name: string; phone: string | null; type: string };
 
 /** Called from the POS to register a customer in a few seconds (name, phone, type). Credit limit starts at 0. */
-export async function quickCreateCustomer(input: { name: string; phone: string; type: string; idNumber?: string; place?: string }): Promise<{ ok: true; customer: QuickCustomer } | { ok: false; error: string }> {
+export async function quickCreateCustomer(input: { name: string; phone: string; type: string; idNumber?: string; place?: string; forCredit?: boolean }): Promise<{ ok: true; customer: QuickCustomer } | { ok: false; error: string }> {
   const out: { customer?: QuickCustomer } = {};
   const result = await guarded("customers.create", async (user) => {
     const parsed = baseSchema.pick({ name: true, phone: true, type: true, idNumber: true, businessLocation: true }).safeParse({ name: input.name?.trim(), phone: input.phone?.trim() || undefined, type: input.type || "RETAIL", idNumber: input.idNumber?.trim() || undefined, businessLocation: input.place?.trim() || undefined });
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the details.");
     const { name, phone, type, idNumber, businessLocation } = parsed.data;
+    // A customer registered for credit is registered fully: phone, ID number and place (Walk-in customers are never registered at the till).
+    if (input.forCredit) {
+      if ((phone ?? "").length < 6) return fail("Enter the customer's phone number.");
+      if ((idNumber ?? "").length < 4) return fail("Enter the customer's ID number.");
+      if (!businessLocation) return fail("Enter where the customer lives or works.");
+    }
     if (await findDuplicate(name, phone ?? null, null)) return fail("A customer with this name and phone number already exists. Search for them instead.");
     const c = await db.$transaction(async (tx) => {
       const created = await tx.customer.create({ data: { name, phone: phone ?? null, type: type as CustomerType, idNumber: idNumber ?? null, businessLocation: businessLocation ?? null, createdById: user.id } });

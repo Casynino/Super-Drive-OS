@@ -11,7 +11,8 @@ import { ItemError, moveStockTracked, resolveItemCodes } from "@/lib/inventory/i
 import { resolveLines } from "@/lib/inventory/lines";
 import { parseMoney } from "@/lib/money";
 import { createPickupNote } from "@/lib/warehouse/pickup";
-import { customerOutstanding } from "./outstanding";
+import { WINGA_MAX_DAYS } from "@/lib/resellers/rules";
+import { customerOutstanding, customerOverdue } from "./outstanding";
 import { isWholesaleType, listPrice } from "./pricing";
 
 const D = Prisma.Decimal;
@@ -203,6 +204,15 @@ export async function postSale(tx: Tx, input: SaleInput) {
     }
   }
 
+  // A Winga who has not paid what was due gets no more goods on credit until he pays.
+  if (onCredit.gt(0) && !input.reseller && customer?.winga) {
+    const late = await customerOverdue(tx, customer.id, businessToday());
+    if (late.amount.gt(0)) {
+      const since = late.since ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(late.since) : "";
+      throw new SaleError(`${customer.name} has not paid what was due${since ? ` (since ${since})` : ""}: ${late.amount.toString()}. He must pay before he can take more goods.`, { customer: "This Winga must pay what is overdue first." });
+    }
+  }
+
   // 5. Credit limit (customer row is locked, so two cashiers can't both slip under the limit)
   let creditApprovedById: string | null = null;
   let creditExceptionReason: string | null = null;
@@ -229,7 +239,7 @@ export async function postSale(tx: Tx, input: SaleInput) {
   const lineIds = new Map(sorted.map(({ l }) => [l.index, randomUUID()])); // known up front so scanned pieces can point at their invoice line
   const dueDate = onCredit.gt(0)
     ? customer?.winga && !input.reseller
-      ? addDays(businessToday(), customer.wingaDays) // a Winga pays within their own pay period
+      ? addDays(businessToday(), Math.min(customer.wingaDays, WINGA_MAX_DAYS)) // a Winga pays within 3 days at the most
       : input.dueDate && !input.reseller
         ? addDays(input.dueDate, 0)
         : addDays(businessToday(), input.creditTermsDays)

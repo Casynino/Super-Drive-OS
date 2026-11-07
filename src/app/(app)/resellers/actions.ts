@@ -79,7 +79,7 @@ export async function quickCreateWinga(input: { name: string; phone: string; idI
     if (await db.reseller.findFirst({ where: { phone }, select: { id: true } })) return fail("A Winga with this phone number is already registered. Search for them instead.");
     try {
       const r = await db.$transaction(async (tx) => {
-        const created = await createReseller(tx, { user, name, businessName: (input.businessName ?? "").trim(), phone, altPhone: "", address: "", salesLocation: (input.place ?? "").trim(), idInfo, notes: "", settlementDays: "14" });
+        const created = await createReseller(tx, { user, name, businessName: (input.businessName ?? "").trim(), phone, altPhone: "", address: "", salesLocation: (input.place ?? "").trim(), idInfo, notes: "", settlementDays: "3" });
         await writeAudit(tx, { user, action: "reseller.create", entityType: "Reseller", entityId: created.id, reference: created.name, after: { phone: created.phone, source: "POS quick add" } });
         return tx.customer.findUniqueOrThrow({ where: { id: created.customerId }, select: { id: true, name: true, phone: true, type: true } });
       });

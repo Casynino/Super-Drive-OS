@@ -13,7 +13,7 @@ const resellerFields = (v: Record<string, string> = {}) => [
   { name: "salesLocation", label: "Where they sell", value: v.salesLocation ?? "", placeholder: "e.g. Mwenge market" },
   { name: "address", label: "Address (optional)", value: v.address ?? "" },
   { name: "idInfo", label: "ID / licence number (optional)", value: v.idInfo ?? "" },
-  { name: "settlementDays", label: "Days to pay after reporting a sale", value: v.settlementDays ?? "14", hint: "After this many days, what they owe counts as overdue." },
+  { name: "settlementDays", label: "Days to pay after reporting a sale", value: v.settlementDays ?? "3", hint: "After this many days, what they owe counts as overdue. At the till a Winga gets 3 days at the most." },
   { name: "notes", label: "Notes (optional)", type: "textarea" as const, value: v.notes ?? "", span: 2 as const },
 ];
 

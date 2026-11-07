@@ -230,11 +230,23 @@ describe("credit sales", () => {
     expect(ok.sale.dueDate!.toISOString().slice(0, 10)).toBe(soon);
     await expect(sell(f, { customerId: known.id, mode: "CREDIT", method: null, creditDetailsRequired: true, dueDate: "2020-01-01" })).rejects.toBeInstanceOf(SaleError);
     await expect(sell(f, { customerId: known.id, mode: "CREDIT", method: null, creditDetailsRequired: true, dueDate: "2999-01-01" })).rejects.toBeInstanceOf(SaleError);
-    // a Winga: no ID check on the till, due date = their settlement days (7 here)
+    // a Winga: no ID check on the till, and 3 days at the most even when 7 are stored on his record
     const w = await db.$transaction((tx) => createReseller(tx, { user: { id: userId }, name: "Winga Due", businessName: "", phone: "0712000222", altPhone: "", address: "", salesLocation: "", idInfo: "1", notes: "", settlementDays: "7" }));
     const ws = await sell(f, { customerId: w.customerId, mode: "CREDIT", method: null, creditDetailsRequired: true, dueDate: soon });
-    const expected = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const expected = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
     expect(Math.abs(new Date(ws.sale.dueDate!).getTime() - new Date(expected).getTime())).toBeLessThanOrEqual(86400000);
+  });
+
+  it("a Winga who has not paid what was due gets no more goods on credit, but can still pay in full for goods; paying clears the block", async () => {
+    const f = await fixture();
+    const w = await db.$transaction((tx) => createReseller(tx, { user: { id: userId }, name: "Winga Late", businessName: "", phone: "0712000333", altPhone: "", address: "", salesLocation: "", idInfo: "1", notes: "", settlementDays: "3" }));
+    const first = await sell(f, { customerId: w.customerId, mode: "CREDIT", method: null });
+    await db.sale.update({ where: { id: first.sale.id }, data: { dueDate: new Date(Date.now() - 2 * 86400000) } }); // 2 days late
+    await expect(sell(f, { customerId: w.customerId, mode: "CREDIT", method: null })).rejects.toBeInstanceOf(SaleError);
+    await expect(sell(f, { customerId: w.customerId, mode: "PART", partAmount: "1000", method: "CASH" })).rejects.toBeInstanceOf(SaleError);
+    await sell(f, { customerId: w.customerId, mode: "FULL", method: "CASH" }); // paying for goods in full is not credit
+    await db.sale.update({ where: { id: first.sale.id }, data: { dueDate: new Date(Date.now() + 86400000) } }); // no longer late
+    await sell(f, { customerId: w.customerId, mode: "CREDIT", method: null });
   });
 
   it("walk-in customers cannot buy on credit; deactivated customers cannot buy at all; no permission, no credit", async () => {

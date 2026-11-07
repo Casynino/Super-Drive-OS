@@ -19,6 +19,10 @@ export type PosCustomer = {
   type: string;
   /** a registered Winga: shown with a tag at the till, and their pickup note says so */
   winga?: boolean;
+  /** phone, ID number and place are all on record: needed before goods can go on credit */
+  complete?: boolean;
+  /** unpaid invoices past their due date (a Winga with something late gets no more goods on credit) */
+  late?: { amount: string; since: string };
   /** only sent to people who may sell on credit */
   creditLimit?: string;
   outstanding?: string;

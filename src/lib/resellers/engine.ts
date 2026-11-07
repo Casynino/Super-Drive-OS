@@ -42,7 +42,7 @@ function cleanProfile(i: ProfileInput) {
   const phone = i.phone.trim();
   if (name.length < 2) fe.name = "Enter the winga's full name.";
   if (phone.length < 6) fe.phone = "Enter a phone number.";
-  const days = Number(i.settlementDays || "14");
+  const days = Number(i.settlementDays || "3");
   if (!Number.isInteger(days) || days < 0 || days > 365) fe.settlementDays = "Enter a number of days between 0 and 365.";
   if (Object.keys(fe).length) throw new ResellerError("Please fix the highlighted fields.", fe);
   const opt = (v: string) => v.trim() || null;
