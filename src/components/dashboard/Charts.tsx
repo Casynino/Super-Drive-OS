@@ -130,8 +130,8 @@ export function MoneyBarsChart({ data, money }: { data: { label: string; cash: n
 }
 
 /** Plain vertical bars (sales by weekday); the strongest bar is shown in oil yellow. */
-export function ColumnsChart({ data, money, label = "Sales" }: { data: { name: string; value: number }[]; money: Money; label?: string }) {
-  if (data.every((d) => d.value === 0)) return <Empty text="No sales in this period yet" />;
+export function ColumnsChart({ data, money, label = "Sales", empty = "No sales in this period yet" }: { data: { name: string; value: number }[]; money: Money; label?: string; empty?: string }) {
+  if (data.every((d) => d.value === 0)) return <Empty text={empty} />;
   const max = Math.max(...data.map((d) => d.value));
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -188,6 +188,47 @@ export function InOutChart({ data, money }: { data: { label: string; in: number;
         <Tooltip cursor={{ fill: "var(--color-slate-100)" }} formatter={(v, name) => [fmt(Number(v), money), String(name)]} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
         <Bar dataKey="in" name="Money in" fill="var(--c5)" radius={[3, 3, 0, 0]} maxBarSize={14} />
         <Bar dataKey="out" name="Money out" fill="var(--c2)" radius={[3, 3, 0, 0]} maxBarSize={14} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Sales of each closed day as bars; a day when the cash was short is red. */
+export function ClosedDaysChart({ data, money }: { data: { label: string; value: number; short: boolean }[]; money: Money }) {
+  if (data.length === 0 || data.every((d) => d.value === 0)) return <Empty text="No sales in these days" />;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 4" stroke="var(--chart-grid)" vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} interval="preserveStartEnd" minTickGap={16} />
+        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} tickFormatter={short} width={40} />
+        <Tooltip cursor={{ fill: "var(--color-slate-100)" }} formatter={(v) => [fmt(Number(v), money), "Sold"]} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
+        <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={22}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={d.short ? "var(--c2)" : "var(--c1)"} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** How far the counted cash was from what was expected, day by day: short in red, extra in oil yellow. */
+export function DifferenceChart({ data, money }: { data: { label: string; value: number }[]; money: Money }) {
+  if (data.length === 0) return <Empty text="No closed days yet" />;
+  if (data.every((d) => d.value === 0)) return <Empty text="Every day matched. No cash was short or extra." />;
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 4" stroke="var(--chart-grid)" vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} interval="preserveStartEnd" minTickGap={16} />
+        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} tickFormatter={short} width={40} />
+        <Tooltip cursor={{ fill: "var(--color-slate-100)" }} formatter={(v) => [`${Number(v) < 0 ? "Short" : Number(v) > 0 ? "Extra" : "Spot on"} ${fmt(Math.abs(Number(v)), money)}`, "Cash"]} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
+        <Bar dataKey="value" radius={[4, 4, 4, 4]} maxBarSize={22}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={d.value < 0 ? "var(--c2)" : d.value > 0 ? "var(--c3)" : "var(--c5)"} />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );

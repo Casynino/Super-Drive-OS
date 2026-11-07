@@ -1,29 +1,34 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
-import { AlertTriangle, Banknote, CalendarCheck, CheckCircle2, Download, ExternalLink, Landmark, Printer, Receipt, Scale, Smartphone, TrendingUp } from "lucide-react";
-import ClosingForm from "@/components/cash/ClosingForm";
+import { AlertTriangle, Banknote, CalendarCheck, CheckCircle2, ExternalLink, Landmark, Receipt, Scale, Smartphone, TrendingUp } from "lucide-react";
+import CloseDayButton from "@/components/cash/CloseDayButton";
 import { DepositForm } from "@/components/cash/CashForms";
-import { ClosingSummaryView, Difference } from "@/components/cash/Display";
+import { Difference } from "@/components/cash/Display";
+import { ColumnsChart, DonutChart, TopProductsChart } from "@/components/dashboard/Charts";
+import BarList from "@/components/reports/BarList";
 import KpiCard from "@/components/dashboard/KpiCard";
-import { Alert, EmptyState, PageHeader } from "@/components/ui";
+import { Alert, PageHeader } from "@/components/ui";
 import { Prisma } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { getClosingPreview, unclosedDays, type ClosingSummary } from "@/lib/cash/closing";
 import { getMoneySummary } from "@/lib/cash/summary";
-import { getProfit, getSalesPerDay } from "@/lib/reports/period";
+import { getProductsSold, getProfit, getSalesByHour, getSalesPerDay } from "@/lib/reports/period";
 import { businessDay, defaultLocationId, getAccountBalances, listAccounts } from "@/lib/cash/ledger";
 import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
-import { cn, formatDate, formatDateTime } from "@/lib/utils";
-import { recordDepositAction } from "./actions";
-import { submitClosingAction } from "./actions";
+import { formatDate } from "@/lib/utils";
+import ClosingsSection, { closingCorrections } from "./ClosingsSection";
+import { recordDepositAction, submitClosingAction } from "./actions";
 
 export const metadata = { title: "End of day" };
 
-/** Closing: one place for the end of the day. The shop counts the cash, banks some of it and closes; the owner sees every day's report. */
+/**
+ * End of day. The shop person's page is short: today's numbers, the cash in the till, and one button that opens the closing pop-up
+ * (count, bank, close). The list of closed days is its own page (Past days). The owner's page is the list of every day.
+ */
 export default async function ClosingPage({ searchParams }: { searchParams: Promise<{ show?: string; shop?: string; banked?: string }> }) {
   const user = await requireUser();
   const canSubmit = can(user, "closing.submit");
@@ -35,51 +40,52 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
   const money = (v: Prisma.Decimal | string | number) => formatMoney(v, currency);
   const today = businessDay();
   const locationId = await defaultLocationId(db);
-
   const show = sp.show === "short" || sp.show === "extra" ? sp.show : undefined;
-  const where: Prisma.DailyClosingWhereInput = { ...(canReview ? {} : { submittedById: user.id }), ...(sp.shop ? { locationId: sp.shop } : {}), ...(show === "short" ? { difference: { lt: 0 } } : show === "extra" ? { difference: { gt: 0 } } : {}) };
   const monthStart = new Date(`${today.slice(0, 8)}01T00:00:00Z`);
-  const depositWhere: Prisma.BankDepositWhereInput = canReview ? {} : { createdById: user.id };
 
-  const [preview, older, history, monthShort, accounts, deposits, monthBanked, shops] = await Promise.all([
+  const [preview, older, last, accounts, monthBanked] = await Promise.all([
     canSubmit ? getClosingPreview(db, locationId, today) : Promise.resolve(null),
     canSubmit ? unclosedDays(db, locationId, today) : Promise.resolve([] as string[]),
-    db.dailyClosing.findMany({ where, orderBy: { businessDate: "desc" }, take: 30, include: { submittedBy: { select: { name: true } }, location: { select: { name: true } } } }),
-    Promise.resolve(null),
+    db.dailyClosing.findFirst({ where: canReview ? {} : { submittedById: user.id }, orderBy: { businessDate: "desc" } }),
     getAccountBalances(db, locationId, today),
-    db.bankDeposit.findMany({ where: depositWhere, orderBy: { createdAt: "desc" }, take: 12, include: { createdBy: { select: { name: true } } } }),
-    db.bankDeposit.aggregate({ where: { ...depositWhere, businessDate: { gte: new Date(`${today.slice(0, 8)}01T00:00:00Z`) } }, _sum: { amount: true } }),
-    db.location.findMany({ where: { type: { not: "RESELLER" }, status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    canReview ? db.bankDeposit.aggregate({ where: { businessDate: { gte: monthStart } }, _sum: { amount: true } }) : Promise.resolve(null),
   ]);
   const seeProfit = can(user, "dashboard.financials") || can(user, "reports.financial");
   const monthYmd = `${today.slice(0, 8)}01`;
-  const monthProfit = seeProfit ? await getProfit(db, (await getMoneySummary(db, locationId, { from: monthYmd, to: today })).expenses, monthYmd, today) : null;
-  const daysShown = history.map((c) => c.businessDate.toISOString().slice(0, 10));
-  const liveSales = daysShown.length ? new Map((await getSalesPerDay(db, locationId, daysShown[daysShown.length - 1]!, daysShown[0]!)).map((d) => [d.day, d.total])) : new Map<string, Prisma.Decimal>();
-  // what was sold that day, from the sales records (another shop's days fall back to the figure saved at closing)
-  const soldOf = (c: (typeof history)[number]) => (c.locationId === locationId ? (liveSales.get(c.businessDate.toISOString().slice(0, 10)) ?? new Prisma.Decimal(0)) : new Prisma.Decimal((c.summary as unknown as ClosingSummary).sales.total));
-  // what the owner corrected after closing, by closing number
-  const corrFor = async (nos: string[]) => {
-    if (nos.length === 0) return new Map<string, Prisma.Decimal>();
-    const rows = await db.cashTransaction.groupBy({ by: ["referenceNo"], where: { type: "ADJUSTMENT", referenceType: "Manual", referenceNo: { in: nos }, account: { method: "CASH" } }, _sum: { amount: true } });
-    return new Map(rows.map((r) => [r.referenceNo ?? "", new Prisma.Decimal(r._sum.amount ?? 0)]));
-  };
-  const corrOf = await corrFor(history.map((c) => c.closingNo));
-  // what reached the bank on each day (a closing's own banking and any deposit made that day), not only what was tied to the closing
-  const bankedRows = history.length ? await db.bankDeposit.groupBy({ by: ["businessDate", "locationId"], where: { businessDate: { in: history.map((c) => c.businessDate) }, ...(canReview ? {} : { createdById: user.id }) }, _sum: { amount: true } }) : [];
-  const bankedOn = new Map(bankedRows.map((r) => [`${r.locationId}|${r.businessDate.toISOString().slice(0, 10)}`, new Prisma.Decimal(r._sum.amount ?? 0)]));
+  const monthProfit = canReview && seeProfit ? await getProfit(db, (await getMoneySummary(db, locationId, { from: monthYmd, to: today })).expenses, monthYmd, today) : null;
+  // the owner's "cash short this month", after the owner's own corrections
   const monthRows = canReview ? await db.dailyClosing.findMany({ where: { businessDate: { gte: monthStart } }, select: { closingNo: true, difference: true } }) : [];
-  const monthCorr = await corrFor(monthRows.map((c) => c.closingNo));
+  const monthCorr = await closingCorrections(monthRows.map((c) => c.closingNo));
   const monthNet = monthRows.map((c) => c.difference.plus(monthCorr.get(c.closingNo) ?? 0)).filter((d) => d.lt(0));
   const monthShortSum = monthNet.reduce((t, d) => t.plus(d.abs()), new Prisma.Decimal(0));
-  const last = history[0];
+  // the shop person sees today (hour by hour, best sellers) and his own latest closings, never the business totals over many days
+  const chart = { symbol: currency.symbol, decimals: currency.decimals };
+  const hours = canSubmit ? await getSalesByHour(db, locationId, today) : [];
+  const soldToday = canSubmit ? (await getProductsSold(db, locationId, today, today)).slice(0, 6) : [];
+  const byHour = new Map(hours.map((h) => [h.hour, h]));
+  const firstHour = Math.min(7, ...hours.map((h) => h.hour));
+  const lastHour = Math.max(18, ...hours.map((h) => h.hour));
+  const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? "am" : "pm"}`;
+  const hourBars = Array.from({ length: lastHour - firstHour + 1 }, (_, i) => ({ name: hourLabel(firstHour + i), value: Number(byHour.get(firstHour + i)?.total ?? 0) }));
+  const salesCount = hours.reduce((t, h) => t + h.count, 0);
+  const busiest = hours.reduce<(typeof hours)[number] | null>((b, h) => (b === null || h.total.gt(b.total) ? h : b), null);
+  const recent = canSubmit ? await db.dailyClosing.findMany({ where: { submittedById: user.id }, orderBy: { businessDate: "desc" }, take: 7 }) : [];
+  const recentSales = recent.length ? new Map((await getSalesPerDay(db, locationId, recent[recent.length - 1]!.businessDate.toISOString().slice(0, 10), recent[0]!.businessDate.toISOString().slice(0, 10))).map((d) => [d.day, d.total])) : new Map<string, Prisma.Decimal>();
+  const recentCorr = await closingCorrections(recent.map((c) => c.closingNo));
+  // after the day is closed everything starts again from zero (new money goes into tomorrow's closing); only the cash left in the till carries forward
+  const closedInfo =
+    preview?.closed
+      ? await (async () => {
+          const closing = await db.dailyClosing.findUnique({ where: { id: preview.closed!.id }, select: { submittedAt: true, countedCash: true, difference: true } });
+          const banked = await db.bankDeposit.aggregate({ where: { closingId: preview.closed!.id }, _sum: { amount: true } });
+          const since = closing ? await db.sale.aggregate({ where: { locationId, status: "COMPLETED", createdAt: { gt: closing.submittedAt } }, _sum: { total: true, returnedTotal: true }, _count: true }) : null;
+          const bankedNow = new Prisma.Decimal(banked._sum.amount ?? 0);
+          return { closing, banked: bankedNow, left: closing ? closing.countedCash.minus(bankedNow) : new Prisma.Decimal(0), soldSince: new Prisma.Decimal(since?._sum.total ?? 0).minus(since?._sum.returnedTotal ?? 0), salesSince: since?._count ?? 0 };
+        })()
+      : null;
+  const sinceBy = (m: "MOBILE_MONEY" | "BANK") => new Prisma.Decimal(preview?.summary.accounts.find((a) => a.method === m)?.in ?? 0);
   const cash = accounts.find((a) => a.method === "CASH");
   const bankAccounts = (await listAccounts(db, locationId)).filter((a) => a.method === "BANK");
-  // the bank account each deposit went into is the account of its ledger row
-  const into = deposits.length
-    ? await db.cashTransaction.findMany({ where: { type: "DEPOSIT_IN", referenceType: "BankDeposit", referenceId: { in: deposits.map((d) => d.id) } }, select: { referenceId: true, account: { select: { name: true } } } })
-    : [];
-  const intoName = new Map(into.map((r) => [r.referenceId, r.account.name]));
   const others = accounts.filter((a) => a.method !== "CASH" && a.status === "ACTIVE");
 
   return (
@@ -99,243 +105,197 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
           <KpiCard icon={Scale} tone={monthNet.length > 0 ? "red" : "green"} label="Cash short this month" value={money(monthShortSum)} hint={monthNet.length > 0 ? `On ${monthNet.length} day${monthNet.length === 1 ? "" : "s"}` : "No cash missing"} href={monthNet.length > 0 ? "/closing?show=short" : undefined} />
           {monthProfit && <KpiCard icon={TrendingUp} tone={monthProfit.net.lt(0) ? "red" : "green"} label={monthProfit.net.lt(0) ? "Loss this month" : "Profit this month"} value={money(monthProfit.net.abs())} badge={`${monthProfit.marginPct.toFixed(1)}% of sales`} hint="Sales profit minus expenses" />}
           <KpiCard icon={Banknote} tone="yellow" label="Cash in the till" value={money(cash?.balance ?? 0)} hint="Now" />
-          <KpiCard icon={Landmark} tone="navy" label="Banked this month" value={money(monthBanked._sum.amount ?? 0)} hint="Cash taken to the bank" />
+          <KpiCard icon={Landmark} tone="navy" label="Banked this month" value={money(monthBanked?._sum.amount ?? 0)} hint="Cash taken to the bank" />
           <KpiCard icon={CalendarCheck} tone={last && !last.difference.isZero() ? "red" : "green"} label="Last closing" value={last ? formatDate(last.businessDate) : "—"} hint={last ? (last.difference.isZero() ? "No difference" : last.difference.lt(0) ? `Short ${money(last.difference.abs())}` : `Extra ${money(last.difference)}`) : "No day closed yet"} />
         </div>
       )}
 
       {canSubmit && preview && (
-        <section className="mb-6">
-          {preview.closed ? (
-            <div className="card overflow-hidden border-emerald-300/60">
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-emerald-50/70 px-4 py-4 sm:px-5">
+        <section className="mb-6 space-y-5">
+          {preview.closed && closedInfo ? (
+            <>
+              <div className="card flex flex-wrap items-center justify-between gap-3 border-emerald-300/60 bg-emerald-50/70 px-4 py-4 sm:px-5">
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="mt-0.5 text-emerald-600" size={22} />
                   <div>
                     <p className="font-semibold text-emerald-900">Today is closed</p>
-                    <p className="text-sm text-emerald-800">{preview.closed.closingNo}. New money goes into tomorrow&apos;s closing.</p>
+                    <p className="text-sm text-emerald-800">{preview.closed.closingNo}. Everything below starts again from zero. New money goes into tomorrow&apos;s closing.</p>
                   </div>
                 </div>
                 <Link href={`/closing/${preview.closed.id}`} className="btn-primary">
                   See the report
                 </Link>
               </div>
-              {canDeposit && bankAccounts.length > 0 && (
-                <details className="group border-t border-line">
-                  <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-slate-900 sm:px-5">
-                    Take more cash to the bank
-                    <span className="text-xs font-normal text-slate-500 group-open:hidden">Cash in the till: {money(cash?.balance ?? 0)}</span>
-                  </summary>
-                  <div className="border-t border-line px-4 py-4 sm:px-5">
-                    <DepositForm key={sp.banked ?? "new"} action={recordDepositAction} submissionKey={randomUUID()} cashBalance={money(cash?.balance ?? 0)} bankAccounts={bankAccounts} />
+              <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
+                <KpiCard icon={Banknote} tone="yellow" label="Cash in the till" value={money(preview.expectedCash)} hint={`Carried forward · left at closing ${money(closedInfo.left)}`} />
+                <KpiCard icon={Receipt} tone="navy" label="Sold since closing" value={money(closedInfo.soldSince)} hint={`${closedInfo.salesSince} sale${closedInfo.salesSince === 1 ? "" : "s"}`} />
+                <KpiCard icon={Smartphone} tone="green" label="Mobile money since closing" value={money(sinceBy("MOBILE_MONEY"))} hint="Nothing to count" />
+                <KpiCard icon={Landmark} tone="blue" label="Bank since closing" value={money(sinceBy("BANK"))} hint="Nothing to count" />
+              </div>
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+                <section className="card px-4 py-4 sm:px-5" aria-label="How the day closed">
+                  <h2 className="text-sm font-semibold text-slate-900">How the day closed</h2>
+                  <dl className="mt-3 space-y-1.5 text-sm">
+                    <StatementRow label="Cash counted" value={money(closedInfo.closing?.countedCash ?? 0)} />
+                    <StatementRow sign="−" label="Taken to the bank" value={money(closedInfo.banked)} />
+                  </dl>
+                  <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
+                    <span className="text-sm font-semibold text-slate-900">Left in the till (tomorrow&apos;s start)</span>
+                    <span className="text-lg font-bold tabular-nums text-slate-900">{money(closedInfo.left)}</span>
                   </div>
-                </details>
-              )}
-            </div>
+                  <p className="mt-2 text-xs text-slate-500">The difference when you counted: {closedInfo.closing ? <Difference value={closedInfo.closing.difference.toString()} currency={currency} /> : "—"}</p>
+                  {canDeposit && bankAccounts.length > 0 && (
+                    <div className="mt-4 border-t border-line pt-4">
+                      <h3 className="mb-3 text-sm font-semibold text-slate-900">Take more cash to the bank</h3>
+                      <DepositForm key={sp.banked ?? "new"} action={recordDepositAction} submissionKey={randomUUID()} cashBalance={money(cash?.balance ?? 0)} bankAccounts={bankAccounts} />
+                    </div>
+                  )}
+                </section>
+                <CashStatementCard title="Cash in the till now" summary={preview.summary} expected={preview.expectedCash} money={money} />
+              </div>
+            </>
           ) : (
             <>
               {older.length > 0 && (
-                <div className="mb-4">
-                  <Alert kind="info">
-                    <span className="flex items-start gap-2">
-                      <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                      <span>Cash from {older.length === 1 ? "an earlier day" : "earlier days"} ({older.slice(0, 5).map((d) => formatDate(`${d}T00:00:00Z`)).join(", ")}{older.length > 5 ? ` and ${older.length - 5} more` : ""}) was never closed. It is included below.</span>
-                    </span>
-                  </Alert>
-                </div>
+                <Alert kind="info">
+                  <span className="flex items-start gap-2">
+                    <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                    <span>Cash from {older.length === 1 ? "an earlier day" : "earlier days"} ({older.slice(0, 5).map((d) => formatDate(`${d}T00:00:00Z`)).join(", ")}{older.length > 5 ? ` and ${older.length - 5} more` : ""}) was never closed. It is included below.</span>
+                  </span>
+                </Alert>
               )}
-              <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
+              <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
                 <KpiCard icon={Receipt} tone="navy" label={`Sold today · ${formatDate(`${today}T00:00:00Z`)}`} value={money(preview.summary.sales.total)} hint={`${preview.summary.sales.count} sale${preview.summary.sales.count === 1 ? "" : "s"}${Number(preview.summary.sales.creditGiven) > 0 ? ` · ${money(preview.summary.sales.creditGiven)} on credit` : ""}`} />
                 <KpiCard icon={Banknote} tone="yellow" label="Cash expected in the till" value={money(preview.expectedCash)} hint={`Start ${money(preview.summary.cash.opening)} + in − out`} />
                 {others.map((a) => (
                   <KpiCard key={a.id} icon={a.method === "BANK" ? Landmark : Smartphone} tone={a.method === "BANK" ? "blue" : "green"} label={a.name} value={money(a.balance)} hint={`Received today ${money(a.inToday)} · nothing to count`} />
                 ))}
               </div>
-
-              <div className="grid items-start gap-5 lg:grid-cols-[1fr_340px]">
-                <div className="card px-4 py-5 sm:px-6">
-                  <ClosingForm action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={canDeposit} submissionKey={randomUUID()} bankAccounts={bankAccounts} />
-                </div>
-                <aside className="card px-4 py-4 sm:px-5 lg:sticky lg:top-20" aria-label="Cash in the till">
-                  <h2 className="text-sm font-semibold text-slate-900">Cash in the till today</h2>
-                  <dl className="mt-3 space-y-1.5 text-sm">
-                    <StatementRow label="Cash from yesterday (closing balance)" value={money(preview.summary.cash.opening)} />
-                    <StatementRow sign="+" label="Cash sales" value={money(preview.summary.cash.salesIn)} />
-                    <StatementRow sign="+" label="Debts collected in cash" value={money(preview.summary.cash.collectionsIn)} />
-                    {Number(preview.summary.cash.refundsOut) !== 0 && <StatementRow sign="−" label="Refunds paid" value={money(preview.summary.cash.refundsOut)} />}
-                    <StatementRow sign="−" label="Cash expenses" value={money(preview.summary.cash.expensesOut)} />
-                    {Number(preview.summary.cash.withdrawals) !== 0 && <StatementRow sign="−" label="Taken out by the owner" value={money(preview.summary.cash.withdrawals)} />}
-                    {Number(preview.summary.cash.transfers ?? 0) !== 0 && <StatementRow sign={Number(preview.summary.cash.transfers) < 0 ? "−" : "+"} label="Moved to or from other accounts" value={money(Math.abs(Number(preview.summary.cash.transfers)))} />}
-                    {Number(preview.summary.cash.supplierPayments ?? 0) !== 0 && <StatementRow sign="−" label="Paid to suppliers" value={money(preview.summary.cash.supplierPayments ?? "0")} />}
-                    {Number(preview.summary.cash.depositsOut) !== 0 && <StatementRow sign="−" label="Banked earlier today" value={money(preview.summary.cash.depositsOut)} />}
-                    {Number(preview.summary.cash.corrections) !== 0 && <StatementRow sign={Number(preview.summary.cash.corrections) < 0 ? "−" : "+"} label="Corrections by the owner" value={money(Math.abs(Number(preview.summary.cash.corrections)))} />}
-                  </dl>
-                  <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
-                    <span className="text-sm font-semibold text-slate-900">Should be in the till</span>
-                    <span className="text-lg font-bold tabular-nums text-slate-900">{money(preview.expectedCash)}</span>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">What you count becomes tomorrow&apos;s starting cash.</p>
-                </aside>
-              </div>
-
-              <details className="group mt-4">
-                <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-navy-700 hover:underline">
-                  <TrendingUp size={15} /> See the day&apos;s figures
-                </summary>
-                <div className="mt-3">
-                  <ClosingSummaryView s={preview.summary} currency={currency} />
-                </div>
-              </details>
             </>
           )}
-        </section>
-      )}
 
-      <section className="mb-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-slate-900">{canReview ? "All closings" : "Your closings"}</h2>
-          {canReview && (
-            <div className="flex gap-1.5 text-sm">
-              {[["", "All"], ["short", "Short"], ["extra", "Extra"]].map(([v, label]) => (
-                <Link key={v} href={`/closing?${new URLSearchParams({ ...(sp.shop ? { shop: sp.shop } : {}), ...(v ? { show: v } : {}) }).toString()}`} className={`rounded-full px-3 py-1 ${(sp.show ?? "") === v ? "bg-navy-700 text-white" : "bg-white text-slate-600 ring-1 ring-line hover:bg-slate-50"}`}>
-                  {label}
+          {!preview.closed && (
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr]">
+            {!preview.closed && (
+              <section className="card flex flex-col justify-between gap-4 px-5 py-5 xl:col-start-2 xl:row-start-1" aria-label="Close the day">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Should be in the till</p>
+                  <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900">{money(preview.expectedCash)}</p>
+                  <p className="mt-2 text-sm text-slate-500">Count the cash, bank it and close the day. What you count becomes tomorrow&apos;s starting cash.</p>
+                </div>
+                <div className="space-y-2">
+                  <CloseDayButton className="h-12 w-full text-base" action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={canDeposit} submissionKey={randomUUID()} bankAccounts={bankAccounts} />
+                  <p className="text-xs text-slate-500">A closed day cannot be changed.</p>
+                </div>
+              </section>
+            )}
+
+            <section className="card flex flex-col px-4 py-4 sm:px-5 xl:col-start-1 xl:row-start-1" aria-label="Sales today by the hour">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-sm font-semibold text-slate-900">Sales today, hour by hour</h2>
+                <span className="text-xs text-slate-500">{salesCount} sale{salesCount === 1 ? "" : "s"} so far</span>
+              </div>
+              <div className="mt-3 h-52">
+                <ColumnsChart data={hourBars} money={chart} label="Sold" empty="No sales yet today" />
+              </div>
+              <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-line pt-3 text-sm">
+                <Fact label="Sales today" value={String(salesCount)} />
+                <Fact label="Average sale" value={salesCount > 0 ? money(Math.round(Number(preview.summary.sales.total) / salesCount)) : "—"} />
+                <Fact label="Busiest hour" value={busiest ? hourLabel(busiest.hour) : "—"} note={busiest ? money(busiest.total) : undefined} />
+              </dl>
+            </section>
+
+            {!preview.closed && (
+              <>
+                <CashStatementCard className="xl:col-start-2 xl:row-start-2" title="Cash in the till today" summary={preview.summary} expected={preview.expectedCash} money={money} />
+
+                <div className="grid gap-5 md:grid-cols-2 xl:col-start-1 xl:row-start-2">
+                  <MoneyInToday summary={preview.summary} money={money} chart={chart} />
+                  <section className="card px-4 py-4 sm:px-5" aria-label="Spent today">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <h2 className="text-sm font-semibold text-slate-900">Spent today</h2>
+                      <span className="text-sm font-bold tabular-nums text-slate-900">{money(preview.summary.expenses.total)}</span>
+                    </div>
+                    <div className="mt-4">
+                      <BarList tone="red" empty="Nothing spent today." rows={preview.summary.expenses.byCategory.map((c) => ({ label: c.name, value: Number(c.amount), text: money(c.amount) }))} />
+                    </div>
+                  </section>
+                </div>
+              </>
+            )}
+          </div>
+          )}
+
+          <div className={preview.closed ? "" : "grid gap-5 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"}>
+            {!preview.closed && (
+            <section className="card flex flex-col px-4 py-4 sm:px-5" aria-label="Best sellers">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-sm font-semibold text-slate-900">Best sellers today</h2>
+                <span className="text-xs text-slate-500">by amount sold</span>
+              </div>
+              <div className="mt-3 h-64">
+                <TopProductsChart data={soldToday.map((p) => ({ name: p.name, value: Number(p.revenue) }))} money={chart} empty="No sales yet today" />
+              </div>
+            </section>
+            )}
+
+            <section className="card overflow-hidden" aria-label="Recent days">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
+                <h2 className="text-sm font-semibold text-slate-900">Your last closed days</h2>
+                <Link href="/closing/history" className="text-sm font-medium text-navy-700 hover:underline">
+                  All past days
                 </Link>
-              ))}
-            </div>
-          )}
-        </div>
-        {shops.length > 1 && (
-          <nav className="-mx-1 mb-3 flex flex-wrap gap-1.5 px-1" aria-label="Shop">
-            {[{ id: "", name: "All shops" }, ...shops].map((x) => (
-              <Link key={x.id} href={`/closing?${new URLSearchParams({ ...(x.id ? { shop: x.id } : {}), ...(show ? { show } : {}) }).toString()}`} className={`rounded-full px-3 py-1 text-sm ${(sp.shop ?? "") === x.id ? "bg-navy-700 text-white" : "bg-white text-slate-600 ring-1 ring-line hover:bg-slate-50"}`}>
-                {x.name}
-              </Link>
-            ))}
-          </nav>
-        )}
-        <div className="card overflow-hidden">
-          {history.length === 0 ? (
-            <EmptyState icon={<CalendarCheck size={22} />} title="No closings yet" description="Each closed day appears here." />
-          ) : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    {shops.length > 1 && <th>Shop</th>}
-                    <th className="hidden 2xl:table-cell">Closing</th>
-                    <th className="hidden text-right md:table-cell">Sold</th>
-                    <th className="text-right">Expected</th>
-                    <th>Difference</th>
-                    <th className="hidden text-right xl:table-cell">Banked</th>
-                    <th className="hidden 2xl:table-cell">By</th>
-                    <th className="text-right">Report</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((c) => (
-                    <tr key={c.id}>
-                      <td>
-                        <Link href={`/closing/${c.id}`} className="whitespace-nowrap font-medium text-navy-700 hover:underline">
-                          {formatDate(c.businessDate)}
-                        </Link>
-                      </td>
-                      {shops.length > 1 && <td className="whitespace-nowrap">{c.location.name}</td>}
-                      <td className="hidden whitespace-nowrap text-slate-500 2xl:table-cell">{c.closingNo}</td>
-                      <td className="hidden text-right tabular-nums md:table-cell">{money(soldOf(c))}</td>
-                      <td className="text-right tabular-nums">{money(c.expectedCash)}</td>
-                      <td>
-                        {(() => {
-                          const corr = corrOf.get(c.closingNo) ?? new Prisma.Decimal(0);
-                          const net = c.difference.plus(corr);
-                          if (corr.isZero()) return <Difference value={c.difference.toString()} currency={currency} />;
-                          return (
-                            <>
-                              {net.isZero() ? <span className="font-semibold text-emerald-700">OK</span> : <Difference value={net.toString()} currency={currency} />}
-                              <span className="block text-xs text-slate-500">was {c.difference.lt(0) ? "−" : "+"} {money(c.difference.abs())}</span>
-                            </>
-                          );
-                        })()}
-                      </td>
-                      <td className="hidden text-right tabular-nums xl:table-cell">{(() => {
-                          const b = bankedOn.get(`${c.locationId}|${c.businessDate.toISOString().slice(0, 10)}`) ?? new Prisma.Decimal(0);
-                          return b.gt(0) ? money(b) : <span className="text-slate-400">—</span>;
-                        })()}</td>
-                      <td className="hidden 2xl:table-cell">
-                        {c.submittedBy.name}
-                        <span className="block text-xs text-slate-400">{formatDateTime(c.submittedAt)}</span>
-                      </td>
-                      <td className="whitespace-nowrap text-right">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Link href={`/closing/${c.id}`} className="btn-secondary btn-sm" title="Open the report">
-                            <ExternalLink size={14} /> Open
-                          </Link>
-                          <Link href={`/print/closing/${c.id}?print=1&save=1`} target="_blank" className="btn-secondary btn-sm !px-2" title="Download as PDF" aria-label="Download as PDF">
-                            <Download size={15} />
-                          </Link>
-                          <Link href={`/print/closing/${c.id}?print=1`} target="_blank" className="btn-secondary btn-sm !px-2" title="Print" aria-label="Print">
-                            <Printer size={15} />
-                          </Link>
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {deposits.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Taken to the bank</h2>
-          <div className="card overflow-hidden">
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    <th>Into</th>
-                    <th>Reference</th>
-                    <th className="hidden md:table-cell">By</th>
-                    <th className="text-right">Amount</th>
-                    <th className="hidden sm:table-cell">Slip</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deposits.map((d) => (
-                    <tr key={d.id}>
-                      <td className="whitespace-nowrap">
-                        {d.closingId ? (
-                          <Link href={`/closing/${d.closingId}`} className="font-medium text-navy-700 hover:underline">
-                            {formatDate(d.businessDate)}
-                          </Link>
-                        ) : (
-                          <span className="font-medium text-slate-800">{formatDate(d.businessDate)}</span>
-                        )}
-                      </td>
-                      <td>{intoName.get(d.id) ?? "Bank"}</td>
-                      <td className="text-slate-600">{d.bankReference}</td>
-                      <td className="hidden md:table-cell">{d.createdBy.name}</td>
-                      <td className="text-right font-medium tabular-nums">{money(d.amount)}</td>
-                      <td className="hidden sm:table-cell">
-                        {d.slipId ? (
-                          <a href={`/api/attachment/${d.slipId}`} target="_blank" rel="noreferrer" className="text-navy-700 hover:underline">
-                            View photo
-                          </a>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+              </div>
+              {recent.length === 0 ? (
+                <p className="border-t border-line px-5 py-10 text-center text-sm text-slate-500">No day closed yet. Each closed day appears here.</p>
+              ) : (
+                <div className="table-wrap border-t border-line">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Day</th>
+                        <th className="hidden text-right sm:table-cell">Sold</th>
+                        <th className="text-right">Counted</th>
+                        <th>Difference</th>
+                        <th className="text-right">Report</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recent.map((c) => {
+                        const day = c.businessDate.toISOString().slice(0, 10);
+                        const sold = recentSales.get(day) ?? (c.summary as unknown as ClosingSummary).sales?.total ?? 0;
+                        const net = c.difference.plus(recentCorr.get(c.closingNo) ?? 0);
+                        return (
+                          <tr key={c.id}>
+                            <td>
+                              <Link href={`/closing/${c.id}`} className="whitespace-nowrap font-medium text-navy-700 hover:underline">
+                                {formatDate(c.businessDate)}
+                              </Link>
+                            </td>
+                            <td className="hidden text-right tabular-nums sm:table-cell">{money(sold)}</td>
+                            <td className="text-right font-medium tabular-nums">{money(c.countedCash)}</td>
+                            <td>
+                              <Difference value={net.toString()} currency={currency} />
+                            </td>
+                            <td className="text-right">
+                              <Link href={`/closing/${c.id}`} className="btn-secondary btn-sm">
+                                <ExternalLink size={14} /> Open
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
           </div>
         </section>
       )}
+
+      {/* the owner's page is the list itself; the shop person finds it under "Past days" */}
+      {!canSubmit && <ClosingsSection user={user} show={show} shop={sp.shop} basePath="/closing" />}
     </>
   );
 }
@@ -349,5 +309,72 @@ function StatementRow({ label, value, sign }: { label: string; value: string; si
       </dt>
       <dd className="tabular-nums text-slate-900">{value}</dd>
     </div>
+  );
+}
+
+function Fact({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dd className="mt-0.5 truncate text-base font-bold tabular-nums text-slate-900" title={value}>
+        {value}
+      </dd>
+      {note && <p className="text-[11px] text-slate-500">{note}</p>}
+    </div>
+  );
+}
+
+/** Money that came in today, by how it was paid (sales paid at the sale plus debts collected), with what was left on credit. */
+function MoneyInToday({ summary, money, chart }: { summary: ClosingSummary; money: (v: Prisma.Decimal | string | number) => string; chart: { symbol: string; decimals: number } }) {
+  const pm = summary.sales.paidByMethod;
+  const cm = summary.collections.byMethod;
+  const by = (k: "CASH" | "MOBILE_MONEY" | "BANK") => Number(pm[k]) + Number(cm[k]);
+  const data = [
+    { name: "Cash", value: by("CASH") },
+    { name: "Mobile money", value: by("MOBILE_MONEY") },
+    { name: "Bank", value: by("BANK") },
+  ].filter((d) => d.value > 0);
+  const total = by("CASH") + by("MOBILE_MONEY") + by("BANK");
+  return (
+    <section className="card flex flex-col px-4 py-4 sm:px-5" aria-label="Money in today">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">Money in today</h2>
+        <span className="text-sm font-bold tabular-nums text-slate-900">{money(total)}</span>
+      </div>
+      <div className="mt-2 h-44">
+        <DonutChart data={data} money={chart} centre={money(total)} centreLabel="Received" empty="Nothing received yet today" />
+      </div>
+      <dl className="mt-3 space-y-1.5 border-t border-line pt-3 text-sm">
+        <StatementRow label="Paid at the sale" value={money(Number(pm.CASH) + Number(pm.MOBILE_MONEY) + Number(pm.BANK))} />
+        <StatementRow label="Debts collected" value={money(summary.collections.total)} />
+        <StatementRow label="Sold on credit (not paid yet)" value={money(summary.sales.creditGiven)} />
+      </dl>
+    </section>
+  );
+}
+
+/** The cash in the till as a short statement: where it started, what came in and went out, what should be there now. */
+function CashStatementCard({ title, summary, expected, money, className }: { title: string; summary: ClosingSummary; expected: Prisma.Decimal; money: (v: Prisma.Decimal | string | number) => string; className?: string }) {
+  const c = summary.cash;
+  return (
+    <section className={`card px-4 py-4 sm:px-5 ${className ?? ""}`} aria-label={title}>
+      <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+      <dl className="mt-3 space-y-1.5 text-sm">
+        <StatementRow label="Cash from yesterday (closing balance)" value={money(c.opening)} />
+        <StatementRow sign="+" label="Cash sales" value={money(c.salesIn)} />
+        <StatementRow sign="+" label="Debts collected in cash" value={money(c.collectionsIn)} />
+        {Number(c.refundsOut) !== 0 && <StatementRow sign="−" label="Refunds paid" value={money(c.refundsOut)} />}
+        <StatementRow sign="−" label="Cash expenses" value={money(c.expensesOut)} />
+        {Number(c.withdrawals) !== 0 && <StatementRow sign="−" label="Taken out by the owner" value={money(c.withdrawals)} />}
+        {Number(c.transfers ?? 0) !== 0 && <StatementRow sign={Number(c.transfers) < 0 ? "−" : "+"} label="Moved to or from other accounts" value={money(Math.abs(Number(c.transfers)))} />}
+        {Number(c.supplierPayments ?? 0) !== 0 && <StatementRow sign="−" label="Paid to suppliers" value={money(c.supplierPayments ?? "0")} />}
+        {Number(c.depositsOut) !== 0 && <StatementRow sign="−" label="Banked earlier today" value={money(c.depositsOut)} />}
+        {Number(c.corrections) !== 0 && <StatementRow sign={Number(c.corrections) < 0 ? "−" : "+"} label="Corrections by the owner" value={money(Math.abs(Number(c.corrections)))} />}
+      </dl>
+      <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
+        <span className="text-sm font-semibold text-slate-900">Should be in the till</span>
+        <span className="text-lg font-bold tabular-nums text-slate-900">{money(expected)}</span>
+      </div>
+    </section>
   );
 }

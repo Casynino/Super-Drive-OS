@@ -20,7 +20,7 @@ type ExpenseFormProps = {
   submissionKey: string;
   /** e.g. "Up to TSh 20,000 is recorded straight away." */
   limitText: string;
-  /** the owner may add a type that is not on the list ("Something else") */
+  /** a type that is not on the list can be added ("Something else") */
   canAddType?: boolean;
 };
 
@@ -70,6 +70,10 @@ function ExpenseForm({ action, categories, today, submissionKey, limitText, acco
   const [accountId, setAccountId] = useState(v.accountId ?? accounts.find((a) => a.method === "CASH")?.id ?? accounts[0]?.id ?? "");
   const [amount, setAmount] = useState((v.amount ?? "").replace(/\D/g, ""));
   const amountRef = useRef<HTMLInputElement>(null);
+  // an error about the account goes away as soon as another account is chosen (it comes back if the server finds a new one)
+  const [accountChanged, setAccountChanged] = useState(false);
+  useEffect(() => setAccountChanged(false), [state]);
+  const accountError = accountChanged ? undefined : (fe.accountId ?? fe.method);
   const category = categories.find((c) => c.id === categoryId);
   const typeName = category?.name ?? (newType.trim() || "");
   const KIND: Record<string, string> = { CASH: "Cash", MOBILE_MONEY: "Mobile money", BANK: "Bank" };
@@ -121,7 +125,7 @@ function ExpenseForm({ action, categories, today, submissionKey, limitText, acco
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-5">
-        {state.error && (
+        {state.error && !(accountChanged && accountError === undefined && (fe.accountId || fe.method)) && (
           <div className="mb-4">
             <Alert>{state.error}</Alert>
           </div>
@@ -191,7 +195,7 @@ function ExpenseForm({ action, categories, today, submissionKey, limitText, acco
             </p>
             <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby={id("account")}>
               {accounts.map((a) => (
-                <button key={a.id} type="button" role="radio" aria-checked={a.id === accountId} onClick={() => setAccountId(a.id)} className={chip(a.id === accountId)}>
+                <button key={a.id} type="button" role="radio" aria-checked={a.id === accountId} onClick={() => (setAccountId(a.id), setAccountChanged(true))} className={chip(a.id === accountId)}>
                   <span className="block">{a.name}</span>
                   {(kindOf(a) || a.accountNumber) && (
                     <span className="block truncate text-[11px] font-normal text-slate-500">
@@ -202,7 +206,7 @@ function ExpenseForm({ action, categories, today, submissionKey, limitText, acco
                 </button>
               ))}
             </div>
-            {(fe.accountId ?? fe.method) && <p className="field-error mt-1.5">{fe.accountId ?? fe.method}</p>}
+            {accountError && <p className="field-error mt-1.5">{accountError}</p>}
           </div>
 
           <Field label="Details (optional)" name="description" id={id("desc")} error={fe.description}>

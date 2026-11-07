@@ -48,11 +48,10 @@ export async function recordExpenseAction(_prev: ActionState, fd: FormData): Pro
         throw e;
       }
     }
-    // "Something else": a type that is not on the list yet (the owner only, same right as Settings → Expenses)
+    // "Something else": a type that is not on the list yet (anyone who may record expenses; audited with who added it, the owner can switch it off in Settings → Expenses)
     const newTypeName = formString(fd, "newCategoryName").replace(/\s+/g, " ").trim();
     const pickedId = formString(fd, "categoryId");
     if (!pickedId && newTypeName) {
-      if (!can(user, "settings.manage")) return fail("Only the owner can add a new type of expense. Pick one from the list.", { categoryId: "Pick one from the list." }, values);
       if (newTypeName.length < 2 || newTypeName.length > 60) return fail("Name the new type in 2 to 60 letters.", { categoryId: "Name the new type in 2 to 60 letters." }, values);
     }
     // "Details" is optional on the quick form: the category name stands in when it is left empty

@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   HandCoins,
   Handshake,
+  History,
   House,
   Landmark,
   LayoutDashboard,
@@ -111,6 +112,7 @@ export const NAV: NavGroup[] = [
       { label: "Expenses", href: "/expenses", icon: ReceiptText, permissions: ["expenses.view", "expenses.create"], ready: true },
       { label: "Accounts", href: "/cash", icon: Landmark, permissions: ["cash.view"], ready: true },
       { label: "End of day", href: "/closing", icon: CalendarCheck, permissions: ["closing.submit", "closing.approve"], ready: true },
+      { label: "Past days", href: "/closing/history", icon: History, permissions: ["closing.submit"], ready: true },
     ],
   },
   {

@@ -44,6 +44,15 @@ export async function getSalesPerDay(db: Db, locationId: string, from: string, t
 }
 
 /** What each product sold on the days between two dates (after returns): quantity in its base unit, revenue and cost. */
+/** Sales of one day by the hour they were made (Tanzania time). */
+export async function getSalesByHour(db: Db, locationId: string, day: string): Promise<{ hour: number; total: Dec; count: number }[]> {
+  const rows = await db.$queryRaw<{ h: number; n: bigint; v: Dec | null }[]>`
+    SELECT EXTRACT(HOUR FROM (s."createdAt" ${Prisma.raw(TZ)}))::int AS h, COUNT(*) AS n, SUM(s."total" - s."returnedTotal") AS v
+      FROM "Sale" s WHERE s."status" = 'COMPLETED' AND s."locationId" = ${locationId} AND (s."createdAt" ${Prisma.raw(TZ)})::date = ${day}::date
+     GROUP BY 1 ORDER BY 1`;
+  return rows.map((r) => ({ hour: Number(r.h), total: new D(r.v ?? 0), count: Number(r.n) }));
+}
+
 export async function getProductsSold(db: Db, locationId: string, from: string, to: string): Promise<{ id: string; name: string; qty: Dec; revenue: Dec; cost: Dec }[]> {
   const rows = await db.$queryRaw<{ id: string; name: string; qty: Dec | null; revenue: Dec | null; cost: Dec | null }[]>`
     SELECT p."id", p."name", SUM(si."quantity" - COALESCE(x.q, 0)) AS qty, SUM(si."lineTotal" - COALESCE(x.v, 0)) AS revenue, SUM(si."costTotal" - COALESCE(x.c, 0)) AS cost
