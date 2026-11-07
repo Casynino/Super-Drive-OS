@@ -26,6 +26,7 @@ const payloadSchema = z.object({
     .array(z.object({ productId: z.string().min(1), unitId: z.string().min(1), quantity: z.string().max(24), unitPrice: z.string().max(24), itemCodes: z.array(z.string().max(64)).max(1000).optional() }))
     .min(1, "Add at least one product.")
     .max(100),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   creditException: z.object({ reason: z.string().trim().min(5, "Give a reason for the exception (at least 5 characters).").max(300) }).nullable(),
   submissionKey: z.string().min(16).max(64),
 });
@@ -45,6 +46,12 @@ export async function createSale(_prev: ActionState, fd: FormData): Promise<Acti
     if (!location) return fail("Choose an active location to sell from.");
     const [currency, profile] = await Promise.all([getCurrency(), getBusinessProfile()]);
 
+    // Goods taken on credit by a normal customer: the till must say the day they will pay (a Winga pays within their own pay period).
+    if (payload.mode !== "FULL" && payload.customerId && !payload.dueDate) {
+      const isWinga = await db.reseller.findFirst({ where: { customerId: payload.customerId }, select: { id: true } });
+      if (!isWinga) return fail("Choose the day the customer will pay.", { dueDate: "Choose the day the customer will pay." });
+    }
+
     try {
       const done = await db.$transaction(
         async (tx) => {
@@ -62,6 +69,8 @@ export async function createSale(_prev: ActionState, fd: FormData): Promise<Acti
             discountReason: payload.discountReason || null,
             lines: payload.lines,
             creditException: payload.creditException,
+            dueDate: payload.mode === "FULL" ? null : (payload.dueDate ?? null),
+            creditDetailsRequired: true,
             submissionKey: payload.submissionKey,
             currencyDecimals: currency.decimals,
             creditTermsDays: profile.creditTermsDays,

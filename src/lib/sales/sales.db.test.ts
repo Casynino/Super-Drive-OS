@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { InsufficientStockError } from "@/lib/inventory/engine";
 import { postReceipt } from "@/lib/inventory/documents";
 import { resolveLines } from "@/lib/inventory/lines";
+import { createReseller } from "@/lib/resellers/engine";
 import { customerOutstanding } from "./outstanding";
 import { CreditLimitError, SaleError, postSale, type SaleInput } from "./post-sale";
 
@@ -204,6 +205,36 @@ describe("credit sales", () => {
     const f = await fixture();
     const c = await newCustomer();
     await expect(sell(f, { customerId: c.id, mode: "CREDIT", method: null })).rejects.toBeInstanceOf(CreditLimitError);
+  });
+
+  it("a Winga can always buy on credit (limit 0 = no cap); a limit above 0 still caps them; a normal customer with limit 0 is still refused", async () => {
+    const f = await fixture();
+    const reseller = await db.$transaction((tx) => createReseller(tx, { user: { id: userId }, name: "Winga Test", businessName: "", phone: "0712000111", altPhone: "", address: "", salesLocation: "", idInfo: "", notes: "", settlementDays: "14" }));
+    const sale = await sell(f, { customerId: reseller.customerId, mode: "CREDIT", method: null });
+    expect(sale.sale.paymentStatus).toBe("UNPAID");
+    expect((await customerOutstanding(db, reseller.customerId)).gt(0)).toBe(true);
+    await db.customer.update({ where: { id: reseller.customerId }, data: { creditLimit: 1000 } });
+    await expect(sell(f, { customerId: reseller.customerId, mode: "CREDIT", method: null })).rejects.toBeInstanceOf(CreditLimitError);
+    const normal = await newCustomer();
+    await expect(sell(f, { customerId: normal.id, mode: "CREDIT", method: null })).rejects.toBeInstanceOf(CreditLimitError);
+  });
+
+  it("a normal customer on credit needs ID number and place on record (when the till asks for it) and a pay-by date inside a year; a Winga pays by their own pay period", async () => {
+    const f = await fixture();
+    const bare = await newCustomer({ creditLimit: 5_000_000 });
+    await expect(sell(f, { customerId: bare.id, mode: "CREDIT", method: null, creditDetailsRequired: true })).rejects.toBeInstanceOf(SaleError);
+    await sell(f, { customerId: bare.id, mode: "CREDIT", method: null }); // the engine alone does not ask (tests, reseller reports)
+    const known = await newCustomer({ creditLimit: 5_000_000, idNumber: "19800101-12345", businessLocation: "Mwenge" });
+    const soon = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
+    const ok = await sell(f, { customerId: known.id, mode: "CREDIT", method: null, creditDetailsRequired: true, dueDate: soon });
+    expect(ok.sale.dueDate!.toISOString().slice(0, 10)).toBe(soon);
+    await expect(sell(f, { customerId: known.id, mode: "CREDIT", method: null, creditDetailsRequired: true, dueDate: "2020-01-01" })).rejects.toBeInstanceOf(SaleError);
+    await expect(sell(f, { customerId: known.id, mode: "CREDIT", method: null, creditDetailsRequired: true, dueDate: "2999-01-01" })).rejects.toBeInstanceOf(SaleError);
+    // a Winga: no ID check on the till, due date = their settlement days (7 here)
+    const w = await db.$transaction((tx) => createReseller(tx, { user: { id: userId }, name: "Winga Due", businessName: "", phone: "0712000222", altPhone: "", address: "", salesLocation: "", idInfo: "1", notes: "", settlementDays: "7" }));
+    const ws = await sell(f, { customerId: w.customerId, mode: "CREDIT", method: null, creditDetailsRequired: true, dueDate: soon });
+    const expected = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    expect(Math.abs(new Date(ws.sale.dueDate!).getTime() - new Date(expected).getTime())).toBeLessThanOrEqual(86400000);
   });
 
   it("walk-in customers cannot buy on credit; deactivated customers cannot buy at all; no permission, no credit", async () => {

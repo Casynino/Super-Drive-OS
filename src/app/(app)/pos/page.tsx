@@ -116,7 +116,7 @@ export default async function PosPage() {
           unitMode={await getUnitMode()}
           currency={currency}
           accounts={accounts.map((a) => ({ id: a.id, locationId: a.locationId, method: a.method, name: a.name, accountNumber: a.accountNumber, isDefault: a.isDefault }))}
-          perms={{ credit: canCredit, discount: can(user, "sales.discount"), addCustomer: can(user, "customers.create"), addWinga: can(user, "resellers.operate") || can(user, "resellers.manage"), creditException: can(user, "credit.approve_exception") }}
+          perms={{ credit: canCredit, discount: can(user, "sales.discount"), addCustomer: can(user, "customers.create"), addWinga: can(user, "resellers.operate") || can(user, "resellers.manage"), collect: can(user, "payments.record"), returns: can(user, "returns.create"), creditException: can(user, "credit.approve_exception") }}
         />
       )}
     </>

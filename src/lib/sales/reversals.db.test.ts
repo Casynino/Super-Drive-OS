@@ -253,3 +253,35 @@ describe("customer statement with returns", () => {
     expect(st.closing.toString()).toBe("0");
   });
 });
+
+describe("a Winga takes back the goods he did not sell", () => {
+  it("returns every unit of an unpaid invoice at once: stock is back, the bill is gone and no money moves; a part-paid invoice needs a refund and is refused", async () => {
+    const w = await world();
+    const before = (await db.stockBalance.findUniqueOrThrow({ where: { productId_locationId: { productId: w.product.id, locationId: w.location.id } } })).quantity;
+    const sale = await sell(w, 10, { customerId: w.customer.id, mode: "CREDIT", method: null });
+    expect((await customerOutstanding(db, w.customer.id)).gt(0)).toBe(true);
+
+    const items = await db.saleItem.findMany({ where: { saleId: sale.id } });
+    const lines = items.map((i) => ({ saleItemId: i.id, quantity: i.enteredQty.toString(), condition: "RESELLABLE" as const }));
+    const cashBefore = await db.cashTransaction.count();
+    const done = await db.$transaction(async (tx) => {
+      const req = await createReversalRequest(tx, { user: { id: cashierId }, saleId: sale.id, kind: "RETURN", reason: "Winga returned the goods he did not sell", refundMethod: null, refundReference: null, lines, submissionKey: randomUUID() });
+      return completeReversal(tx, { reversalId: req.id, approver: { id: cashierId }, dp: 0 });
+    });
+    expect(done.refund.toString()).toBe("0");
+    expect((await customerOutstanding(db, w.customer.id)).toString()).toBe("0");
+    expect((await db.stockBalance.findUniqueOrThrow({ where: { productId_locationId: { productId: w.product.id, locationId: w.location.id } } })).quantity.toString()).toBe(before.toString());
+    expect(await db.cashTransaction.count()).toBe(cashBefore); // no money moved
+
+    // part paid: returning everything would leave the Winga owed a refund
+    const part = await sell(w, 4, { customerId: w.customer.id, mode: "PART", partAmount: "20000", method: "CASH" });
+    const pItems = await db.saleItem.findMany({ where: { saleId: part.id } });
+    await expect(
+      db.$transaction(async (tx) => {
+        const req = await createReversalRequest(tx, { user: { id: cashierId }, saleId: part.id, kind: "RETURN", reason: "Winga returned the goods he did not sell", refundMethod: null, refundReference: null, lines: pItems.map((i) => ({ saleItemId: i.id, quantity: i.enteredQty.toString(), condition: "RESELLABLE" as const })), submissionKey: randomUUID() });
+        return completeReversal(tx, { reversalId: req.id, approver: { id: cashierId }, dp: 0 });
+      }),
+    ).rejects.toBeInstanceOf(ReversalError);
+  });
+});
+

@@ -8,7 +8,7 @@ import { writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
 import { fail, formString, guarded, type ActionState } from "@/lib/action";
 import { notifyPermission, notifyUser } from "@/lib/notifications";
-import { ReversalError, completeReversal, createReversalRequest, rejectReversal } from "@/lib/sales/reversals";
+import { ReversalError, completeReversal, createReversalRequest, rejectReversal, returnedBySaleItem } from "@/lib/sales/reversals";
 import { getCurrency } from "@/lib/settings";
 
 const requestSchema = z.object({
@@ -74,6 +74,63 @@ export async function requestReversal(_prev: ActionState, fd: FormData): Promise
   if (result.ok) {
     const saleId = parse(requestSchema, fd)?.saleId ?? "";
     redirect(`/sales/${saleId}?reversal=${result.message}`);
+  }
+  return result;
+}
+
+// ───────────── A Winga brings back what they did not sell ─────────────
+
+/**
+ * One click: all the goods still on the Winga's invoice go back to the store and the invoice shrinks by their value
+ * (Nino 2026-11-08: "when the Winga comes back and did not sell, we just click Return and the goods go back to the store").
+ * It completes at once, without the owner's approval, because no money moves: if the Winga already paid part of the invoice a
+ * refund would be needed, and then it is refused here and goes through the normal Return / cancel on the invoice page.
+ * Always audited; the owners get a notification.
+ */
+export async function returnWingaGoods(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const saleId = formString(fd, "saleId");
+  const key = formString(fd, "submissionKey");
+  const result = await guarded("returns.create", async (user) => {
+    if (!saleId || key.length < 16) return fail("The form could not be read. Reload the page and try again.");
+    const sale = await db.sale.findUnique({ where: { id: saleId }, select: { id: true, saleNo: true, customerId: true, customer: { select: { name: true, reseller: { select: { id: true } } } }, items: { select: { id: true, enteredQty: true } } } });
+    if (!sale || !sale.customer?.reseller) return fail("This invoice does not belong to a Winga.");
+    const currency = await getCurrency();
+    try {
+      await db.$transaction(
+        async (tx) => {
+          const done = await returnedBySaleItem(tx, sale.id, true);
+          const lines = sale.items
+            .map((it) => ({ id: it.id, left: it.enteredQty.minus(done.qty.get(it.id) ?? 0) }))
+            .filter((x) => x.left.gt(0))
+            .map((x) => ({ saleItemId: x.id, quantity: x.left.toString(), condition: "RESELLABLE" as const }));
+          if (lines.length === 0) throw new ReversalError("All the goods on this invoice were already returned.");
+          const req = await createReversalRequest(tx, { user, saleId: sale.id, kind: "RETURN", reason: "Winga returned the goods he did not sell", refundMethod: null, refundReference: null, lines, submissionKey: key });
+          const r = await completeReversal(tx, { reversalId: req.id, approver: user, dp: currency.decimals });
+          await writeAudit(tx, { user, action: "winga.goods_returned", entityType: "SaleReversal", entityId: req.id, reference: `${req.reversalNo} · ${sale.saleNo}`, reason: "Winga returned the goods he did not sell", after: { winga: sale.customer!.name, returnValue: r.returnValue, refund: r.refund } });
+          await notifyPermission(tx, "returns.approve", { type: "reversal.winga", title: `${sale.customer!.name} returned goods (${sale.saleNo})`, body: `${user.name} took the goods back to the store. Value ${r.returnValue.toString()}.`, link: `/sales/${sale.id}` }, user.id);
+        },
+        { timeout: 30000, maxWait: 15000 },
+      );
+    } catch (e) {
+      if (e instanceof ReversalError) {
+        if (e.fieldErrors.refundMethod) return fail("This Winga already paid part of this invoice, so some money would have to go back. Use Return / cancel on the invoice page for this one.");
+        return fail(e.message);
+      }
+      const existing = await db.saleReversal.findUnique({ where: { submissionKey: key }, select: { status: true } });
+      if (existing?.status === "COMPLETED") return { ok: true, message: sale.saleNo };
+      throw e;
+    }
+    revalidatePath("/sales");
+    revalidatePath(`/sales/${sale.id}`);
+    revalidatePath("/credit");
+    revalidatePath("/customers");
+    revalidatePath("/inventory", "layout");
+    revalidatePath("/warehouse", "layout");
+    return { ok: true, message: sale.saleNo };
+  });
+  if (result.ok) {
+    const customerId = formString(fd, "customerId");
+    redirect(`/customers/${customerId}/return?done=${encodeURIComponent(result.message ?? "")}`);
   }
   return result;
 }

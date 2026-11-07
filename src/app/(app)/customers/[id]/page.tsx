@@ -298,7 +298,8 @@ export default async function CustomerPage({ params, searchParams }: { params: P
             { name: "contactPerson", label: "Contact person", value: c.contactPerson ?? "" },
             { name: "phone", label: "Phone number", value: c.phone ?? "" },
             { name: "type", label: "Customer type", type: "select", value: c.type, options: CUSTOMER_TYPES.map((t) => ({ value: t.value, label: t.label })) },
-            { name: "businessLocation", label: "Business location", value: c.businessLocation ?? "" },
+            { name: "businessLocation", label: "Place (where they live or work)", value: c.businessLocation ?? "" },
+            { name: "idNumber", label: "ID number", value: c.idNumber ?? "", hint: "Needed before they can take goods on credit." },
             ...(canLimit ? [{ name: "creditLimit", label: "Credit limit", value: c.creditLimit.toString(), hint: "0 means no credit." }] : []),
             ...(can(user, "customers.deactivate")
               ? [{ name: "status", label: "Status", type: "select" as const, value: c.status, options: [{ value: "ACTIVE", label: "Active" }, { value: "INACTIVE", label: "Inactive (cannot buy)" }] }]

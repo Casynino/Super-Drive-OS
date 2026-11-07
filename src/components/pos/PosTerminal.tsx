@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ImageOff, Minus, Plus, ScanBarcode, Search, Trash2, UserPlus, X } from "lucide-react";
 import { posScan } from "@/app/(app)/scan/actions";
@@ -16,9 +17,9 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   action: (prev: ActionState, fd: FormData) => Promise<ActionState>;
-  quickAddCustomer: (input: { name: string; phone: string; type: string }) => Promise<{ ok: true; customer: { id: string; name: string; phone: string | null; type: string } } | { ok: false; error: string }>;
+  quickAddCustomer: (input: { name: string; phone: string; type: string; idNumber?: string; place?: string }) => Promise<{ ok: true; customer: { id: string; name: string; phone: string | null; type: string } } | { ok: false; error: string }>;
   /** registers a Winga (account + stock location) without leaving the till */
-  quickAddWinga?: (input: { name: string; phone: string }) => Promise<{ ok: true; customer: { id: string; name: string; phone: string | null; type: string } } | { ok: false; error: string }>;
+  quickAddWinga?: (input: { name: string; phone: string; idInfo: string; businessName?: string; place?: string }) => Promise<{ ok: true; customer: { id: string; name: string; phone: string | null; type: string } } | { ok: false; error: string }>;
   products: PosProduct[];
   locations: LocationOption[];
   stockByLocation: Record<string, Record<string, string>>;
@@ -27,7 +28,7 @@ type Props = {
   accounts: PayAccount[];
   submissionKey: string;
   currency: { code: string; symbol: string; decimals: number };
-  perms: { credit: boolean; discount: boolean; addCustomer: boolean; addWinga?: boolean; creditException: boolean };
+  perms: { credit: boolean; discount: boolean; addCustomer: boolean; addWinga?: boolean; collect?: boolean; returns?: boolean; creditException: boolean };
   /** the CTN | PCS switch: cartons are the default, PCS makes new lines start in pieces */
   unitMode: UnitMode;
 };
@@ -82,6 +83,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
   const [notes, setNotes] = useState("");
   const [discountReason, setDiscountReason] = useState("");
   const [exception, setException] = useState(false);
+  const [dueDate, setDueDate] = useState(""); // the day a normal customer says they will pay what is left on credit
   const [exceptionReason, setExceptionReason] = useState("");
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
@@ -127,13 +129,16 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
   const onCredit = Math.max(total - paidNow, 0);
   const owes = Number(customer?.outstanding ?? 0);
   const limit = Number(customer?.creditLimit ?? 0);
-  const overLimit = onCredit > 0 && customer?.creditLimit !== undefined && owes + onCredit > limit;
+  // a Winga with no limit set has no cap; a limit above 0 still caps them
+  const noCap = customer?.winga === true && limit <= 0;
+  const overLimit = onCredit > 0 && !noCap && customer?.creditLimit !== undefined && owes + onCredit > limit;
 
   const problems: string[] = [];
   if (cart.length === 0) problems.push("Add a product");
   else if (rows.some((r) => !r.valid)) problems.push("Fix the quantities or prices");
   if (mode !== "FULL" && !customer) problems.push("Choose a customer");
   if (mode === "PART" && !(partNum > 0 && partNum < total)) problems.push("Enter a part payment below the total");
+  if (mode !== "FULL" && customer && !customer.winga && !dueDate) problems.push("Choose the day the customer will pay");
   if (discount > 0 && discountReason.trim().length < 3) problems.push("Say why the discount was given");
   if (overLimit && perms.creditException && exception && exceptionReason.trim().length < 5) problems.push("Give a reason for the exception");
   const canSubmit = problems.length === 0;
@@ -150,6 +155,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
     discountReason: discount > 0 ? discountReason.trim() : null,
     lines: cart.map((l) => ({ productId: l.productId, unitId: l.unitId, quantity: l.quantity, unitPrice: l.price, ...(l.scanned?.length ? { itemCodes: l.scanned.map((x) => x.token) } : {}) })),
     creditException: overLimit && perms.creditException && exception ? { reason: exceptionReason.trim() } : null,
+    dueDate: mode !== "FULL" && customer && !customer.winga ? dueDate || null : null,
     submissionKey,
   });
 
@@ -277,22 +283,30 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
   // ── customer search / quick add ──
   const [custQ, setCustQ] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  const [newCust, setNewCust] = useState({ name: "", phone: "", type: "RETAIL" });
+  const [newCust, setNewCust] = useState({ name: "", phone: "", type: "RETAIL", idInfo: "", business: "", place: "" });
   const [addError, setAddError] = useState<string | null>(null);
   const [adding, startAdd] = useTransition();
   const matches = custQ.trim() ? customers.filter((c) => c.name.toLowerCase().includes(custQ.trim().toLowerCase()) || (c.phone ?? "").includes(custQ.trim())).slice(0, 6) : [];
+  // A Winga always takes goods on credit: choosing one puts the sale on credit (the person can still change it).
+  const pickCustomer = (c: PosCustomer) => {
+    setCustomer(c);
+    setCustQ("");
+    if (c.winga && perms.credit) setMode("CREDIT");
+  };
+  const wingaList = customers.filter((c) => c.winga && (!custQ.trim() || c.name.toLowerCase().includes(custQ.trim().toLowerCase()) || (c.phone ?? "").includes(custQ.trim())));
   const saveNewCustomer = () =>
     startAdd(async () => {
       setAddError(null);
       const isWinga = newCust.type === "WINGA" && Boolean(quickAddWinga);
       if (isWinga && newCust.phone.trim().length < 6) return setAddError("A Winga needs a phone number.");
-      const r = isWinga ? await quickAddWinga!({ name: newCust.name, phone: newCust.phone }) : await quickAddCustomer(newCust);
+      if (isWinga && newCust.idInfo.trim().length < 4) return setAddError("A Winga needs an ID number.");
+      const r = isWinga ? await quickAddWinga!({ name: newCust.name, phone: newCust.phone, idInfo: newCust.idInfo, businessName: newCust.business, place: newCust.place }) : await quickAddCustomer({ name: newCust.name, phone: newCust.phone, type: newCust.type, idNumber: newCust.idInfo, place: newCust.place });
       if (!r.ok) return setAddError(r.error);
       const c: PosCustomer = { ...r.customer, ...(isWinga ? { winga: true } : {}), ...(perms.credit ? { creditLimit: "0", outstanding: "0" } : {}) };
       setCustomers((all) => [...all, c]);
-      setCustomer(c);
+      pickCustomer(c);
       setAddOpen(false);
-      setNewCust({ name: "", phone: "", type: "RETAIL" });
+      setNewCust({ name: "", phone: "", type: "RETAIL", idInfo: "", business: "", place: "" });
     });
 
   const cartCount = rows.length;
@@ -518,13 +532,25 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
                   </p>
                   {customer.creditLimit !== undefined && (
                     <p className="text-xs text-slate-500">
-                      Owes {fmt(owes)} · limit {limit > 0 ? fmt(limit) : "none"}
+                      Owes {fmt(owes)} · {limit > 0 ? `limit ${fmt(limit)}` : customer.winga ? "no limit" : "limit none"}
                     </p>
                   )}
                 </div>
-                <button type="button" className="btn-secondary btn-sm shrink-0" onClick={() => setCustomer(null)} aria-label="Remove customer">
-                  <X size={14} />
-                </button>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {perms.returns && customer.winga && owes > 0 && (
+                    <Link href={`/customers/${customer.id}/return`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className="btn-secondary btn-sm" title="The Winga brings back goods he did not sell">
+                      Return goods
+                    </Link>
+                  )}
+                  {perms.collect && owes > 0 && (
+                    <Link href={`/customers/${customer.id}/pay`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className="btn-secondary btn-sm" title="Record money this customer paid towards what they owe">
+                      Collect payment
+                    </Link>
+                  )}
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => setCustomer(null)} aria-label="Remove customer">
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="relative">
@@ -533,7 +559,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
                   <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-line bg-white py-1 shadow-lg">
                     {matches.map((c) => (
                       <li key={c.id}>
-                        <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setCustomer(c); setCustQ(""); }}>
+                        <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => pickCustomer(c)}>
                           <span className="flex min-w-0 items-center gap-2">
                             <span className="truncate font-medium">{c.name}</span>
                             {c.winga && <span className="shrink-0 rounded-full bg-oil-400/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span>}
@@ -544,6 +570,37 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
                     ))}
                   </ul>
                 )}
+              </div>
+            )}
+            {!customer && wingaList.length > 0 && (
+              <div className="mt-3">
+                <p className="label">Winga</p>
+                <ul className="max-h-52 divide-y divide-line overflow-y-auto rounded-lg border border-line md:max-h-64">
+                  {wingaList.map((w) => {
+                    const o = Number(w.outstanding ?? 0);
+                    return (
+                      <li key={w.id} className="flex items-center gap-2 px-3 py-2">
+                        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => pickCustomer(w)}>
+                          <span className="block truncate text-sm font-medium text-slate-900">{w.name}</span>
+                          <span className={cn("block text-xs", o > 0 ? "font-medium text-brand-red-dark" : "text-slate-500")}>{w.outstanding === undefined ? w.phone ?? "" : o > 0 ? `Owes ${fmt(o)}` : "Owes nothing"}</span>
+                        </button>
+                        {perms.returns && o > 0 && (
+                          <Link href={`/customers/${w.id}/return`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className="btn-secondary btn-sm shrink-0" title="He brings back goods he did not sell">
+                            Return
+                          </Link>
+                        )}
+                        {perms.collect && o > 0 && (
+                          <Link href={`/customers/${w.id}/pay`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className="btn-secondary btn-sm shrink-0" title="He brings money">
+                            Collect
+                          </Link>
+                        )}
+                        <button type="button" className="btn-primary btn-sm shrink-0" onClick={() => pickCustomer(w)}>
+                          Sell
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             )}
             {fe.customer && <p className="field-error">{fe.customer}</p>}
@@ -561,10 +618,16 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
                     ))}
                   </select>
                 </div>
+                {/* A customer who will take credit gives the same details as a Winga: name, phone, ID number and place */}
+                <div className="grid grid-cols-2 gap-2">
+                  <input className="input" placeholder={newCust.type === "WINGA" ? "ID number *" : "ID number (for credit)"} value={newCust.idInfo} onChange={(e) => setNewCust({ ...newCust, idInfo: e.target.value })} aria-label="ID number" />
+                  <input className="input" placeholder={newCust.type === "WINGA" ? "Where they sell (place)" : "Place (for credit)"} value={newCust.place} onChange={(e) => setNewCust({ ...newCust, place: e.target.value })} aria-label="Place" />
+                  {newCust.type === "WINGA" && <input className="input col-span-2" placeholder="Business name (if any)" value={newCust.business} onChange={(e) => setNewCust({ ...newCust, business: e.target.value })} aria-label="Winga business name" />}
+                </div>
                 {addError && <p className="field-error">{addError}</p>}
                 <div className="flex gap-2">
                   <button type="button" className="btn-primary btn-sm" disabled={adding || newCust.name.trim().length < 2} onClick={saveNewCustomer}>
-                    {adding ? "Adding…" : "Add customer"}
+                    {adding ? "Adding…" : newCust.type === "WINGA" ? "Add Winga" : "Add customer"}
                   </button>
                   <button type="button" className="btn-secondary btn-sm" onClick={() => setAddOpen(false)}>
                     Cancel
@@ -585,6 +648,16 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
                 ))}
               </div>
             )}
+            {mode !== "FULL" && customer && !customer.winga && (
+              <div className="mb-3">
+                <label className="label" htmlFor="pos-due">
+                  The customer will pay on <span className="text-brand-red">*</span>
+                </label>
+                <input id="pos-due" type="date" className={cn("input", fe.dueDate && "input-error")} min={new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Dar_es_Salaam" })} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                {fe.dueDate && <p className="field-error">{fe.dueDate}</p>}
+              </div>
+            )}
+            {mode !== "FULL" && customer?.winga && <p className="mb-3 text-xs text-slate-500">Winga take the goods now and pay within their pay period.</p>}
 
             {mode !== "CREDIT" && (
               <>

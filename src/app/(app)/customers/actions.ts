@@ -17,6 +17,7 @@ const baseSchema = z.object({
   contactPerson: z.string().trim().max(100, "Too long.").optional(),
   phone: z.string().trim().max(30, "Too long.").optional(),
   businessLocation: z.string().trim().max(150, "Too long.").optional(),
+  idNumber: z.string().trim().max(40, "Too long.").optional(),
   type: customerTypeSchema,
   notes: z.string().trim().max(500, "Too long.").optional(),
 });
@@ -39,6 +40,7 @@ export async function saveCustomer(_prev: ActionState, fd: FormData): Promise<Ac
       contactPerson: formString(fd, "contactPerson") || undefined,
       phone: formString(fd, "phone") || undefined,
       businessLocation: formString(fd, "businessLocation") || undefined,
+      idNumber: formString(fd, "idNumber") || undefined,
       type: formString(fd, "type") || "RETAIL",
       notes: formString(fd, "notes") || undefined,
     });
@@ -73,6 +75,7 @@ export async function saveCustomer(_prev: ActionState, fd: FormData): Promise<Ac
       contactPerson: d.contactPerson ?? null,
       phone: d.phone ?? null,
       businessLocation: d.businessLocation ?? null,
+      idNumber: d.idNumber ?? null,
       type: d.type as CustomerType,
       notes: d.notes ?? null,
       creditLimit: creditLimit ?? existing?.creditLimit ?? new Prisma.Decimal(0),
@@ -86,8 +89,8 @@ export async function saveCustomer(_prev: ActionState, fd: FormData): Promise<Ac
         return c;
       }
       const c = await tx.customer.update({ where: { id: existing.id }, data });
-      const before = { name: existing.name, contactPerson: existing.contactPerson, phone: existing.phone, businessLocation: existing.businessLocation, type: existing.type, notes: existing.notes };
-      const diff = diffFields(before, { name: data.name, contactPerson: data.contactPerson, phone: data.phone, businessLocation: data.businessLocation, type: data.type, notes: data.notes });
+      const before = { name: existing.name, contactPerson: existing.contactPerson, phone: existing.phone, businessLocation: existing.businessLocation, idNumber: existing.idNumber, type: existing.type, notes: existing.notes };
+      const diff = diffFields(before, { name: data.name, contactPerson: data.contactPerson, phone: data.phone, businessLocation: data.businessLocation, idNumber: data.idNumber, type: data.type, notes: data.notes });
       const base = { user, entityType: "Customer", entityId: c.id, reference: c.name };
       if (diff.changed) await writeAudit(tx, { ...base, action: "customer.update", before: diff.before, after: diff.after });
       if (!existing.creditLimit.eq(data.creditLimit)) {
@@ -108,15 +111,15 @@ export async function saveCustomer(_prev: ActionState, fd: FormData): Promise<Ac
 export type QuickCustomer = { id: string; name: string; phone: string | null; type: string };
 
 /** Called from the POS to register a customer in a few seconds (name, phone, type). Credit limit starts at 0. */
-export async function quickCreateCustomer(input: { name: string; phone: string; type: string }): Promise<{ ok: true; customer: QuickCustomer } | { ok: false; error: string }> {
+export async function quickCreateCustomer(input: { name: string; phone: string; type: string; idNumber?: string; place?: string }): Promise<{ ok: true; customer: QuickCustomer } | { ok: false; error: string }> {
   const out: { customer?: QuickCustomer } = {};
   const result = await guarded("customers.create", async (user) => {
-    const parsed = baseSchema.pick({ name: true, phone: true, type: true }).safeParse({ name: input.name?.trim(), phone: input.phone?.trim() || undefined, type: input.type || "RETAIL" });
+    const parsed = baseSchema.pick({ name: true, phone: true, type: true, idNumber: true, businessLocation: true }).safeParse({ name: input.name?.trim(), phone: input.phone?.trim() || undefined, type: input.type || "RETAIL", idNumber: input.idNumber?.trim() || undefined, businessLocation: input.place?.trim() || undefined });
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the details.");
-    const { name, phone, type } = parsed.data;
+    const { name, phone, type, idNumber, businessLocation } = parsed.data;
     if (await findDuplicate(name, phone ?? null, null)) return fail("A customer with this name and phone number already exists. Search for them instead.");
     const c = await db.$transaction(async (tx) => {
-      const created = await tx.customer.create({ data: { name, phone: phone ?? null, type: type as CustomerType, createdById: user.id } });
+      const created = await tx.customer.create({ data: { name, phone: phone ?? null, type: type as CustomerType, idNumber: idNumber ?? null, businessLocation: businessLocation ?? null, createdById: user.id } });
       await writeAudit(tx, { user, action: "customer.create", entityType: "Customer", entityId: created.id, reference: name, after: { name, phone, type, source: "POS quick add" } });
       return created;
     });

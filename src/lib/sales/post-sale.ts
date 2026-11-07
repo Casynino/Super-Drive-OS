@@ -58,6 +58,10 @@ export type SaleInput = {
    */
   lines: { productId: string; unitId: string; quantity: string; unitPrice: string; itemCodes?: string[] }[];
   creditException: { reason: string } | null;
+  /** the day the customer says they will pay what is left on credit (YYYY-MM-DD). A Winga uses their own pay period instead. */
+  dueDate?: string | null;
+  /** the till sets this: a normal customer needs a phone, ID number and place on record before taking goods on credit */
+  creditDetailsRequired?: boolean;
   /**
    * A reseller's sold report: an invoice on the reseller's account for goods taken from their custody location, at the
    * prices agreed when the stock was issued (per BASE unit). Credit limits do not apply: the exposure is the stock already issued.
@@ -90,10 +94,11 @@ export async function postSale(tx: Tx, input: SaleInput) {
   // 2. Locks, in the documented order
   const saleNo = await nextDocumentNo(tx, "INV");
 
-  let customer: { id: string; name: string; type: string; status: string; creditLimit: Dec; phone: string | null } | null = null;
+  let customer: { id: string; name: string; type: string; status: string; creditLimit: Dec; phone: string | null; winga: boolean; wingaDays: number; idNumber: string | null; place: string | null } | null = null;
   if (input.customerId) {
     await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${input.customerId} FOR UPDATE`;
-    customer = await tx.customer.findUnique({ where: { id: input.customerId }, select: { id: true, name: true, type: true, status: true, creditLimit: true, phone: true } });
+    const row = await tx.customer.findUnique({ where: { id: input.customerId }, select: { id: true, name: true, type: true, status: true, creditLimit: true, phone: true, idNumber: true, businessLocation: true, reseller: { select: { id: true, settlementDays: true } } } });
+    customer = row ? { id: row.id, name: row.name, type: row.type, status: row.status, creditLimit: row.creditLimit, phone: row.phone, winga: Boolean(row.reseller), wingaDays: row.reseller?.settlementDays ?? 14, idNumber: row.idNumber, place: row.businessLocation } : null;
     if (!customer) throw new SaleError("This customer no longer exists.", { customer: "Customer not found." });
     if (customer.status !== "ACTIVE") throw new SaleError(`${customer.name} is deactivated and cannot buy.`, { customer: "Customer is deactivated." });
   }
@@ -184,10 +189,26 @@ export async function postSale(tx: Tx, input: SaleInput) {
     throw new SaleError(`${customer?.name ?? "This customer"} has no phone number. Add one on the customer's page first: it is used to remind them when payment is late.`, { customer: "This customer needs a phone number for credit." });
   }
 
+  // A normal customer who takes goods on credit must be known: phone, ID number and place on record, and the day they will pay.
+  // (A Winga is registered with all of that, and pays within their own pay period.)
+  if (onCredit.gt(0) && !input.reseller && customer && !customer.winga) {
+    if (input.creditDetailsRequired) {
+      const missing = [!customer.idNumber?.trim() && "an ID number", !customer.place?.trim() && "a place (where they live or work)"].filter(Boolean) as string[];
+      if (missing.length) throw new SaleError(`${customer.name} needs ${missing.join(" and ")} on their record before taking goods on credit. Add it on the customer's page.`, { customer: "This customer's details are not complete for credit." });
+    }
+    if (input.dueDate !== undefined && input.dueDate !== null) {
+      const today = businessToday();
+      const latest = addDays(today, 365).toISOString().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(input.dueDate) || input.dueDate < today || input.dueDate > latest) throw new SaleError("Choose the day the customer will pay: from today up to one year ahead.", { dueDate: "Choose a pay-by date from today up to one year ahead." });
+    }
+  }
+
   // 5. Credit limit (customer row is locked, so two cashiers can't both slip under the limit)
   let creditApprovedById: string | null = null;
   let creditExceptionReason: string | null = null;
-  if (onCredit.gt(0) && !input.reseller) {
+  // A Winga always takes goods on credit (Nino 2026-11-08): for them a credit limit of 0 means "no cap", a limit above 0 is still a cap.
+  const wingaNoCap = customer?.winga === true && customer.creditLimit.lte(0);
+  if (onCredit.gt(0) && !input.reseller && !wingaNoCap) {
     const outstanding = await customerOutstanding(tx, customer!.id);
     const limit = customer!.creditLimit;
     if (outstanding.plus(onCredit).gt(limit)) {
@@ -206,7 +227,13 @@ export async function postSale(tx: Tx, input: SaleInput) {
   // 6. The invoice and its lines
   const sorted = [...priced].sort((a, b) => a.l.productId.localeCompare(b.l.productId) || a.l.enteredUnitId.localeCompare(b.l.enteredUnitId));
   const lineIds = new Map(sorted.map(({ l }) => [l.index, randomUUID()])); // known up front so scanned pieces can point at their invoice line
-  const dueDate = onCredit.gt(0) ? addDays(businessToday(), input.creditTermsDays) : null;
+  const dueDate = onCredit.gt(0)
+    ? customer?.winga && !input.reseller
+      ? addDays(businessToday(), customer.wingaDays) // a Winga pays within their own pay period
+      : input.dueDate && !input.reseller
+        ? addDays(input.dueDate, 0)
+        : addDays(businessToday(), input.creditTermsDays)
+    : null;
   const sale = await tx.sale.create({
     data: {
       saleNo,

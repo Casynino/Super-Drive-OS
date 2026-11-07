@@ -21,7 +21,8 @@ export default async function NewCustomerPage() {
             { name: "contactPerson", label: "Contact person" },
             { name: "phone", label: "Phone number" },
             { name: "type", label: "Customer type", type: "select", value: "RETAIL", options: CUSTOMER_TYPES.map((t) => ({ value: t.value, label: t.label })), hint: "Wholesale and distributor customers get wholesale prices." },
-            { name: "businessLocation", label: "Business location" },
+            { name: "businessLocation", label: "Place (where they live or work)" },
+            { name: "idNumber", label: "ID number", hint: "Needed before they can take goods on credit." },
             ...(can(user, "credit.set_limit")
               ? [{ name: "creditLimit", label: "Credit limit", value: "0", hint: "0 means this customer cannot buy on credit." }]
               : []),

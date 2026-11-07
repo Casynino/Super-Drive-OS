@@ -563,6 +563,7 @@ model Customer {
   contactPerson      String?
   phone              String?
   businessLocation   String?
+  idNumber           String? // ID number: needed before a (non-Winga) customer can take goods on credit
   type               CustomerType        @default(RETAIL)
   creditLimit        Decimal             @default(0) @db.Decimal(14, 2) // 0 = no credit allowed
   notes              String?
