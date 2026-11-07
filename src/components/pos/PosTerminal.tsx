@@ -231,6 +231,11 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
     prevLines.current = lineCount;
   }, [lineCount]);
 
+  // the unit one tap adds (same rule as addProduct): the carton by default
+  const cardUnit = (p: PosProduct) => {
+    const id = unitMode === "pcs" && p.allowPieceSales !== false ? p.baseUnitId : defaultUnitId(p, "sales");
+    return p.units.find((u) => u.id === id) ?? p.units[0]!;
+  };
   function cardState(p: PosProduct) {
     const left = inStock(p.id) - (baseUsed.get(p.id) ?? 0);
     const hasPrice = unitPrice(p) > 0;
@@ -390,6 +395,11 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
               {visible.map((p) => {
                 const { left, hasPrice, sellable } = cardState(p);
                 const inCart = rows.filter((r) => r.p.id === p.id).reduce((s, r) => s + r.qty, 0);
+                // the price shown is the price of what one tap adds: a carton for products sold by the carton
+                const cu = cardUnit(p);
+                const cuPrice = Number(wholesale ? cu.wholesale : cu.retail);
+                const perPiece = cu.id !== p.baseUnitId ? unitPrice(p) : 0;
+                const stockTone = left <= 0 ? "bg-brand-red" : left <= 5 ? "bg-oil-400" : "bg-emerald-500";
                 return (
                   <li key={p.id}>
                     <button
@@ -397,27 +407,40 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, p
                       onClick={() => addProduct(p)}
                       disabled={!sellable}
                       className={cn(
-                        "group relative flex h-full w-full flex-col rounded-2xl border bg-white p-2.5 text-left shadow-[0_1px_2px_rgba(15,27,45,0.05)] transition",
-                        sellable ? "border-line hover:-translate-y-0.5 hover:border-navy-300 hover:shadow-md active:translate-y-0" : "cursor-not-allowed border-line opacity-60",
+                        "group relative flex h-full w-full flex-col rounded-2xl border bg-white p-2 text-left shadow-[0_1px_2px_rgba(15,27,45,0.05)] transition duration-150",
+                        sellable ? "border-line hover:-translate-y-0.5 hover:border-navy-300 hover:shadow-md active:translate-y-0 active:scale-[0.99]" : "cursor-not-allowed border-line opacity-60",
                         inCart > 0 && "border-navy-600 ring-2 ring-navy-200",
                       )}
                     >
                       <div className="relative">
-                        <Thumb p={p} className="aspect-square w-full rounded-xl [&_img]:p-1.5 [&_img]:transition [&_img]:duration-200 group-hover:[&_img]:scale-105" />
-                        {inCart > 0 && <span className="absolute right-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full bg-navy-700 px-1.5 text-xs font-semibold text-white shadow">{trim(inCart)}</span>}
-                        <span className={cn("absolute bottom-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-semibold backdrop-blur", left <= 0 ? "bg-brand-red text-white" : left <= 5 ? "bg-oil-400 text-navy-950" : "bg-white/90 text-slate-700 ring-1 ring-slate-200")}>
+                        <Thumb p={p} className="aspect-[5/4] w-full rounded-xl [&_img]:p-2 [&_img]:transition [&_img]:duration-200 group-hover:[&_img]:scale-105" />
+                        {inCart > 0 && <span className="absolute right-1.5 top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-navy-700 px-1.5 text-xs font-semibold text-white shadow">{trim(inCart)}</span>}
+                        <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 backdrop-blur">
+                          <span className={cn("h-1.5 w-1.5 rounded-full", stockTone)} aria-hidden />
                           {left <= 0 ? "Out of stock" : `${qtyText(left, largestPack(p.units), p.units[0]?.symbol ?? "", unitMode).main} left`}
                         </span>
                       </div>
-                      <p className="mt-2.5 line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-slate-900">{p.name}</p>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">{[p.brand, p.packaging].filter(Boolean).join(" · ") || p.categoryName}</p>
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        {hasPrice ? <span className="text-base font-bold text-navy-800">{fmt(unitPrice(p))}</span> : <span className="text-xs font-medium text-brand-red-dark">No price set</span>}
-                        {sellable && (
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-700 text-white transition group-hover:bg-navy-800" aria-hidden>
-                            <Plus size={16} />
-                          </span>
-                        )}
+                      <div className="flex flex-1 flex-col px-1 pb-0.5 pt-2">
+                        <p className="line-clamp-2 min-h-[2.5rem] text-[13.5px] font-semibold leading-5 text-slate-900">{p.name}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">{[p.brand, p.packaging].filter(Boolean).join(" · ") || p.categoryName}</p>
+                        <div className="mt-auto flex items-end justify-between gap-2 pt-2">
+                          {hasPrice ? (
+                            <span className="min-w-0">
+                              <span className="block whitespace-nowrap text-[15px] font-bold leading-5 text-navy-800">{fmt(cuPrice)}</span>
+                              <span className="block truncate text-[11px] text-slate-500">
+                                per {cu.symbol}
+                                {perPiece > 0 && ` · ${fmt(perPiece)} each`}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-brand-red-dark">No price set</span>
+                          )}
+                          {sellable && (
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy-700 text-white transition group-hover:bg-navy-800 group-hover:shadow" aria-hidden>
+                              <Plus size={16} />
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </button>
                   </li>
