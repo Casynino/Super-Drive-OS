@@ -2,29 +2,22 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, FileDown, Printer, Receipt, X } from "lucide-react";
+import { Check, ExternalLink, FileDown, Printer, X } from "lucide-react";
 import Modal from "@/components/Modal";
-import { loadSaleDone, type SaleDone } from "@/app/(app)/till/actions";
+import PickupNoteSheet, { type PickupNoteData } from "@/components/warehouse/PickupNoteSheet";
+import { loadPickupPreview, loadSaleDone, type SaleDone } from "@/app/(app)/till/actions";
 import { cn } from "@/lib/utils";
-
-/** A square action: icon over a short word. Same size everywhere so the pop-up reads as a tidy grid. */
-function Tile({ href, icon, label, strong }: { href: string; icon: React.ReactNode; label: string; strong?: boolean }) {
-  return (
-    <Link href={href} target="_blank" rel="noopener" className={cn("flex flex-col items-center justify-center gap-1.5 rounded-xl border px-2 py-3 text-xs font-semibold transition", strong ? "border-navy-700 bg-navy-700 text-white hover:bg-navy-800" : "border-line bg-white text-slate-700 hover:border-navy-300 hover:bg-slate-50")}>
-      {icon}
-      {label}
-    </Link>
-  );
-}
 
 const Label = ({ children }: { children: React.ReactNode }) => <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{children}</p>;
 
 /**
- * The pop-up after Complete sale. Left: the sale (who, what, how much, how it was paid). Right: what to do with the papers
- * (pickup note and receipt). Bottom: New sale. The till never leaves the page, so the next customer is one tap away.
+ * The pop-up after Complete sale. It shows the pickup note itself, small (an A5 sheet at half size, with its QR code), and what to do
+ * with it: Print, save as PDF, open it. Next to it, the sale in short. New sale at the bottom. The till never leaves the page.
+ * On screen the note wears the system's colours; on paper it prints in its own.
  */
 export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }: { saleId: string | null; currency: { symbol: string; decimals: number }; onNewSale: () => void; onLoaded?: (s: SaleDone) => void }) {
   const [sale, setSale] = useState<SaleDone | null>(null);
+  const [note, setNote] = useState<PickupNoteData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const nf = useMemo(() => new Intl.NumberFormat("en-US", { minimumFractionDigits: currency.decimals, maximumFractionDigits: currency.decimals }), [currency.decimals]);
   const fmt = (v: string | number) => `${currency.symbol} ${nf.format(Number(v))}`;
@@ -33,13 +26,14 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
     if (!saleId) return;
     let alive = true;
     setSale(null);
+    setNote(null);
     setError(null);
     loadSaleDone(saleId).then((r) => {
       if (!alive) return;
-      if (r.ok) {
-        setSale(r.sale);
-        onLoaded?.(r.sale);
-      } else setError(r.error);
+      if (!r.ok) return setError(r.error);
+      setSale(r.sale);
+      onLoaded?.(r.sale);
+      if (r.sale.pickup) loadPickupPreview(r.sale.pickup.id).then((p) => alive && p.ok && setNote(p.data));
     });
     return () => {
       alive = false;
@@ -50,6 +44,8 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
   const owed = sale ? Number(sale.owed) : 0;
   const paid = sale ? Number(sale.paid) : 0;
   const chip = !sale ? null : sale.status === "PAID" ? { text: "Paid", tone: "bg-emerald-100 text-emerald-800" } : { text: sale.status === "PARTIALLY_PAID" ? "Part paid" : "On credit", tone: "bg-amber-100 text-amber-800" };
+  const pickup = sale?.pickup ?? null;
+  const act = "inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition";
 
   return (
     <Modal open={Boolean(saleId)} onClose={onNewSale} label="Sale complete" wide>
@@ -76,34 +72,33 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
       ) : !sale ? (
         <p className="px-6 py-12 text-center text-sm text-slate-500">Getting the details…</p>
       ) : (
-        <div className="grid min-h-0 flex-1 overflow-y-auto sm:grid-cols-[1.4fr_1fr]">
-          <div className="px-5 py-5 sm:px-6">
+        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto px-5 py-5 sm:grid-cols-[auto_1fr] sm:px-6">
+          {pickup && (
+            <div className="mx-auto">
+              {/* the real note, first page, at half size: 148 x 210 mm = about 559 x 794 px, shown at 280 x 397 */}
+              <div className="overflow-hidden rounded-lg border border-line shadow-sm" style={{ width: 280, height: 397 }}>
+                {note ? (
+                  <div style={{ width: "148mm", height: "210mm", transform: "scale(0.5)", transformOrigin: "top left" }}>
+                    <PickupNoteSheet d={note} preview />
+                  </div>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-slate-500">Getting the note…</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex min-w-0 flex-col">
             <Label>Customer</Label>
             <p className="mt-0.5 text-sm font-semibold text-slate-900">
               {sale.customer ?? "Walk-in customer"}
               {sale.winga && <span className="ml-2 rounded-full bg-oil-400/20 px-2 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span>}
             </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {sale.lines.length} product{sale.lines.length === 1 ? "" : "s"}
+            </p>
 
-            <div className="mt-4 overflow-hidden rounded-xl border border-line">
-              <div className="grid grid-cols-[4.5rem_1fr_auto] gap-3 border-b border-line bg-slate-50/70 px-3 py-1.5">
-                <Label>Qty</Label>
-                <Label>Product</Label>
-                <Label>Amount</Label>
-              </div>
-              <ul className="max-h-44 divide-y divide-line overflow-y-auto text-sm">
-                {sale.lines.map((l, i) => (
-                  <li key={i} className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-3 px-3 py-2">
-                    <span className="font-semibold tabular-nums text-slate-900">
-                      {l.qty} <span className="text-xs font-medium text-slate-500">{l.unit}</span>
-                    </span>
-                    <span className="min-w-0 truncate text-slate-800">{l.name}</span>
-                    <span className="font-medium tabular-nums text-slate-900">{fmt(l.amount)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <dl className="mt-4 space-y-1.5 text-sm">
+            <dl className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm">
               <div className="flex items-baseline justify-between">
                 <dt className="font-semibold text-slate-900">Total</dt>
                 <dd className="text-2xl font-bold tracking-tight text-slate-900">{fmt(sale.total)}</dd>
@@ -121,30 +116,32 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
                 </div>
               )}
             </dl>
-          </div>
 
-          <div className="space-y-5 border-t border-line bg-slate-50/60 px-5 py-5 sm:border-l sm:border-t-0">
-            {sale.pickup ? (
-              <div>
+            {pickup ? (
+              <div className="mt-5">
                 <Label>Pickup note</Label>
-                <p className="mb-2 mt-0.5 font-mono text-sm font-semibold text-slate-900">{sale.pickup.noteNo}</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <Tile strong href={`/print/pickup/${sale.pickup.id}?print=1`} icon={<Printer size={18} />} label="Print" />
-                  <Tile href={`/print/pickup/${sale.pickup.id}?print=1&save=1`} icon={<FileDown size={18} />} label="PDF" />
-                  <Tile href={`/print/pickup/${sale.pickup.id}`} icon={<ExternalLink size={18} />} label="Open" />
+                <p className="mb-2 mt-0.5 font-mono text-sm font-semibold text-slate-900">{pickup.noteNo}</p>
+                <Link href={`/print/pickup/${pickup.id}?print=1`} target="_blank" rel="noopener" className={cn(act, "w-full border-navy-700 bg-navy-700 text-white hover:bg-navy-800")}>
+                  <Printer size={16} /> Print note
+                </Link>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Link href={`/print/pickup/${pickup.id}?print=1&save=1`} target="_blank" rel="noopener" className={cn(act, "border-line bg-white text-slate-700 hover:border-navy-300 hover:bg-slate-50")}>
+                    <FileDown size={16} /> PDF
+                  </Link>
+                  <Link href={`/print/pickup/${pickup.id}`} target="_blank" rel="noopener" className={cn(act, "border-line bg-white text-slate-700 hover:border-navy-300 hover:bg-slate-50")}>
+                    <ExternalLink size={16} /> Open
+                  </Link>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">Give it to the customer. It is also the delivery note.</p>
               </div>
             ) : (
-              <p className="text-xs text-slate-500">Stock is updated.</p>
-            )}
-            <div>
-              <Label>Receipt</Label>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <Tile href={`/sales/${sale.id}/receipt?first=1`} icon={<Receipt size={18} />} label="Print receipt" />
-                <Tile href={`/sales/${sale.id}`} icon={<ExternalLink size={18} />} label="Open sale" />
+              <div className="mt-5 text-xs text-slate-500">
+                Stock is updated. No pickup note: the goods left at once.
+                <Link href={`/sales/${sale.id}/receipt?first=1`} target="_blank" rel="noopener" className="ml-1 font-medium text-navy-700 underline">
+                  Print receipt
+                </Link>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

@@ -16,6 +16,8 @@ import { getCurrency } from "@/lib/settings";
 import { can } from "@/lib/auth/can";
 import { methodLabel } from "@/lib/sales/types";
 import { formatDate } from "@/lib/utils";
+import { loadPickupSheetData } from "@/lib/warehouse/sheet-data";
+import type { PickupNoteData } from "@/components/warehouse/PickupNoteSheet";
 
 export type TillLine = { id: string; name: string; qty: string; unit: string; unitValue: string };
 export type TillOrder = { id: string; saleNo: string; date: string; dueDate: string | null; overdue: boolean; total: string; owed: string; lines: TillLine[] };
@@ -235,4 +237,17 @@ export async function loadSaleDone(saleId: string): Promise<TillResult<{ sale: S
   });
   if (!result.ok || !out.sale) return { ok: false, error: result.error ?? "Could not load the sale." };
   return { ok: true, sale: out.sale };
+}
+
+/** The pickup note as the paper shows it (first page, small) for the "Sale complete" pop-up. */
+export async function loadPickupPreview(noteId: string): Promise<TillResult<{ data: PickupNoteData }>> {
+  const out: { data?: PickupNoteData } = {};
+  const result = await guarded("sales.pos", async (user) => {
+    const r = await loadPickupSheetData(user, noteId);
+    if (!r || r === "forbidden") return { error: "This pickup note was not found." };
+    out.data = r.data;
+    return { ok: true };
+  });
+  if (!result.ok || !out.data) return { ok: false, error: result.error ?? "Could not load the pickup note." };
+  return { ok: true, data: out.data };
 }

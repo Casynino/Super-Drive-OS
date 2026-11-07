@@ -14,9 +14,9 @@ export default function PrintBar({ auto, title, save }: { auto: boolean; title: 
   }, [auto]);
   return (
     <div className="print-hide" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, maxWidth: 900, margin: "0 auto 14px", padding: "0 2px" }}>
-      <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
+      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--pb-ink, #0f172a)" }}>
         {title}
-        {save && <span style={{ display: "block", marginTop: 2, fontSize: 12, fontWeight: 400, color: "#475569" }}>To download it: in the print window choose “Save as PDF” as the destination, then Save.</span>}
+        {save && <span style={{ display: "block", marginTop: 2, fontSize: 12, fontWeight: 400, color: "var(--pb-ink, #475569)", opacity: 0.75 }}>To download it: in the print window choose “Save as PDF” as the destination, then Save.</span>}
       </span>
       <span style={{ display: "flex", gap: 8 }}>
         <button type="button" onClick={() => window.print()} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: "#0E3D6E", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>

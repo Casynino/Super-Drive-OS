@@ -1,5 +1,13 @@
 import type { CSSProperties } from "react";
-import { GOLD, INK, LINE, MUTED, NAVY, NAVY2, small } from "@/components/reports/EndOfDaySheet";
+// Colours are CSS variables: on screen the note wears the system's colours (dark or light, like the app); on paper it always prints
+// in its own light colours (the dark set below only applies to screens).
+const INK = "var(--pn-ink)";
+const MUTED = "var(--pn-muted)";
+const LINE = "var(--pn-line)";
+const NAVY = "var(--pn-navy)";
+const NAVY2 = "var(--pn-head)";
+const GOLD = "var(--pn-gold)";
+const small: CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: MUTED };
 
 /**
  * The pickup note as paper, on A5 pages (148 x 210 mm). It is also the DELIVERY NOTE: the goods listed are handed over against it
@@ -43,11 +51,16 @@ export function paginate<T>(lines: T[]): T[][] {
   return pages;
 }
 
-const PAGE: CSSProperties = { width: "148mm", height: "210mm", boxSizing: "border-box", background: "#fff", color: INK, fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", margin: "0 auto 8mm", boxShadow: "0 1px 4px rgba(15,23,42,0.18)" };
-const CSS = `.a5-qr svg{display:block;width:100%;height:100%}@media print{.a5-page{margin:0!important;box-shadow:none!important;break-after:page;page-break-after:always}.a5-page:last-child{break-after:auto;page-break-after:auto}}`;
+const PAGE: CSSProperties = { width: "148mm", height: "210mm", boxSizing: "border-box", background: "var(--pn-paper)", color: INK, fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", margin: "0 auto 8mm", boxShadow: "0 1px 4px rgba(15,23,42,0.18)" };
+const CSS = `.a5-doc{--pn-paper:#fff;--pn-ink:#0f172a;--pn-muted:#64748b;--pn-line:#e5e7eb;--pn-navy:#0b2a4d;--pn-head:#0E3D6E;--pn-gold:#FDC400;--pn-gold-text:#a07c00;--pn-zebra:#fafafa;--pn-note:#faf8f2;--pn-note-line:#ece6d6}
+.a5-logo-light{display:block}.a5-logo-dark{display:none}
+@media screen{html.dark .a5-doc{--pn-paper:#101b30;--pn-ink:#e8eef8;--pn-muted:#93a3bd;--pn-line:#22304a;--pn-navy:#8fb4e8;--pn-head:#8cbcf7;--pn-gold-text:#FDC400;--pn-zebra:#0d1829;--pn-note:#14233d;--pn-note-line:#22304a}html.dark .a5-logo-light{display:none}html.dark .a5-logo-dark{display:block}}
+.a5-qr svg{display:block;width:100%;height:100%}@media print{.a5-page{margin:0!important;box-shadow:none!important;break-after:page;page-break-after:always}.a5-page:last-child{break-after:auto;page-break-after:auto}}`;
 
-export default function PickupNoteSheet({ d }: { d: PickupNoteData }) {
-  const pages = paginate(d.lines);
+/** `preview` = only the first page, without the gap and shadow: used small inside the till's "Sale complete" pop-up. */
+export default function PickupNoteSheet({ d, preview }: { d: PickupNoteData; preview?: boolean }) {
+  const allPages = paginate(d.lines);
+  const pages = preview ? allPages.slice(0, 1) : allPages;
   const hasPrices = d.total !== null;
   let counter = 0;
 
@@ -74,15 +87,17 @@ export default function PickupNoteSheet({ d }: { d: PickupNoteData }) {
       <style>{CSS}</style>
       {pages.map((rows, pi) => {
         const first = pi === 0;
-        const last = pi === pages.length - 1;
+        const last = pi === allPages.length - 1;
         return (
-          <section key={pi} className="a5-page" style={PAGE}>
+          <section key={pi} className="a5-page" style={preview ? { ...PAGE, margin: 0, boxShadow: "none" } : PAGE}>
             {first ? (
               <>
                 <div style={{ padding: "6mm 8mm 3.5mm", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "4mm" }}>
                   <div style={{ minWidth: 0 }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={d.logoSrc} alt="" style={{ height: "11mm", width: "auto", display: "block" }} />
+                    <img className="a5-logo-light" src={d.logoSrc} alt="" style={{ height: "11mm", width: "auto" }} />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="a5-logo-dark" src={d.logoSrc.replace("logo-full.png", "logo-full-dark.png")} alt="" style={{ height: "11mm", width: "auto" }} />
                     <div style={{ marginTop: "1.8mm", fontSize: 8, lineHeight: 1.4, color: MUTED }}>
                       {d.business.address && <div>{d.business.address}</div>}
                       {d.business.phone && <div>{d.business.phone}</div>}
@@ -90,7 +105,7 @@ export default function PickupNoteSheet({ d }: { d: PickupNoteData }) {
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.04em", color: NAVY2, lineHeight: 1 }}>PICKUP NOTE</div>
-                    <div style={{ marginTop: "1mm", fontSize: 7.5, fontWeight: 700, letterSpacing: "0.16em", color: "#a07c00" }}>ALSO THE DELIVERY NOTE</div>
+                    <div style={{ marginTop: "1mm", fontSize: 7.5, fontWeight: 700, letterSpacing: "0.16em", color: "var(--pn-gold-text)" }}>ALSO THE DELIVERY NOTE</div>
                     <div style={{ marginTop: "2mm", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12.5, fontWeight: 700, color: INK }}>{d.noteNo}</div>
                     <div style={{ marginTop: 0.5, fontSize: 8.5, color: MUTED }}>{d.when}</div>
                   </div>
@@ -106,7 +121,7 @@ export default function PickupNoteSheet({ d }: { d: PickupNoteData }) {
                     {fact("Status", d.collection)}
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div className="a5-qr" style={{ width: "27mm", height: "27mm", border: `0.3mm solid ${LINE}`, borderRadius: "1.5mm", padding: "1mm", boxSizing: "border-box", margin: "0 auto" }} dangerouslySetInnerHTML={{ __html: d.qrSvg }} />
+                    <div className="a5-qr" style={{ width: "27mm", height: "27mm", border: `0.3mm solid ${LINE}`, borderRadius: "1.5mm", padding: "1mm", boxSizing: "border-box", margin: "0 auto", background: "#fff" }} dangerouslySetInnerHTML={{ __html: d.qrSvg }} />
                     <div style={{ marginTop: "1mm", fontSize: 7, color: MUTED }}>Scan at the warehouse</div>
                   </div>
                 </div>
@@ -120,7 +135,7 @@ export default function PickupNoteSheet({ d }: { d: PickupNoteData }) {
                   </div>
                   <div style={{ marginTop: 0.5, fontSize: 8, color: MUTED }}>{d.customer}</div>
                 </div>
-                <div className="a5-qr" style={{ width: "15mm", height: "15mm", border: `0.3mm solid ${LINE}`, borderRadius: "1mm", padding: "0.6mm", boxSizing: "border-box" }} dangerouslySetInnerHTML={{ __html: d.qrSvg }} />
+                <div className="a5-qr" style={{ width: "15mm", height: "15mm", border: `0.3mm solid ${LINE}`, borderRadius: "1mm", padding: "0.6mm", boxSizing: "border-box", background: "#fff" }} dangerouslySetInnerHTML={{ __html: d.qrSvg }} />
               </div>
             )}
 
@@ -129,7 +144,7 @@ export default function PickupNoteSheet({ d }: { d: PickupNoteData }) {
               {rows.map((l) => {
                 const n = ++counter;
                 return (
-                  <div key={n} style={{ display: "grid", gridTemplateColumns: hasPrices ? "6mm 1fr 17mm 21mm 24mm" : "6mm 1fr 24mm", alignItems: "center", height: `${ROW_MM}mm`, borderBottom: `0.2mm solid ${LINE}`, background: n % 2 === 0 ? "#fafafa" : "#fff", fontSize: 9.5 }}>
+                  <div key={n} style={{ display: "grid", gridTemplateColumns: hasPrices ? "6mm 1fr 17mm 21mm 24mm" : "6mm 1fr 24mm", alignItems: "center", height: `${ROW_MM}mm`, borderBottom: `0.2mm solid ${LINE}`, background: n % 2 === 0 ? "var(--pn-zebra)" : "var(--pn-paper)", fontSize: 9.5 }}>
                     <span style={{ padding: "0 1mm", color: MUTED, fontSize: 8.5 }}>{n}</span>
                     <span style={{ padding: "0 1mm", minWidth: 0 }}>
                       <span style={{ display: "block", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
@@ -154,7 +169,7 @@ export default function PickupNoteSheet({ d }: { d: PickupNoteData }) {
                     </div>
                   </div>
                 )}
-                <div style={{ background: "#faf8f2", border: "0.25mm solid #ece6d6", borderRadius: "1.5mm", padding: "2.2mm 3mm", fontSize: 7.8, lineHeight: 1.45, color: INK }}>
+                <div style={{ background: "var(--pn-note)", border: "0.25mm solid var(--pn-note-line)", borderRadius: "1.5mm", padding: "2.2mm 3mm", fontSize: 7.8, lineHeight: 1.45, color: INK }}>
                   This note is also the <strong>delivery note</strong>. The warehouse scans the QR code, checks the goods against this list and hands them over. The customer signs to confirm the goods were received in the right quantities and in good order. A note can be used once.
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6mm", marginTop: "8mm" }}>
@@ -173,7 +188,7 @@ export default function PickupNoteSheet({ d }: { d: PickupNoteData }) {
                 {d.business.name} · {d.noteNo} · sale {d.saleNo}
               </span>
               <span>
-                Page {pi + 1} of {pages.length}
+                Page {pi + 1} of {allPages.length}
               </span>
             </div>
           </section>
