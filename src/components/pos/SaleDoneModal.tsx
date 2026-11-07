@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, FileDown, Printer, X } from "lucide-react";
+import { ExternalLink, FileDown, Plus, Printer, X } from "lucide-react";
 import Modal from "@/components/Modal";
 import PickupNoteSheet, { type PickupNoteData } from "@/components/warehouse/PickupNoteSheet";
 import { loadPickupPreview, loadSaleDone, type SaleDone } from "@/app/(app)/till/actions";
@@ -12,9 +12,10 @@ import { cn } from "@/lib/utils";
 const SHEET_W = 559.37;
 const SHEET_H = 793.7;
 
-// solid buttons (nothing shows through them), small, one calm set
-const btn = "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition md:justify-start md:px-3 max-md:px-2";
-const quiet = "bg-[#152a4a] text-[#ffffff] ring-1 ring-white/15 hover:bg-[#1c3560]";
+// small round icon buttons, one calm set, solid so nothing shows through (fixed hex colours: the dark theme swaps the named tokens)
+const dot = "group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-white/20 transition hover:scale-105";
+const navy = "bg-[#152a4a] text-[#ffffff] hover:bg-[#1c3560]";
+const tip = "pointer-events-none absolute left-full top-1/2 ml-2.5 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-[#ffffff] px-2 py-1 text-xs font-semibold text-[#0e3d6e] opacity-0 shadow-lg transition group-hover:opacity-100 md:block";
 const xBtn = "grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#152a4a] text-[#ffffff] ring-1 ring-white/20 transition hover:bg-[#1c3560]";
 
 /**
@@ -35,9 +36,9 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
   useEffect(() => {
     const fit = () => {
       const side = window.innerWidth >= 768;
-      // the note is as big as the space left by the actions (beside it on a computer, under it on a phone)
-      const maxW = side ? window.innerWidth - 28 - 188 : window.innerWidth - 28;
-      const maxH = side ? window.innerHeight - 48 : window.innerHeight - 190;
+      // the note is as big as the space left by the small buttons (beside it on a computer, under it on a phone)
+      const maxW = side ? window.innerWidth - 28 - 72 : window.innerWidth - 28;
+      const maxH = side ? window.innerHeight - 48 : window.innerHeight - 150;
       setScale(Math.max(0.4, Math.min(1, maxH / SHEET_H, maxW / SHEET_W)));
     };
     fit();
@@ -103,29 +104,32 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
           </div>
         )}
 
-        {/* the actions: a small solid panel at the side of the note on a computer or tablet, a row under it on a phone */}
-        <div className="flex w-full flex-col gap-2 rounded-2xl bg-[#0b1a30] p-2 ring-1 ring-white/15 md:w-44" style={{ maxWidth: SHEET_W * scale }}>
-          <div className={cn("gap-2 md:flex md:flex-col", pickup ? "grid grid-cols-3" : "hidden md:flex")}>
-            <button type="button" onClick={onNewSale} className={cn(xBtn, "hidden self-end md:grid")} aria-label="Close the note (the sale stays completed)" title="Close the note. The sale stays completed.">
-              <X size={15} />
-            </button>
-            {pickup && (
-              <>
-                <Link href={`/print/pickup/${pickup.id}?print=1`} target="_blank" rel="noopener" className={cn(btn, "bg-[#ffffff] text-[#0e3d6e] hover:bg-[#e8eef6]")}>
-                  <Printer size={16} /> Print
-                </Link>
-                <Link href={`/print/pickup/${pickup.id}?print=1&save=1`} target="_blank" rel="noopener" className={cn(btn, quiet)}>
-                  <FileDown size={16} /> <span className="md:hidden">PDF</span>
-                  <span className="hidden md:inline">Download PDF</span>
-                </Link>
-                <Link href={`/print/pickup/${pickup.id}`} target="_blank" rel="noopener" className={cn(btn, quiet)}>
-                  <ExternalLink size={16} /> Open
-                </Link>
-              </>
-            )}
-          </div>
-          <button type="button" autoFocus className={cn(btn, "justify-center bg-[#fdc400] px-6 text-[#0e3d6e] hover:brightness-95 md:justify-center")} onClick={onNewSale}>
-            New sale
+        {/* the actions: a few small round buttons, in a column beside the note on a computer or tablet, in one row under it on a phone */}
+        <div className="flex w-full items-center justify-center gap-2 md:w-10 md:flex-col md:justify-start" style={{ maxWidth: SHEET_W * scale }}>
+          <button type="button" onClick={onNewSale} className={cn(xBtn, "group relative hidden md:mb-1 md:grid")} aria-label="Close the note (the sale stays completed)">
+            <X size={15} />
+            <span className={tip}>Close (the sale stays)</span>
+          </button>
+          {pickup && (
+            <>
+              <Link href={`/print/pickup/${pickup.id}?print=1`} target="_blank" rel="noopener" aria-label="Print the note" className={cn(dot, "bg-[#ffffff] text-[#0e3d6e] hover:bg-[#e8eef6]")}>
+                <Printer size={17} />
+                <span className={tip}>Print</span>
+              </Link>
+              <Link href={`/print/pickup/${pickup.id}?print=1&save=1`} target="_blank" rel="noopener" aria-label="Download the note as PDF" className={cn(dot, navy)}>
+                <FileDown size={17} />
+                <span className={tip}>Download PDF</span>
+              </Link>
+              <Link href={`/print/pickup/${pickup.id}`} target="_blank" rel="noopener" aria-label="Open the note" className={cn(dot, navy)}>
+                <ExternalLink size={17} />
+                <span className={tip}>Open</span>
+              </Link>
+            </>
+          )}
+          <button type="button" autoFocus onClick={onNewSale} aria-label="New sale" className="group relative inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-[#fdc400] px-4 text-sm font-semibold text-[#0e3d6e] transition hover:brightness-95 md:w-10 md:px-0">
+            <Plus size={18} strokeWidth={2.5} />
+            <span className="md:hidden">New sale</span>
+            <span className={tip}>New sale</span>
           </button>
         </div>
       </div>
