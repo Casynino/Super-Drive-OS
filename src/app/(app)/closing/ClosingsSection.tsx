@@ -79,7 +79,7 @@ export default async function ClosingsSection({ user, show, shop, basePath, kpis
               <KpiCard icon={CalendarCheck} tone="navy" label="Closings" value={String(history.length)} hint={history.length === 30 ? "The latest 30" : "Shown below"} />
               <KpiCard icon={Receipt} tone="green" label="Sold in these days" value={money(soldTotal)} hint={`About ${money(soldTotal.div(history.length).toDecimalPlaces(0))} a day`} />
               <KpiCard icon={Scale} tone={shortDays.length > 0 ? "red" : "green"} label="Cash short" value={money(shortTotal)} hint={shortDays.length > 0 ? `On ${shortDays.length} day${shortDays.length === 1 ? "" : "s"} · net ${netTotal.lt(0) ? "−" : "+"} ${money(netTotal.abs())}` : "No cash was missing"} />
-              <KpiCard icon={Landmark} tone="blue" label="Sent to the bank" value={money(bankedTotal)} hint={`Spent ${money(spentTotal)} in these days`} />
+              <KpiCard icon={Landmark} tone="blue" label="Deposited" value={money(bankedTotal)} hint={`Spent ${money(spentTotal)} in these days`} />
             </div>
           )}
           <div className="mb-6 grid gap-4 xl:grid-cols-2">
@@ -230,7 +230,7 @@ export default async function ClosingsSection({ user, show, shop, basePath, kpis
 
       {deposits.length > 0 && (
         <section>
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Sent to the bank</h2>
+          <h2 className="mb-3 text-base font-semibold text-slate-900">Deposits</h2>
           <div className="card overflow-hidden">
             <div className="table-wrap">
               <table className="table">
@@ -239,7 +239,7 @@ export default async function ClosingsSection({ user, show, shop, basePath, kpis
                     <th>Day</th>
                     <th>Into</th>
                     <th>Reference</th>
-                    <th className="hidden md:table-cell">Sent by</th>
+                    <th className="hidden md:table-cell">Deposited by</th>
                     <th className="text-right">Amount</th>
                     <th className="hidden sm:table-cell">Slip</th>
                   </tr>

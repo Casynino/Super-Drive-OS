@@ -150,7 +150,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                   <h2 className="text-sm font-semibold text-slate-900">How the closing went</h2>
                   <dl className="mt-3 space-y-1.5 text-sm">
                     <StatementRow label="Cash counted" value={money(closedInfo.closing?.countedCash ?? 0)} />
-                    <StatementRow sign="−" label="Sent to the boss's account" value={money(closedInfo.banked)} />
+                    <StatementRow sign="−" label="Deposited into the boss's account" value={money(closedInfo.banked)} />
                   </dl>
                   <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
                     <span className="text-sm font-semibold text-slate-900">Left in the till (the balance)</span>
@@ -159,7 +159,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                   <p className="mt-2 text-xs text-slate-500">The difference when you counted: {closedInfo.closing ? <Difference value={closedInfo.closing.difference.toString()} currency={currency} /> : "—"}</p>
                   {canDeposit && bankAccounts.length > 0 && (
                     <div className="mt-4 border-t border-line pt-4">
-                      <h3 className="mb-3 text-sm font-semibold text-slate-900">Send more cash to the boss's account</h3>
+                      <h3 className="mb-3 text-sm font-semibold text-slate-900">Deposit more cash</h3>
                       <DepositForm key={sp.banked ?? "new"} action={recordDepositAction} submissionKey={randomUUID()} cashBalance={money(cash?.balance ?? 0)} bankAccounts={bankAccounts} />
                     </div>
                   )}
@@ -186,7 +186,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Should be in the till</p>
                   <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900">{money(preview.expectedCash)}</p>
-                  <p className="mt-2 text-sm text-slate-500">Count the cash, send it to the boss's account and close. What you keep in the till is the balance you start the next time with.</p>
+                  <p className="mt-2 text-sm text-slate-500">Count the cash, deposit it into the boss's account and close. What you keep in the till is the balance you start the next time with.</p>
                 </div>
                 <div className="space-y-2">
                   <CloseDayButton className="h-12 w-full text-base" action={submitClosingAction} day={today} expected={preview.expectedCash.toString()} symbol={currency.symbol} canDeposit={canDeposit} submissionKey={randomUUID()} bankAccounts={bankAccounts} />
@@ -373,7 +373,7 @@ function CashStatementCard({ title, summary, expected, money, className }: { tit
         {Number(c.withdrawals) !== 0 && <StatementRow sign="−" label="Taken out by the owner" value={money(c.withdrawals)} />}
         {Number(c.transfers ?? 0) !== 0 && <StatementRow sign={Number(c.transfers) < 0 ? "−" : "+"} label="Moved to or from other accounts" value={money(Math.abs(Number(c.transfers)))} />}
         {Number(c.supplierPayments ?? 0) !== 0 && <StatementRow sign="−" label="Paid to suppliers" value={money(c.supplierPayments ?? "0")} />}
-        {Number(c.depositsOut) !== 0 && <StatementRow sign="−" label="Sent to the bank since" value={money(c.depositsOut)} />}
+        {Number(c.depositsOut) !== 0 && <StatementRow sign="−" label="Deposited since" value={money(c.depositsOut)} />}
         {Number(c.corrections) !== 0 && <StatementRow sign={Number(c.corrections) < 0 ? "−" : "+"} label="Corrections by the owner" value={money(Math.abs(Number(c.corrections)))} />}
       </dl>
       <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">

@@ -222,7 +222,7 @@ export default function EndOfDaySheet({ data: d }: { data: DaySheetData }) {
         </Keep>
 
         <Keep>
-        <SectionTitle n="05" title="Where the money is" sub="At the closing, and what was sent to the bank" />
+        <SectionTitle n="05" title="Where the money is" sub="At the closing, and what was deposited" />
         <Tiles tiles={d.money} cols={4} />
         {d.deposit.empty ? (
           <p style={{ margin: "12px 0 0", fontSize: 12.5, color: MUTED }}>{d.deposit.empty}</p>

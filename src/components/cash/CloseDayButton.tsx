@@ -27,7 +27,7 @@ const digits = (s: string) => s.replace(/\D/g, "").slice(0, 12);
 const group = (s: string) => (s ? Number(s).toLocaleString("en-US") : "");
 
 /**
- * "Close and send to boss" button + pop-up with three short steps: 1 Count, 2 Send (to the boss's bank account), 3 Close. A closing does not have to be the same day.
+ * "Close and deposit" button + pop-up with three short steps: 1 Count, 2 Deposit (into the boss's bank account), 3 Close. A closing does not have to be the same day.
  * Same rules as before: the counted cash is compared with what the system expects, the bank part is part of the same closing
  * (the amount leaves the till and enters the chosen account together with it), and a closing cannot be changed.
  */
@@ -37,7 +37,7 @@ export default function CloseDayButton({ className, ...props }: Props) {
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={cn("btn-primary", className)}>
-        <Lock size={16} aria-hidden /> Close and send to boss
+        <Lock size={16} aria-hidden /> Close and deposit
       </button>
       <Modal open={open} onClose={close} label="Closing">
         <CloseDayForm {...props} onClose={close} />
@@ -55,7 +55,7 @@ function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey
   const fe = state.fieldErrors ?? {};
   const v = state.values ?? {};
   const bankable = canDeposit && bankAccounts.length > 0;
-  const steps: { key: StepKey; label: string }[] = bankable ? [{ key: "count", label: "Count" }, { key: "bank", label: "Send" }, { key: "close", label: "Close" }] : [{ key: "count", label: "Count" }, { key: "close", label: "Close" }];
+  const steps: { key: StepKey; label: string }[] = bankable ? [{ key: "count", label: "Count" }, { key: "bank", label: "Deposit" }, { key: "close", label: "Close" }] : [{ key: "count", label: "Count" }, { key: "close", label: "Close" }];
   const [step, setStep] = useState<StepKey>("count");
   const [counted, setCounted] = useState(digits(v.countedCash ?? ""));
   // closing banks what was counted, all of it, by default; the person can keep some back or not bank today
@@ -148,11 +148,11 @@ function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey
         {bankable && (
           <div className={step === "bank" ? "space-y-4" : "hidden"}>
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">Send the money to the boss</h2>
+              <h2 className="text-xl font-semibold text-slate-900">Deposit the money</h2>
               <p className="mt-1 text-sm text-slate-500">{c === null ? "Count the cash first." : `You counted ${money(c)}.`}</p>
             </div>
-            <div className="inline-flex flex-wrap rounded-xl border border-line bg-slate-50 p-1 text-sm font-medium" role="group" aria-label="How much to send">
-              {([["all", "Send it all", Landmark], ["some", "Keep some", Banknote], ["none", "Keep it all", Banknote]] as const).map(([k, label, Icon]) => (
+            <div className="inline-flex flex-wrap rounded-xl border border-line bg-slate-50 p-1 text-sm font-medium" role="group" aria-label="How much to deposit">
+              {([["all", "Deposit it all", Landmark], ["some", "Keep some", Banknote], ["none", "Keep it all", Banknote]] as const).map(([k, label, Icon]) => (
                 <button key={k} type="button" onClick={() => setMode(k)} aria-pressed={mode === k} className={cn("inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition", mode === k ? "bg-navy-700 text-white shadow-sm" : "text-slate-600 hover:text-slate-900")}>
                   <Icon size={15} /> {label}
                 </button>
@@ -203,7 +203,7 @@ function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey
             ) : (
               <p className={cn("rounded-lg px-3 py-2 text-sm", mode === "none" ? "bg-slate-50 text-slate-600" : "bg-emerald-50 text-emerald-900")}>
                 {mode === "none" ? (
-                  "Nothing is sent. The counted cash stays in the till as the balance."
+                  "Nothing is deposited. The counted cash stays in the till as the balance."
                 ) : c === null ? (
                   "Count the cash first. All of it goes into the account you choose."
                 ) : (
@@ -224,14 +224,14 @@ function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey
         {/* 3 Close */}
         <div className={step === "close" ? "space-y-4" : "hidden"}>
           <div>
-            <h2 className="text-xl font-semibold text-slate-900">Close and send to boss</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Close and deposit</h2>
             <p className="mt-1 text-sm text-slate-500">Check it once more. A closing cannot be changed, and the boss gets the report.</p>
           </div>
           <dl className="divide-y divide-line rounded-xl border border-line text-sm">
             <SummaryRow label="Cash counted" value={c === null ? "—" : money(c)} />
             <SummaryRow label="The system expected" value={money(exp)} />
             <SummaryRow label="Difference" value={diff === null ? "—" : diff === 0 ? "None" : `${diff < 0 ? "Short" : "Extra"} ${money(diff)}`} tone={diff === null || diff === 0 ? undefined : diff < 0 ? "bad" : "warn"} />
-            {bankable && <SummaryRow label="Sent to the boss's account" value={dep > 0 ? `${money(dep)} · ${picked?.name ?? "Bank"}` : "Nothing"} />}
+            {bankable && <SummaryRow label="Deposited into the boss's account" value={dep > 0 ? `${money(dep)} · ${picked?.name ?? "Bank"}` : "Nothing"} />}
             <SummaryRow label="Stays in the till (the balance)" value={c === null ? "—" : money(left ?? 0)} strong />
           </dl>
           <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700">
@@ -253,7 +253,7 @@ function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey
           </button>
         ) : (
           <SubmitButton pendingLabel="Closing…" disabled={!ready} className="btn-primary flex-1">
-            <Lock size={15} /> Close and send to boss
+            <Lock size={15} /> Close and deposit
           </SubmitButton>
         )}
       </div>
