@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { EmptyState } from "@/components/ui";
+import { BannerBell, bannerDate } from "@/components/BannerBell";
 import PosTerminal from "@/components/pos/PosTerminal";
 import { getUnitMode } from "@/lib/unit-mode";
 import { can } from "@/lib/auth/can";
@@ -87,6 +88,8 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(520px_170px_at_50%_0%,rgba(253,196,0,0.10),transparent_72%)]" aria-hidden />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/banner-products.webp" alt="" aria-hidden className="pointer-events-none absolute bottom-0 right-0 hidden h-full w-auto max-w-[32%] select-none object-contain object-right-bottom lg:block" />
+        {/* the notifications bell: at the left side, in the middle (a phone has its bell in its own top bar) */}
+        <BannerBell userId={user.id} className="absolute left-6 top-1/2 z-10 h-8 w-8 -translate-y-1/2" />
         <div className="relative flex min-h-[7.5rem] flex-col items-center justify-center px-5 py-5 text-center">
           <h1 className="flex items-center gap-4 text-3xl font-semibold tracking-[0.5em] text-white sm:text-4xl">
             <span className="hidden h-px w-10 bg-oil-400/60 sm:block" aria-hidden />
@@ -94,7 +97,10 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
             <span className="hidden h-px w-10 bg-oil-400/60 sm:block" aria-hidden />
           </h1>
           <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400">Super Drive Oil</p>
-          <p className="mt-1.5 text-sm text-white/65">Tap a product to start a sale</p>
+          {/* the date, small, under the shop name */}
+          <p className="mt-1.5 text-sm text-white/65" suppressHydrationWarning>
+            {bannerDate()}
+          </p>
         </div>
       </section>
       {posProducts.length === 0 || locations.length === 0 ? (

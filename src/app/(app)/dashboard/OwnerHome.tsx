@@ -1,3 +1,4 @@
+import { BannerBell } from "@/components/BannerBell";
 import { qtyText } from "@/lib/qty";
 import { getUnitMode } from "@/lib/unit-mode";
 import Link from "next/link";
@@ -191,7 +192,10 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
         <img src="/brand/banner-products.webp" alt="" aria-hidden className="pointer-events-none absolute bottom-0 right-0 hidden h-full w-auto max-w-[56%] select-none object-contain object-right-bottom xl:block" />
 
         <div className="relative px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-7">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-oil-400">Management · Owner</p>
+          <p className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-oil-400">
+            Management · Owner
+            <BannerBell userId={user.id} className="relative h-6 w-6" />
+          </p>
           <h1 className="mt-2 text-[1.7rem] font-bold leading-tight tracking-tight sm:text-4xl">
             {greeting()}, {firstName}
           </h1>
