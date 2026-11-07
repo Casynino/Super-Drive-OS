@@ -47,6 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       logoutAction={logout}
       unread={unread}
       badges={badges}
+      labels={can(user, "closing.submit") ? { "/closing": "Close & deposit" } : undefined}
     >
       {children}
     </AppShell>

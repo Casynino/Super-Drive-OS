@@ -395,7 +395,7 @@ function DayHeader({ date, state }: { date: string; state: { tone: "open" | "wai
     <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{date}</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Closing</h1>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Close &amp; deposit</h1>
       </div>
       <div className={cn("flex max-w-full items-center gap-3 rounded-xl border px-3 py-2", t.box)}>
         <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", t.icon)}>

@@ -20,6 +20,8 @@ type Props = {
   unread: number;
   /** numbers shown beside menu items that need someone to act */
   badges: { approvals: number; incoming: number };
+  /** a different menu name for this person (for example the shop person's "Close & deposit" where the Director has "Closing") */
+  labels?: Record<string, string>;
   children: React.ReactNode;
 };
 
@@ -32,7 +34,7 @@ function initials(name: string) {
     .join("");
 }
 
-export default function AppShell({ businessName, user, visibleHrefs, logoutAction, unread, badges, children }: Props) {
+export default function AppShell({ businessName, user, visibleHrefs, logoutAction, unread, badges, labels, children }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -89,7 +91,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         >
           {isActive && <span className="absolute inset-y-1.5 -left-[13px] w-[3px] rounded-r bg-oil-400" />}
           <Icon size={16} className={cn("shrink-0", isActive ? "text-navy-700" : "text-slate-400")} />
-          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          <span className="min-w-0 flex-1 truncate">{labels?.[item.href] ?? item.label}</span>
           {n > 0 && <span className="shrink-0 rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white">{n > 99 ? "99+" : n}</span>}
         </Link>
       </li>
