@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
-import { EmptyState, PageHeader } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import PosTerminal from "@/components/pos/PosTerminal";
 import { getUnitMode } from "@/lib/unit-mode";
 import { can } from "@/lib/auth/can";
@@ -16,7 +16,7 @@ import { createSale } from "./actions";
 import { quickCreateCustomer } from "../customers/actions";
 import { getActiveLocations, getStockByLocation } from "../inventory/data";
 
-export const metadata = { title: "Point of sale" };
+export const metadata = { title: "Home" };
 
 export default async function PosPage() {
   const user = await requirePagePermission("sales.pos");
@@ -71,9 +71,22 @@ export default async function PosPage() {
     ...(canCredit ? { creditLimit: c.creditLimit.toString(), outstanding: (owed.get(c.id) ?? 0).toString() } : {}),
   }));
 
+  // the shop person's home: a short greeting instead of a page title
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Africa/Dar_es_Salaam" }).format(new Date())) % 24;
+  const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
   return (
     <>
-      <PageHeader title="Point of sale" description="Search for a product, set the quantity, and take payment." />
+      <div className="mb-6 flex items-center gap-4">
+        <span className="hidden h-14 w-1 shrink-0 rounded-full bg-oil-400 sm:block" aria-hidden />
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{hello}</p>
+          <h1 className="mt-1 truncate text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Hello, <span className="text-yellow-600 dark:text-oil-400">{user.name.split(" ")[0]}</span>
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">Tap a product to start a sale.</p>
+        </div>
+      </div>
       {posProducts.length === 0 || locations.length === 0 ? (
         <div className="card">
           <EmptyState
