@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, ImageOff, Minus, Plus, ScanBarcode, Search, Trash2, UserPlus, X } from "lucide-react";
 import { posScan } from "@/app/(app)/scan/actions";
 import CodeScanner from "@/components/scan/CodeScanner";
@@ -12,6 +12,9 @@ import type { ActionState } from "@/lib/action";
 import { defaultUnitId, type LocationOption } from "@/lib/inventory/types";
 import { largestPack, qtyText, type UnitMode } from "@/lib/qty";
 import AccountButtons from "@/components/cash/AccountButtons";
+import RegisterModal, { type RegisterForm } from "@/components/pos/RegisterModal";
+import WingaActions from "@/components/pos/WingaActions";
+import type { TillSummary } from "@/app/(app)/till/actions";
 import { PAYMENT_METHODS, type CartLine, type PayAccount, type PosCustomer, type PosProduct } from "@/lib/sales/types";
 import { cn } from "@/lib/utils";
 
@@ -37,13 +40,6 @@ type Props = {
 
 const initial: ActionState = {};
 const WHOLESALE = ["WHOLESALE", "DISTRIBUTOR"];
-const TYPE_OPTIONS = [
-  ["RETAIL", "Retail"],
-  ["WHOLESALE", "Wholesale"],
-  ["DISTRIBUTOR", "Distributor"],
-  ["BUSINESS", "Business"],
-  ["OTHER", "Other"],
-] as const;
 const trim = (n: number) => String(Number(n.toFixed(3)));
 const imgSrc = (p: PosProduct, size: "thumb" | "full" = "thumb") => (p.imageV ? `/api/product-image/${p.id}?size=${size}&v=${p.imageV}` : null);
 
@@ -296,19 +292,16 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
   // ── customer search / quick add ──
   const [custQ, setCustQ] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  const [newCust, setNewCust] = useState({ name: "", phone: "", type: "RETAIL", idInfo: "", business: "", place: "" });
-  const [addError, setAddError] = useState<string | null>(null);
-  const [adding, startAdd] = useTransition();
   // Who is buying: a walk-in (nothing written down, pays in full), a registered credit customer, or a Winga.
   const chooseWho = (w: "walkin" | "credit" | "winga") => {
     setWho(w);
     setCustomer(null);
     setCustQ("");
     setAddOpen(false);
-    setAddError(null);
     setPartAmount("");
     setMode(w !== "walkin" && perms.credit ? "CREDIT" : "FULL");
   };
+  const creditList = customers.filter((c) => !c.winga && (!custQ.trim() || c.name.toLowerCase().includes(custQ.trim().toLowerCase()) || (c.phone ?? "").includes(custQ.trim()))).slice(0, 60);
   const matches = custQ.trim() ? customers.filter((c) => !c.winga && (c.name.toLowerCase().includes(custQ.trim().toLowerCase()) || (c.phone ?? "").includes(custQ.trim()))).slice(0, 6) : [];
   // Choosing a credit customer or a Winga puts the sale on credit (the person can still change it to paid in full).
   const pickCustomer = (c: PosCustomer) => {
@@ -317,22 +310,24 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
     if (perms.credit) setMode("CREDIT");
   };
   const wingaList = customers.filter((c) => c.winga && (!custQ.trim() || c.name.toLowerCase().includes(custQ.trim().toLowerCase()) || (c.phone ?? "").includes(custQ.trim())));
-  const saveNewCustomer = () =>
-    startAdd(async () => {
-      setAddError(null);
-      const isWinga = who === "winga" && Boolean(quickAddWinga);
-      // fully registered: name, phone, ID number and place
-      if (newCust.phone.trim().length < 6) return setAddError("Enter the phone number.");
-      if (newCust.idInfo.trim().length < 4) return setAddError("Enter the ID number.");
-      if (!newCust.place.trim()) return setAddError(isWinga ? "Enter where the Winga sells." : "Enter where the customer lives or works.");
-      const r = isWinga ? await quickAddWinga!({ name: newCust.name, phone: newCust.phone, idInfo: newCust.idInfo, businessName: newCust.business, place: newCust.place }) : await quickAddCustomer({ name: newCust.name, phone: newCust.phone, type: newCust.type, idNumber: newCust.idInfo, place: newCust.place, forCredit: true });
-      if (!r.ok) return setAddError(r.error);
-      const c: PosCustomer = { ...r.customer, complete: true, ...(isWinga ? { winga: true } : {}), ...(perms.credit ? { creditLimit: "0", outstanding: "0" } : {}) };
-      setCustomers((all) => [...all, c]);
-      pickCustomer(c);
-      setAddOpen(false);
-      setNewCust({ name: "", phone: "", type: "RETAIL", idInfo: "", business: "", place: "" });
-    });
+  // A new Winga / credit customer is registered in a pop-up; once saved they show on the list, ready to be chosen.
+  const [justAdded, setJustAdded] = useState<string | null>(null);
+  const registerPerson = async (f: RegisterForm): Promise<string | null> => {
+    const isWinga = who === "winga" && Boolean(quickAddWinga);
+    const r = isWinga ? await quickAddWinga!({ name: f.name, phone: f.phone, idInfo: f.idNumber, businessName: f.business, place: f.place }) : await quickAddCustomer({ name: f.name, phone: f.phone, type: f.type, idNumber: f.idNumber, place: f.place, forCredit: true });
+    if (!r.ok) return r.error;
+    const c: PosCustomer = { ...r.customer, complete: true, ...(isWinga ? { winga: true } : {}), ...(perms.credit ? { creditLimit: "0", outstanding: "0", openOrders: 0 } : {}) };
+    setCustomers((all) => [c, ...all]);
+    setJustAdded(c.id);
+    setAddOpen(false);
+    return null;
+  };
+  // after money or goods came in from a pop-up: the balance on the till follows
+  const refreshCustomer = (id: string, s: TillSummary) => {
+    const apply = (c: PosCustomer): PosCustomer => (c.id === id ? { ...c, outstanding: s.owed, openOrders: s.openOrders, late: s.late } : c);
+    setCustomers((all) => all.map(apply));
+    setCustomer((c) => (c ? apply(c) : c));
+  };
 
   const cartCount = rows.length;
 
@@ -620,43 +615,43 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                   </p>
                 )}
                 {((perms.returns && customer.winga && owes > 0) || (perms.collect && owes > 0)) && (
-                  <div className="mt-2.5 flex flex-wrap gap-2">
-                    {perms.collect && owes > 0 && (
-                      <Link href={`/customers/${customer.id}/pay`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className={cn("btn-sm", customer.late ? "btn-primary" : "btn-secondary")} title="Record money this customer paid towards what they owe">
-                        Collect payment
-                      </Link>
-                    )}
-                    {perms.returns && customer.winga && owes > 0 && (
-                      <Link href={`/customers/${customer.id}/return`} target={cartCount > 0 ? "_blank" : undefined} rel={cartCount > 0 ? "noopener" : undefined} className="btn-secondary btn-sm" title="The Winga brings back goods he did not sell">
-                        Return goods
-                      </Link>
-                    )}
+                  <div className="mt-2.5">
+                    <WingaActions customerId={customer.id} name={customer.name} canCollect={perms.collect && owes > 0} canReturn={perms.returns && customer.winga === true && owes > 0} accounts={locAccounts} currency={currency} emphasizeCollect={Boolean(customer.late)} onDone={(sum) => refreshCustomer(customer.id, sum)} />
                   </div>
                 )}
               </div>
             )}
 
             {who === "credit" && !customer && (
-              <div className="relative">
+              <div>
                 <input className="input" placeholder="Search a registered customer" value={custQ} onChange={(e) => setCustQ(e.target.value)} aria-label="Search customers" />
-                {matches.length > 0 && (
-                  <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-line bg-white py-1 shadow-lg">
-                    {matches.map((c) => (
+                {justAdded && customers.some((c) => c.id === justAdded && !c.winga) && <p className="mt-2 text-xs font-medium text-emerald-700">Saved. Tap the customer below to choose.</p>}
+                {creditList.length > 0 ? (
+                  <ul className="mt-2 max-h-56 divide-y divide-line overflow-y-auto rounded-lg border border-line md:max-h-64">
+                    {creditList.map((c) => (
                       <li key={c.id}>
-                        <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => pickCustomer(c)}>
-                          <span className="truncate font-medium">{c.name}</span>
-                          <span className="shrink-0 text-xs text-slate-500">{c.phone ?? ""}</span>
+                        <button type="button" className={cn("flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50", c.id === justAdded && "bg-emerald-50/60")} onClick={() => pickCustomer(c)}>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-slate-900">{c.name}</span>
+                            <span className="block truncate text-xs text-slate-500">
+                              {c.phone ?? "No phone"}
+                              {c.outstanding !== undefined && Number(c.outstanding) > 0 && <span className="font-medium text-brand-red-dark"> · owes {fmt(Number(c.outstanding))}</span>}
+                            </span>
+                          </span>
+                          <ChevronRight size={16} className="shrink-0 text-slate-400" aria-hidden />
                         </button>
                       </li>
                     ))}
                   </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-500">No registered customer found.{perms.addCustomer ? " Use New credit customer to register one." : ""}</p>
                 )}
-                {custQ.trim() && matches.length === 0 && <p className="mt-1.5 text-xs text-slate-500">No registered customer found.{perms.addCustomer ? " Use New credit customer to register one fully." : ""}</p>}
               </div>
             )}
 
             {who === "winga" && !customer && (
               <div>
+                {justAdded && customers.some((c) => c.id === justAdded && c.winga) && <p className="mb-2 text-xs font-medium text-emerald-700">Saved. Tap the Winga below to choose.</p>}
                 {wingaList.length > 0 ? (
                   <ul className="max-h-52 divide-y divide-line overflow-y-auto rounded-lg border border-line md:max-h-64">
                     {wingaList.map((w) => {
@@ -665,7 +660,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                       return (
                         <li key={w.id}>
                           {/* one tap picks the Winga; what to do next (sell, return goods, collect money) comes after */}
-                          <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50" onClick={() => pickCustomer(w)}>
+                          <button type="button" className={cn("flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50", w.id === justAdded && "bg-emerald-50/60")} onClick={() => pickCustomer(w)}>
                             <span className="min-w-0">
                               <span className="block truncate text-sm font-medium text-slate-900">{w.name}</span>
                               <span className={cn("block text-xs", o > 0 ? "font-medium text-brand-red-dark" : "text-slate-500")}>
@@ -685,37 +680,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
             )}
             {fe.customer && <p className="field-error">{fe.customer}</p>}
 
-            {addOpen && who !== "walkin" && (
-              <div className="mt-3 space-y-2.5 rounded-lg border border-line p-3">
-                <p className="text-xs font-medium text-slate-600">{who === "winga" ? "Register a Winga" : "Register a credit customer"}: full details are needed</p>
-                <input className="input" placeholder={who === "winga" ? "Winga's name *" : "Customer / business name *"} value={newCust.name} onChange={(e) => setNewCust({ ...newCust, name: e.target.value })} aria-label="New customer name" />
-                <div className="grid grid-cols-2 gap-2">
-                  <input className="input" placeholder="Phone *" inputMode="tel" value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} aria-label="New customer phone" />
-                  <input className="input" placeholder="ID number *" value={newCust.idInfo} onChange={(e) => setNewCust({ ...newCust, idInfo: e.target.value })} aria-label="ID number" />
-                  <input className="input" placeholder={who === "winga" ? "Where they sell *" : "Place (lives / works) *"} value={newCust.place} onChange={(e) => setNewCust({ ...newCust, place: e.target.value })} aria-label="Place" />
-                  {who === "winga" ? (
-                    <input className="input" placeholder="Business name (if any)" value={newCust.business} onChange={(e) => setNewCust({ ...newCust, business: e.target.value })} aria-label="Winga business name" />
-                  ) : (
-                    <select className="input" value={newCust.type} onChange={(e) => setNewCust({ ...newCust, type: e.target.value })} aria-label="Customer type">
-                      {TYPE_OPTIONS.map(([v, l]) => (
-                        <option key={v} value={v}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                {addError && <p className="field-error">{addError}</p>}
-                <div className="flex gap-2">
-                  <button type="button" className="btn-primary btn-sm" disabled={adding || newCust.name.trim().length < 2} onClick={saveNewCustomer}>
-                    {adding ? "Adding…" : who === "winga" ? "Add Winga" : "Add customer"}
-                  </button>
-                  <button type="button" className="btn-secondary btn-sm" onClick={() => setAddOpen(false)}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+            <RegisterModal open={addOpen && who !== "walkin"} kind={who === "winga" ? "winga" : "credit"} onClose={() => setAddOpen(false)} onSave={registerPerson} />
           </div>
 
           <div className="card card-pad">

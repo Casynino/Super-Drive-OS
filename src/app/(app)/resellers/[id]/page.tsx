@@ -3,6 +3,8 @@ import BackLink from "@/components/BackLink";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Calendar, HandCoins, MapPin, MessageCircle, Pencil, Phone, Undo2 } from "lucide-react";
 import { Alert } from "@/components/ui";
+import WingaActions from "@/components/pos/WingaActions";
+import { defaultLocationId, listAccounts } from "@/lib/cash/ledger";
 import StatTile from "@/components/dashboard/StatTile";
 import { SalesTrendChart } from "@/components/dashboard/Charts";
 import RemindButton from "@/components/credit/RemindButton";
@@ -33,6 +35,7 @@ export default async function ResellerPage({ params, searchParams }: { params: P
   const sp = await searchParams;
   if (!(await db.reseller.findUnique({ where: { id }, select: { id: true } }))) notFound();
   const currency = await getCurrency();
+  const payAccounts = (await defaultLocationId(db).then((l) => listAccounts(db, l))).map((x) => ({ id: x.id, locationId: x.locationId, method: x.method, name: x.name, accountNumber: x.accountNumber, isDefault: x.isDefault }));
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
 
   const [a, products, sales, issues, returns, payments] = await Promise.all([
@@ -104,21 +107,7 @@ export default async function ResellerPage({ params, searchParams }: { params: P
         </div>
         {/* What you do when the Winga comes in: sell to him, take his money, take goods back. The stock he holds comes after. */}
         <div className="flex flex-wrap items-center gap-2 border-t border-line bg-slate-50/60 px-4 py-3 sm:px-5">
-          {can(user, "sales.pos") && r.status === "ACTIVE" && (
-            <Link href={`/pos?winga=${r.customerId}`} className="btn-primary">
-              Sell
-            </Link>
-          )}
-          {can(user, "payments.record") && (
-            <Link href={`/customers/${r.customerId}/pay`} className="btn-secondary">
-              <HandCoins size={16} /> Collect payment
-            </Link>
-          )}
-          {can(user, "returns.create") && a.outstanding.gt(0) && (
-            <Link href={`/customers/${r.customerId}/return`} className="btn-secondary" title="He brings back goods he took on credit and did not sell">
-              <Undo2 size={16} /> Return goods
-            </Link>
-          )}
+          <WingaActions customerId={r.customerId} name={r.name} sellHref={can(user, "sales.pos") && r.status === "ACTIVE" ? `/pos?winga=${r.customerId}` : undefined} canCollect={can(user, "payments.record")} canReturn={can(user, "returns.create") && a.outstanding.gt(0)} accounts={payAccounts} currency={{ symbol: currency.symbol, decimals: currency.decimals }} emphasizeCollect={a.overdue.gt(0)} />
           {(canOperate || late.length > 0 || chatNumber) && <span className="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden />}
           {canOperate && r.status === "ACTIVE" && (
             <Link href={`/resellers/${id}/issue`} className="btn-secondary btn-sm">

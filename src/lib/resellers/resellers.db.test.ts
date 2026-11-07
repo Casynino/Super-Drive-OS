@@ -150,8 +150,9 @@ describe("collections, returns and the account", () => {
     const a = await account(w);
     expect([a.collected.toString(), a.outstanding.toString(), a.soldValue.toString()]).toEqual(["100000", "120000", "220000"]);
     expect(a.lastPaymentAt).not.toBeNull();
-    const rows = await db.cashTransaction.findMany({ where: { referenceId: res.payment.id }, include: { account: true } });
-    expect(rows.map((r) => [r.type, r.account.method, r.account.locationId === w.reseller.locationId])).toEqual([["COLLECTION", "MOBILE_MONEY", true]]);
+    const rows = await db.cashTransaction.findMany({ where: { referenceId: res.payment.id }, include: { account: { include: { location: true } } } });
+    // the money is paid to the SHOP: never into an account at the Winga's own (custody) location
+    expect(rows.map((r) => [r.type, r.account.method, r.account.locationId === w.reseller.locationId, r.account.location.type === "RESELLER"])).toEqual([["COLLECTION", "MOBILE_MONEY", false, false]]);
   });
 
   it("good goods go back on the shelf, damaged ones are written off from custody, and nobody can return what they do not hold", async () => {

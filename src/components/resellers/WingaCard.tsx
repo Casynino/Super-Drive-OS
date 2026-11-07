@@ -46,8 +46,8 @@ export default function WingaCard({
   owesTone: "red" | "normal" | "muted";
   owesHint: string;
   footer: string;
-  /** where each quick action goes (left out = not shown): money in, goods back, a new sale */
-  actions?: { collect?: string; returns?: string; sell?: string };
+  /** small action buttons under the card (Sell, Collect payment, Return goods) */
+  actions?: React.ReactNode;
 }) {
   return (
     <div className={cn("card overflow-hidden border-l-4 transition hover:border-navy-200 hover:shadow-md", EDGE[status.tone])}>
@@ -92,25 +92,7 @@ export default function WingaCard({
       </div>
       <p className="border-t border-line bg-slate-50/60 px-4 py-2 text-[11px] text-slate-500 group-hover:text-slate-700">{footer}</p>
     </Link>
-    {actions && (actions.collect || actions.returns || actions.sell) && (
-      <div className="flex flex-wrap gap-2 border-t border-line px-4 py-3">
-        {actions.sell && (
-          <Link href={actions.sell} className="btn-primary btn-sm">
-            Sell
-          </Link>
-        )}
-        {actions.collect && (
-          <Link href={actions.collect} className="btn-secondary btn-sm">
-            Collect payment
-          </Link>
-        )}
-        {actions.returns && (
-          <Link href={actions.returns} className="btn-secondary btn-sm">
-            Return goods
-          </Link>
-        )}
-      </div>
-    )}
+    {actions && <div className="border-t border-line px-4 py-2.5">{actions}</div>}
     </div>
   );
 }

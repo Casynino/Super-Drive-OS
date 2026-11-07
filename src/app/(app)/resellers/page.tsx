@@ -1,4 +1,6 @@
 import Link from "next/link";
+import WingaActions from "@/components/pos/WingaActions";
+import { defaultLocationId, listAccounts } from "@/lib/cash/ledger";
 import { Clock, HandCoins, Handshake, Package, Plus, Search, UserCheck } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -37,6 +39,7 @@ export default async function ResellersPage({ searchParams }: { searchParams: Pr
   const f: FilterKey = FILTERS.some((x) => x.key === sp.f) ? (sp.f as FilterKey) : "all";
   const q = sp.q?.trim().toLowerCase() ?? "";
 
+  const payAccounts = (await defaultLocationId(db).then((l) => listAccounts(db, l))).map((x) => ({ id: x.id, locationId: x.locationId, method: x.method, name: x.name, accountNumber: x.accountNumber, isDefault: x.isDefault }));
   const resellers = await db.reseller.findMany({ orderBy: [{ status: "asc" }, { name: "asc" }] });
   const [accounts, standings] = await Promise.all([Promise.all(resellers.map((r) => getResellerAccount(db, r.id))), getStandings(db)]);
 
@@ -148,13 +151,9 @@ export default async function ResellersPage({ searchParams }: { searchParams: Pr
                   owesHint={a.overdue.gt(0) ? `Oldest ${st.oldestLateDays ?? 0} day${st.oldestLateDays === 1 ? "" : "s"} late` : a.outstanding.gt(0) ? (st.nextDueDays === null ? "Open invoices" : st.nextDueDays === 0 ? "Next payment due today" : `Next payment due in ${st.nextDueDays} day${st.nextDueDays === 1 ? "" : "s"}`) : a.reports > 0 ? "All paid up" : "Nothing reported yet"}
                   footer={`Reported sold ${money(a.soldValue)} · ${a.lastPaymentAt ? `last payment ${formatDate(a.lastPaymentAt)}` : "no payment yet"}`}
                   actions={
-                    a.reseller.status === "ACTIVE"
-                      ? {
-                          sell: canSell ? `/pos?winga=${a.reseller.customerId}` : undefined,
-                          collect: canCollect && a.outstanding.gt(0) ? `/customers/${a.reseller.customerId}/pay` : undefined,
-                          returns: canReturn && a.outstanding.gt(0) ? `/customers/${a.reseller.customerId}/return` : undefined,
-                        }
-                      : undefined
+                    a.reseller.status === "ACTIVE" ? (
+                      <WingaActions customerId={a.reseller.customerId} name={a.reseller.name} sellHref={canSell ? `/pos?winga=${a.reseller.customerId}` : undefined} canCollect={canCollect && a.outstanding.gt(0)} canReturn={canReturn && a.outstanding.gt(0)} accounts={payAccounts} currency={{ symbol: currency.symbol, decimals: currency.decimals }} emphasizeCollect={a.overdue.gt(0)} short />
+                    ) : undefined
                   }
                 />
               ))}

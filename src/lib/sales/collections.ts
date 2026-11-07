@@ -4,7 +4,7 @@
 //
 // Lock order (matches post-sale.ts): customer row → invoice rows → payment counter.
 import { Prisma, type PaymentMethod, type PaymentStatus } from "@/generated/prisma/client";
-import { CashError, recordPaymentCash } from "@/lib/cash/ledger";
+import { CashError, defaultLocationId, recordPaymentCash } from "@/lib/cash/ledger";
 import { nextDocumentNo, type Dec, type Tx } from "@/lib/inventory/engine";
 import { parseMoney } from "@/lib/money";
 import { netPaid, netTotal, owedOf } from "./owed";
@@ -141,7 +141,17 @@ export async function postCollection(tx: Tx, input: CollectionInput) {
   });
   await bumpSales(tx, rows);
   try {
-    await recordPaymentCash(tx, { id: payment.id, paymentNo, source: "DEBT_COLLECTION", method: input.method, amount, accountId: input.accountId }, { locationId: rows[0]?.sale.locationId, userId: input.user.id });
+    // The money is paid to the SHOP. An invoice that was sold from a Winga's custody location (a "sold report") is still paid to the
+    // shop's till or accounts, never into accounts at the Winga's own location (the shop's closing would never count them).
+    const saleLocationId = rows[0]?.sale.locationId;
+    const saleLocation = saleLocationId ? await tx.location.findUnique({ where: { id: saleLocationId }, select: { type: true } }) : null;
+    let cashLocationId = saleLocationId;
+    if (saleLocation?.type === "RESELLER") {
+      const chosen = input.accountId ? await tx.cashAccount.findUnique({ where: { id: input.accountId }, select: { locationId: true, location: { select: { type: true } } } }) : null;
+      if (chosen && chosen.location.type === "RESELLER") throw new CashError("This account does not exist here.", { accountId: "Choose an account from the list." });
+      cashLocationId = chosen ? chosen.locationId : await defaultLocationId(tx);
+    }
+    await recordPaymentCash(tx, { id: payment.id, paymentNo, source: "DEBT_COLLECTION", method: input.method, amount, accountId: input.accountId }, { locationId: cashLocationId, userId: input.user.id });
   } catch (e) {
     if (e instanceof CashError) throw new CollectionError(e.message, { accountId: e.fieldErrors?.accountId ?? e.message });
     throw e;
