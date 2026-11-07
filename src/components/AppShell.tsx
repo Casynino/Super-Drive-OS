@@ -155,7 +155,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
 
   /** the full menu: brand, search, MAIN, WORKSPACE (folding groups with branches), night mode and the person */
   const full = (drawer: boolean) => (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between gap-2 px-4 pb-3 pr-7 pt-4">
         {brand(false)}
         {drawer && (
@@ -288,8 +288,8 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   return (
     <div className={cn("min-h-dvh transition-[padding] duration-200 print:pl-0", collapsed ? "lg:pl-[5.9rem]" : "lg:pl-[17.5rem]")}>
       {/* Desktop and tablet: the glass sidebar. The round button on its edge folds it into an icon rail and back. */}
-      <aside className={cn("fixed left-3 top-3 z-30 hidden lg:block print:hidden", collapsed ? "w-[4.5rem]" : "bottom-3 w-64")}>
-        <div className={cn("glass-panel flex flex-col", collapsed ? "max-h-[calc(100dvh-1.5rem)]" : "h-full")}>{collapsed ? rail : full(false)}</div>
+      <aside className={cn("fixed left-3 top-3 z-30 hidden lg:block print:hidden", collapsed ? "w-[4.5rem]" : "w-64")}>
+        <div className="glass-panel flex max-h-[calc(100dvh-1.5rem)] flex-col">{collapsed ? rail : full(false)}</div>
         <div className="group absolute -right-3.5 top-[1.65rem] z-10">
           <button type="button" onClick={() => setRail(!collapsed)} aria-label={collapsed ? "Expand the menu" : "Collapse the menu"} className="grid h-7 w-7 place-items-center rounded-full bg-white text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.4)] ring-1 ring-black/10 transition hover:scale-105">
             {collapsed ? <ChevronRight size={15} strokeWidth={2.5} /> : <ChevronLeft size={15} strokeWidth={2.5} />}
@@ -304,8 +304,8 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} aria-hidden />
-          <aside className="absolute inset-y-3 left-3 w-72 max-w-[85vw]">
-            <div className="glass-panel h-full">{full(true)}</div>
+          <aside className="absolute left-3 top-3 w-72 max-w-[85vw]">
+            <div className="glass-panel flex max-h-[calc(100dvh-1.5rem)] flex-col">{full(true)}</div>
           </aside>
         </div>
       )}

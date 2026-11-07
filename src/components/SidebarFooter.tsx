@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bell, ChevronsUpDown, KeyRound, LogOut, Moon, Sun, UserRound } from "lucide-react";
+import { Bell, KeyRound, LogOut, Moon, Sun, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function initials(name: string) {
@@ -79,17 +79,9 @@ export default function SidebarFooter({ name, roleName, logoutAction, unread = 0
         <button type="button" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-haspopup="menu" className={cn("glass-row flex w-full items-center gap-3 rounded-full text-left", rail ? "justify-center p-1" : "px-2 py-2")} title={rail ? name : undefined}>
           <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-navy-600 to-navy-800 text-xs font-semibold text-white ring-1 ring-white/25">
             {initials(name)}
-            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-[#0f1c33]" aria-hidden />
           </span>
-          {!rail && (
-            <>
-              <span className="min-w-0 flex-1 leading-tight">
-                <span className="block truncate text-sm font-semibold text-slate-900">{name}</span>
-                <span className="mt-0.5 block truncate text-xs text-slate-500">{roleName}</span>
-              </span>
-              <ChevronsUpDown size={15} className="shrink-0 text-slate-400" aria-hidden />
-            </>
-          )}
+          {/* only the initials and the full name (it wraps instead of being cut off) */}
+          {!rail && <span className="min-w-0 flex-1 break-words text-sm font-semibold leading-snug text-slate-900">{name}</span>}
         </button>
 
         {menu && (
