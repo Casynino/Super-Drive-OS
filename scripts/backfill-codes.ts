@@ -6,7 +6,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { backfillBarcodes } from "../src/lib/product-codes";
 
-const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: (process.env.DIRECT_URL || process.env.DATABASE_URL)! }) });
 
 backfillBarcodes(db as unknown as Parameters<typeof backfillBarcodes>[0])
   .then((n) => console.log(n === 0 ? "Every product already has a barcode." : `${n} product(s) got a barcode.`))

@@ -17,7 +17,7 @@ const setSetting = (key: string, value: unknown) => db.setting.upsert({ where: {
 
 beforeAll(async () => {
   const role = await db.role.create({ data: { key: `T_${randomUUID()}`, name: "Test role" } });
-  userId = (await db.user.create({ data: { username: `t_${randomUUID()}`, name: "Cashier", passwordHash: "x", roleId: role.id } })).id;
+  userId = (await db.user.create({ data: { username: `t_${randomUUID()}`, email: `t_${randomUUID()}@test.local`, name: "Cashier", passwordHash: "x", roleId: role.id } })).id;
   unit = (await db.unit.create({ data: { name: `Bottle ${randomUUID()}`, symbol: randomUUID().slice(0, 8) } })).id;
   categoryId = (await db.category.create({ data: { name: `Cat ${randomUUID()}` } })).id;
   await setSetting("reminderAutoEnabled", true);

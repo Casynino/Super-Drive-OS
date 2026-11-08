@@ -98,7 +98,7 @@ export default async function EmployeePage({
       <PageHeader title="Member" back={{ href: "/employees", label: "Roles" }} />
       {sp.created && (
         <div className="mb-4">
-          <Alert kind="success">Member added. Give them their username and temporary password.</Alert>
+          <Alert kind="success">Member added. Give them their email and temporary password.</Alert>
         </div>
       )}
       {locked && (
@@ -118,7 +118,7 @@ export default async function EmployeePage({
               {employee.name} {isSelf && <span className="text-base font-normal text-slate-400">(you)</span>}
             </h2>
             <p className="mt-0.5 text-sm text-slate-600">
-              @{employee.username} · {employee.role.name}
+              {employee.email} · {employee.role.name}
               {employee.status !== "ACTIVE" && <span className="ml-2 font-medium text-brand-red-dark">Inactive</span>}
             </p>
             <p className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-slate-500">

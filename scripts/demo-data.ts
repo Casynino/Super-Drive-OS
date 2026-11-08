@@ -145,7 +145,7 @@ async function setup(d: number) {
   const roles = new Map((await db.role.findMany({ select: { id: true, key: true } })).map((r) => [r.key, r.id]));
   const mk = async (name: string, username: string, roleKey: string, phone: string): Promise<Who> => {
     const password = `Demo-${randomUUID().slice(0, 8)}9`;
-    const u = await db.user.create({ data: { name, username, phone, passwordHash: await hashPassword(password), roleId: roles.get(roleKey)! } });
+    const u = await db.user.create({ data: { name, username, email: `${username}@superdrive.local`, phone, passwordHash: await hashPassword(password), roleId: roles.get(roleKey)! } });
     accounts.push({ name, username, password, role: roleKey });
     return { id: u.id, name };
   };
@@ -546,7 +546,7 @@ async function main() {
   // the logins of the sample staff, kept in a private file (never printed)
   const dir = join(__dirname, "..", ".backups");
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, "demo-accounts.txt"), ["Sample staff logins (the owner's login is unchanged)", "", ...accounts.map((a) => `${a.role.padEnd(12)} ${a.name.padEnd(16)} username: ${a.username.padEnd(8)} password: ${a.password}`), ""].join("\n"));
+  writeFileSync(join(dir, "demo-accounts.txt"), ["Sample staff logins (the owner's login is unchanged)", "", ...accounts.map((a) => `${a.role.padEnd(12)} ${a.name.padEnd(16)} email: ${(a.username + "@superdrive.local").padEnd(26)} password: ${a.password}`), ""].join("\n"));
 
   const counts = await Promise.all([db.sale.count(), db.customer.count(), db.inventoryItem.count(), db.shipment.count(), db.expense.count(), db.dailyClosing.count()]);
   console.log(`Done: ${counts[0]} sales, ${counts[1]} customers, ${counts[2]} item records, ${counts[3]} purchase orders, ${counts[4]} expenses, ${counts[5]} daily closings.`);

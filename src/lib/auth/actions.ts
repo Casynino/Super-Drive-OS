@@ -14,21 +14,22 @@ const MAX_FAILED = 5;
 const LOCK_MINUTES = 15;
 
 const loginSchema = z.object({
-  username: z.string().trim().min(1, "Enter your username.").max(64),
+  email: z.string().trim().min(1, "Enter your email address.").max(254),
   password: z.string().min(1, "Enter your password.").max(200),
 });
 
 export async function login(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = loginSchema.safeParse({ username: formString(formData, "username"), password: formData.get("password") });
+  const parsed = loginSchema.safeParse({ email: formString(formData, "email"), password: formData.get("password") });
   if (!parsed.success) return zodErrors(parsed.error);
 
-  const username = parsed.data.username.toLowerCase();
-  const genericError = fail("Invalid username or password.");
-  const user = await db.user.findUnique({ where: { username } });
+  const email = parsed.data.email.toLowerCase();
+  const keep = { email: parsed.data.email }; // the typed email stays in the box after a failed attempt
+  const genericError = fail("Invalid email or password.", undefined, keep);
+  const user = await db.user.findUnique({ where: { email } });
 
   if (user?.lockedUntil && user.lockedUntil > new Date()) {
     const mins = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
-    return fail(`Too many failed attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`);
+    return fail(`Too many failed attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`, undefined, keep);
   }
 
   const valid = await verifyPassword(parsed.data.password, user?.passwordHash ?? (await getDummyHash()));
@@ -47,13 +48,13 @@ export async function login(_prev: ActionState, formData: FormData): Promise<Act
         entityId: user.id,
       });
     } else {
-      // somebody typed a username that does not exist: the Admin should know
-      await writeAudit(db, { user: null, action: "auth.login_unknown", entityType: "User", reference: username.slice(0, 64) });
+      // somebody typed an email that does not exist: the Admin should know
+      await writeAudit(db, { user: null, action: "auth.login_unknown", entityType: "User", reference: email.slice(0, 64) });
     }
     return genericError;
   }
 
-  if (user.status !== "ACTIVE") return fail("This account has been deactivated. Contact the business owner.");
+  if (user.status !== "ACTIVE") return fail("This account has been deactivated. Contact the business owner.", undefined, keep);
 
   await db.user.update({ where: { id: user.id }, data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() } });
   await createSession(user.id);
@@ -73,7 +74,7 @@ const profileSchema = z.object({
   phone: z.string().trim().max(30, "Too long.").optional(),
 });
 
-/** A signed-in person edits their OWN name, email and phone. Username and role stay with the owner (Employees). */
+/** A signed-in person edits their OWN name, email (the sign-in name) and phone. Role and status stay with the owner (Employees). */
 export async function updateProfile(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const session = await getSessionUser();
   if (!session) return fail("Your session has expired. Please sign in again.");
@@ -83,11 +84,12 @@ export async function updateProfile(_prev: ActionState, formData: FormData): Pro
   const errors: Record<string, string> = {};
   if (!parsed.success) for (const i of parsed.error.issues) errors[String(i.path[0])] ??= i.message;
   const email = values.email.toLowerCase();
-  if (email && !z.email().safeParse(email).success) errors.email = "Enter a valid email.";
+  if (!email) errors.email = "Enter your email address: it is how you sign in.";
+  else if (!z.email().safeParse(email).success) errors.email = "Enter a valid email.";
   if (Object.keys(errors).length > 0 || !parsed.success) return fail("Please fix the highlighted fields.", errors, values);
 
   const before = await db.user.findUniqueOrThrow({ where: { id: session.id }, select: { name: true, email: true, phone: true } });
-  const after = { name: parsed.data.name, email: email || null, phone: parsed.data.phone ?? null };
+  const after = { name: parsed.data.name, email, phone: parsed.data.phone ?? null };
   if (after.email && after.email !== before.email && (await db.user.findUnique({ where: { email: after.email }, select: { id: true } }))) {
     return fail("Please fix the highlighted fields.", { email: "This email is already used by another employee." }, values);
   }

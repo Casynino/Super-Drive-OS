@@ -42,7 +42,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
   ]);
   const roles = [...rolesRaw].sort(byPositionRank); // Admin first
   const showInactive = sp.status === "all";
-  const shown = employees.filter((e) => (showInactive ? true : e.status === "ACTIVE") && (!q || [e.name, e.username, e.phone ?? "", e.email ?? ""].some((x) => x.toLowerCase().includes(q))));
+  const shown = employees.filter((e) => (showInactive ? true : e.status === "ACTIVE") && (!q || [e.name, e.phone ?? "", e.email].some((x) => x.toLowerCase().includes(q))));
 
   return (
     <>
@@ -61,7 +61,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
       <form method="get" className="card card-pad mb-5 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto]">
         <div className="relative">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input name="q" defaultValue={sp.q ?? ""} placeholder="Search name, username or phone" className="input pl-9" aria-label="Search members" />
+          <input name="q" defaultValue={sp.q ?? ""} placeholder="Search name, email or phone" className="input pl-9" aria-label="Search members" />
         </div>
         <select name="status" defaultValue={sp.status ?? ""} className="input" aria-label="Status">
           <option value="">Active only</option>
@@ -124,7 +124,7 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
                               </Link>
                               {e.id === user.id && <span className="ml-2 text-xs font-normal text-slate-400">(you)</span>}
                             </td>
-                            <td className="text-slate-600">@{e.username}</td>
+                            <td className="text-slate-600">{e.email}</td>
                             <td className="hidden text-slate-600 sm:table-cell">{e.phone ?? "—"}</td>
                             <td className="hidden text-slate-600 md:table-cell">{lastSeen(e.lastLoginAt)}</td>
                             <td className={cn("text-right text-sm", e.status === "ACTIVE" ? "text-emerald-600" : "text-slate-500")}>{e.status === "ACTIVE" ? "Active" : "Inactive"}</td>

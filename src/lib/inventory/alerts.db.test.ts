@@ -12,7 +12,7 @@ let categoryId: string;
 
 beforeAll(async () => {
   const role = await db.role.create({ data: { key: `OWN_${randomUUID()}`, name: "Owner test role", isSuperAdmin: true } });
-  ownerId = (await db.user.create({ data: { username: `o_${randomUUID()}`, name: "Owner", passwordHash: "x", roleId: role.id } })).id;
+  ownerId = (await db.user.create({ data: { username: `o_${randomUUID()}`, email: `o_${randomUUID()}@test.local`, name: "Owner", passwordHash: "x", roleId: role.id } })).id;
   unitId = (await db.unit.create({ data: { name: `Bottle ${randomUUID()}`, symbol: randomUUID().slice(0, 8) } })).id;
   categoryId = (await db.category.create({ data: { name: `Cat ${randomUUID()}` } })).id;
 });

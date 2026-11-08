@@ -27,8 +27,7 @@ export default function EmployeeForm({ action, roles }: { action: Action; roles:
   const fe = state.fieldErrors ?? {};
   const v = state.values ?? {};
   const [name, setName] = useState(v.name ?? "");
-  const [username, setUsername] = useState(v.username ?? "");
-  const [touched, setTouched] = useState(Boolean(v.username));
+  const [email, setEmail] = useState(v.email ?? "");
   const [roleId, setRoleId] = useState(v.roleId ?? "");
   const [password, setPassword] = useState(v.password ?? "");
 
@@ -50,31 +49,15 @@ export default function EmployeeForm({ action, roles }: { action: Action; roles:
                 name="name"
                 autoComplete="off"
                 value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  if (!touched) setUsername(e.target.value.trim().split(/\s+/)[0]?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "");
-                }}
+                onChange={(e) => setName(e.target.value)}
                 className={cn(inputClass(fe.name), "h-11")}
               />
             </Field>
-            <Field label="Username" name="username" id={id("user")} error={fe.username} required hint="What they type to sign in.">
-              <input
-                id={id("user")}
-                name="username"
-                autoComplete="off"
-                value={username}
-                onChange={(e) => {
-                  setTouched(true);
-                  setUsername(e.target.value.toLowerCase().replace(/\s/g, ""));
-                }}
-                className={cn(inputClass(fe.username), "h-11")}
-              />
+            <Field label="Email address" name="email" id={id("email")} error={fe.email} required hint="What they type to sign in. One email, one person.">
+              <input id={id("email")} name="email" type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value.trim().toLowerCase())} className={cn(inputClass(fe.email), "h-11")} />
             </Field>
             <Field label="Phone" name="phone" id={id("phone")} error={fe.phone} hint="Optional.">
               <input id={id("phone")} name="phone" autoComplete="off" defaultValue={v.phone ?? ""} className={cn(inputClass(fe.phone), "h-11")} />
-            </Field>
-            <Field label="Email" name="email" id={id("email")} error={fe.email} hint="Optional.">
-              <input id={id("email")} name="email" type="email" autoComplete="off" defaultValue={v.email ?? ""} className={cn(inputClass(fe.email), "h-11")} />
             </Field>
           </div>
         </section>
@@ -92,10 +75,10 @@ export default function EmployeeForm({ action, roles }: { action: Action; roles:
         </section>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5">
-          <SubmitButton pendingLabel="Creating…" disabled={!name.trim() || !username || !roleId || password.length < 8}>
+          <SubmitButton pendingLabel="Creating…" disabled={!name.trim() || !email.includes("@") || !roleId || password.length < 8}>
             Create employee
           </SubmitButton>
-          <span className="text-xs text-slate-500">Then tell them the username and the temporary password.</span>
+          <span className="text-xs text-slate-500">Then tell them their email and the temporary password.</span>
         </div>
       </div>
 

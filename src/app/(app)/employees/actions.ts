@@ -11,19 +11,25 @@ import type { SessionUser } from "@/lib/auth/session";
 
 const profileSchema = z.object({
   name: z.string().trim().min(2, "Enter the full name.").max(100, "Too long."),
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9._-]{3,32}$/, "3–32 characters: letters, numbers, dot, dash or underscore."),
   phone: z.string().trim().max(30, "Too long.").optional(),
   roleId: z.string().min(1, "Choose a role."),
 });
 
-function readEmail(fd: FormData): { email: string | null; error?: string } {
+/** The email is how a person signs in, so it is required and always stored lowercase. */
+function readEmail(fd: FormData): { email: string; error?: string } {
   const raw = formString(fd, "email").toLowerCase();
-  if (!raw) return { email: null };
-  return z.email().safeParse(raw).success ? { email: raw } : { email: null, error: "Enter a valid email." };
+  if (!raw) return { email: "", error: "Enter their email address: it is how they sign in." };
+  return z.email().safeParse(raw).success ? { email: raw } : { email: "", error: "Enter a valid email." };
+}
+
+/** The internal handle (the old username column, still unique): the start of the email, made safe, with a number added if it is taken. */
+async function uniqueHandle(email: string): Promise<string> {
+  const base = (email.split("@")[0] ?? "").replace(/[^a-z0-9._-]/g, "").slice(0, 28).padEnd(3, "0") || "user";
+  for (let n = 0; n < 200; n++) {
+    const handle = n === 0 ? base : `${base}${n + 1}`;
+    if (!(await db.user.findUnique({ where: { username: handle }, select: { id: true } }))) return handle;
+  }
+  return `${base}${Date.now()}`;
 }
 
 const bad = (fieldErrors: Record<string, string>, values: Record<string, string>) => fail("Please fix the highlighted fields.", fieldErrors, values);
@@ -36,7 +42,6 @@ export async function createEmployee(_prev: ActionState, fd: FormData): Promise<
   const result = await guarded("employees.manage", async (actor) => {
     const parsed = profileSchema.safeParse({
       name: formString(fd, "name"),
-      username: formString(fd, "username"),
       phone: formString(fd, "phone") || undefined,
       roleId: formString(fd, "roleId"),
     });
@@ -52,19 +57,15 @@ export async function createEmployee(_prev: ActionState, fd: FormData): Promise<
     if (!role) return bad({ roleId: "Unknown role." }, values);
     if (!mayTouch(actor, role.isSuperAdmin)) return fail("Only a Director can create another Director.", undefined, values);
 
-    const [dupUser, dupMail] = await Promise.all([
-      db.user.findUnique({ where: { username: parsed.data.username } }),
-      mail.email ? db.user.findUnique({ where: { email: mail.email } }) : null,
-    ]);
-    if (dupUser) return bad({ username: "This username is taken." }, values);
-    if (dupMail) return bad({ email: "This email is already used by another employee." }, values);
+    if (await db.user.findUnique({ where: { email: mail.email }, select: { id: true } })) return bad({ email: "This email is already used by another employee." }, values);
+    const handle = await uniqueHandle(mail.email);
 
     try {
       const created = await db.$transaction(async (tx) => {
         const u = await tx.user.create({
           data: {
             name: parsed.data.name,
-            username: parsed.data.username,
+            username: handle,
             email: mail.email,
             phone: parsed.data.phone ?? null,
             roleId: role.id,
@@ -77,15 +78,15 @@ export async function createEmployee(_prev: ActionState, fd: FormData): Promise<
           action: "user.create",
           entityType: "User",
           entityId: u.id,
-          reference: u.username,
-          after: { name: u.name, username: u.username, email: u.email, phone: u.phone, role: role.name },
+          reference: u.email,
+          after: { name: u.name, email: u.email, phone: u.phone, role: role.name },
         });
         return u;
       });
       revalidatePath("/employees");
       return { ok: true, message: created.id };
     } catch (e) {
-      if (isUniqueViolation(e)) return bad({ username: "This username or email is already used." }, values);
+      if (isUniqueViolation(e)) return bad({ email: "This email is already used by another employee." }, values);
       throw e;
     }
   });
@@ -97,7 +98,7 @@ export async function updateEmployee(_prev: ActionState, fd: FormData): Promise<
   const values = formValues(fd);
   return guarded("employees.manage", async (actor) => {
     const id = formString(fd, "id");
-    const parsed = profileSchema.omit({ username: true }).safeParse({
+    const parsed = profileSchema.safeParse({
       name: formString(fd, "name"),
       phone: formString(fd, "phone") || undefined,
       roleId: formString(fd, "roleId"),
@@ -122,7 +123,7 @@ export async function updateEmployee(_prev: ActionState, fd: FormData): Promise<
     if (isSelf && (newRole.id !== target.roleId || status !== target.status)) {
       return fail("You cannot change your own role or deactivate your own account.", undefined, values);
     }
-    if (mail.email && mail.email !== target.email) {
+    if (mail.email !== target.email) {
       const dup = await db.user.findUnique({ where: { email: mail.email } });
       if (dup) return bad({ email: "This email is already used by another employee." }, values);
     }
@@ -145,7 +146,7 @@ export async function updateEmployee(_prev: ActionState, fd: FormData): Promise<
           { name: target.name, phone: target.phone, email: target.email },
           { name: parsed.data.name, phone: parsed.data.phone ?? null, email: mail.email },
         );
-        const base = { user: actor, entityType: "User", entityId: id, reference: target.username };
+        const base = { user: actor, entityType: "User", entityId: id, reference: target.email };
         if (prof.changed) await writeAudit(tx, { ...base, action: "user.update", before: prof.before, after: prof.after });
         if (newRole.id !== target.roleId) {
           await writeAudit(tx, { ...base, action: "user.role_change", before: { role: target.role.name }, after: { role: newRole.name } });
@@ -189,7 +190,7 @@ export async function resetEmployeePassword(_prev: ActionState, fd: FormData): P
         data: { passwordHash: await hashPassword(pw.data), mustChangePassword: true, failedLoginCount: 0, lockedUntil: null },
       });
       await tx.session.deleteMany({ where: { userId: id } });
-      await writeAudit(tx, { user: actor, action: "user.password_reset", entityType: "User", entityId: id, reference: target.username });
+      await writeAudit(tx, { user: actor, action: "user.password_reset", entityType: "User", entityId: id, reference: target.email });
     });
     return { ok: true, message: "Password reset. They must choose a new one at next sign-in." };
   });

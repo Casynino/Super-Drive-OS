@@ -10,7 +10,7 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { backfillBarcodes } from "../src/lib/product-codes";
 import { processProductImage } from "../src/lib/product-images";
 
-const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: (process.env.DIRECT_URL || process.env.DATABASE_URL)! }) });
 const dir = join(__dirname, "..", "prisma", "catalog");
 
 type Item = { sku: string; name: string; brand: string; category: string; packaging: string; perCarton: number; description: string; image: string };

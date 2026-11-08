@@ -203,17 +203,17 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
           <dl className="mt-5 hidden lg:flex lg:flex-wrap lg:gap-x-9">
             {balances.length > 0 && (
               <div>
-                <dt className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/55 sm:text-[11px] sm:tracking-[0.14em]">You can use now</dt>
-                <dd className="mt-0.5 text-[12px] font-bold tabular-nums sm:text-xl">{m(usable)}</dd>
+                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">You can use now</dt>
+                <dd className="mt-0.5 text-xl font-bold tabular-nums">{m(usable)}</dd>
               </div>
             )}
             <div>
-              <dt className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/55 sm:text-[11px] sm:tracking-[0.14em]">Collected today</dt>
-              <dd className="mt-0.5 text-[12px] font-bold tabular-nums text-emerald-300 sm:text-xl">{m(o.today.collected)}</dd>
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Collected today</dt>
+              <dd className="mt-0.5 text-xl font-bold tabular-nums text-emerald-300">{m(o.today.collected)}</dd>
             </div>
             <div>
-              <dt className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/55 sm:text-[11px] sm:tracking-[0.14em]">Owed by customers</dt>
-              <dd className="mt-0.5 text-[12px] font-bold tabular-nums text-oil-400 sm:text-xl">{m(k.debt.value)}</dd>
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Owed by customers</dt>
+              <dd className="mt-0.5 text-xl font-bold tabular-nums text-oil-400">{m(k.debt.value)}</dd>
             </div>
           </dl>
         </div>

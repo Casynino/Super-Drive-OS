@@ -7,7 +7,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { DEFAULT_ROLES, PERMISSIONS } from "../src/lib/permissions";
 
-const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: (process.env.DIRECT_URL || process.env.DATABASE_URL)! }) });
 
 const BASE_UNITS = [
   { name: "Litre", symbol: "L", allowsDecimal: true },
@@ -92,20 +92,22 @@ async function main() {
 
   // 4. First Super Admin (only when there are no users at all)
   if ((await db.user.count()) === 0) {
-    const username = process.env.ADMIN_USERNAME?.trim().toLowerCase();
+    const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
     const password = process.env.ADMIN_PASSWORD;
     const name = process.env.ADMIN_NAME?.trim() || "Business Owner";
-    if (!username || !password || password.length < 12) {
-      throw new Error("Set ADMIN_USERNAME and ADMIN_PASSWORD (min 12 chars) in .env to create the first Super Admin.");
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password || password.length < 12) {
+      throw new Error("Set ADMIN_EMAIL (a real email address) and ADMIN_PASSWORD (min 12 chars) in .env to create the first Super Admin.");
     }
+    // the internal handle (old username column) is the start of the email
+    const username = (email.split("@")[0] ?? "admin").replace(/[^a-z0-9._-]/g, "").padEnd(3, "0");
     const role = await db.role.findUniqueOrThrow({ where: { key: "SUPER_ADMIN" } });
     const user = await db.user.create({
-      data: { username, name, roleId: role.id, passwordHash: await bcrypt.hash(password, 12), mustChangePassword: false },
+      data: { username, email, name, roleId: role.id, passwordHash: await bcrypt.hash(password, 12), mustChangePassword: false },
     });
     await db.auditLog.create({
       data: { userId: user.id, userName: user.name, action: "user.create", entityType: "User", entityId: user.id, reason: "Initial Super Admin created by seed" },
     });
-    console.log(`Created first Super Admin "${username}".`);
+    console.log(`Created first Super Admin (sign in with ${email}).`);
   }
 
   console.log("Seed complete.");

@@ -24,13 +24,13 @@ const activityLabel = (action: string) => {
 export default async function AccountPage() {
   const session = await requireUser();
   const [me, activity, devices] = await Promise.all([
-    db.user.findUniqueOrThrow({ where: { id: session.id }, select: { name: true, username: true, email: true, phone: true, lastLoginAt: true, createdAt: true } }),
+    db.user.findUniqueOrThrow({ where: { id: session.id }, select: { name: true, email: true, phone: true, lastLoginAt: true, createdAt: true } }),
     db.auditLog.findMany({ where: { userId: session.id }, orderBy: { createdAt: "desc" }, take: 8, select: { id: true, action: true, reference: true, createdAt: true } }),
     db.session.count({ where: { userId: session.id, expiresAt: { gt: new Date() } } }),
   ]);
 
   const facts = [
-    { label: "Username", value: `@${me.username}` },
+    { label: "Sign-in email", value: me.email },
     { label: "Role", value: session.roleName },
     { label: "Last sign-in", value: me.lastLoginAt ? formatDateTime(me.lastLoginAt) : "—" },
     { label: "Member since", value: formatDate(me.createdAt) },
@@ -50,7 +50,7 @@ export default async function AccountPage() {
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-xl font-semibold text-slate-900">{me.name}</h2>
             <p className="truncate text-sm text-slate-500">
-              {session.roleName} · @{me.username}
+              {session.roleName} · {me.email}
             </p>
           </div>
         </div>
@@ -68,7 +68,7 @@ export default async function AccountPage() {
         <div className="space-y-6">
           <div className="card card-pad">
             <h2 className="text-base font-semibold text-slate-900">My details</h2>
-            <p className="mt-1 text-sm text-slate-500">Your name appears on sales, receipts and reports. Your username and role are set by the owner.</p>
+            <p className="mt-1 text-sm text-slate-500">Your name appears on sales, receipts and reports. Your email is how you sign in; your role is set by the owner.</p>
             <ProfileForm name={me.name} email={me.email ?? ""} phone={me.phone ?? ""} />
           </div>
 

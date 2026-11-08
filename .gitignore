@@ -19,3 +19,4 @@ PRODUCTS */
 
 # Local backups and sample-data logins (never committed)
 .backups
+.next-*

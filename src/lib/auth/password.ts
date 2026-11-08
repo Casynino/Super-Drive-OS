@@ -14,7 +14,7 @@ export const passwordSchema = z
   .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), "Include at least one letter and one number.");
 
 let dummyHash: Promise<string> | null = null;
-/** Compared against when the username does not exist, so response time doesn't reveal valid usernames. */
+/** Compared against when the email does not exist, so response time doesn't reveal which emails are registered. */
 export function getDummyHash() {
   dummyHash ??= bcrypt.hash("not-a-real-password", COST);
   return dummyHash;

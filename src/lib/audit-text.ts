@@ -4,7 +4,7 @@ const AUTH: Record<string, string> = {
   "auth.logout": "Signed out",
   "auth.login_failed": "Wrong password",
   "auth.locked": "Locked out after 5 wrong passwords",
-  "auth.login_unknown": "Tried to sign in with an unknown username",
+  "auth.login_unknown": "Tried to sign in with an unknown email",
   "auth.profile_updated": "Changed their own details",
   "auth.password_changed": "Changed their password",
 };

@@ -65,7 +65,7 @@ model User {
   id                  String                  @id @default(cuid())
   username            String                  @unique // stored lowercase
   name                String
-  email               String?                 @unique
+  email               String                  @unique // the sign-in name, stored lowercase (DB CHECK)
   phone               String?
   passwordHash        String
   roleId              String
@@ -414,6 +414,8 @@ model StockMovement {
   @@index([type, createdAt])
   @@index([referenceType, referenceId])
   @@index([createdAt])
+  @@index([locationId])
+  @@index([userId])
 }
 
 model StockReceipt {
@@ -439,6 +441,7 @@ model StockReceipt {
 
   @@index([createdAt])
   @@index([supplierId])
+  @@index([locationId])
 }
 
 model StockReceiptItem {
@@ -474,6 +477,8 @@ model StockTransfer {
   items          StockTransferItem[]
 
   @@index([createdAt])
+  @@index([fromLocationId])
+  @@index([toLocationId])
 }
 
 model StockTransferItem {
@@ -510,6 +515,7 @@ model StockAdjustment {
 
   @@index([createdAt])
   @@index([kind])
+  @@index([locationId])
 }
 
 model StockAdjustmentItem {
@@ -677,6 +683,7 @@ model Payment {
   @@index([receivedAt])
   @@index([customerId])
   @@index([method, receivedAt])
+  @@index([receivedById])
 }
 
 // One slice of a payment applied to one invoice. A payment can be spread over several invoices, and the
@@ -788,6 +795,7 @@ model SaleReversal {
 
   @@index([saleId])
   @@index([status, requestedAt])
+  @@index([requestedById])
 }
 
 model ReversalItem {
@@ -809,6 +817,7 @@ model ReversalItem {
 
   @@index([reversalId])
   @@index([saleItemId])
+  @@index([productId])
 }
 
 model Notification {
@@ -885,6 +894,8 @@ model Shipment {
 
   @@index([status, createdAt])
   @@index([issue])
+  @@index([supplierId])
+  @@index([locationId])
 }
 
 model ShipmentItem {
@@ -997,6 +1008,7 @@ model ShipmentReceivingItem {
 
   @@index([receivingId])
   @@index([shipmentItemId])
+  @@index([productId])
 }
 
 // ───────────── Cash, expenses, deposits and daily closing ─────────────
@@ -1064,6 +1076,8 @@ model CashTransaction {
   @@index([accountId, closingId])
   @@index([businessDate])
   @@index([type, businessDate])
+  @@index([closingId])
+  @@index([userId])
 }
 
 model ExpenseCategory {
@@ -1115,6 +1129,9 @@ model Expense {
   @@index([status, requestedAt])
   @@index([expenseDate])
   @@index([requestedById, requestedAt])
+  @@index([categoryId])
+  @@index([cashAccountId])
+  @@index([locationId])
 }
 
 // A small picture (receipt, deposit slip) stored resized in the database, like product pictures.
@@ -1186,6 +1203,7 @@ model DailyClosing {
 
   @@unique([locationId, businessDate])
   @@index([status])
+  @@index([submittedById])
 }
 
 // ───────────── Resellers / consignment ─────────────
@@ -1241,6 +1259,8 @@ model ResellerIssue {
   items          ResellerIssueItem[]
 
   @@index([resellerId, createdAt])
+  @@index([fromLocationId])
+  @@index([toLocationId])
 }
 
 model ResellerIssueItem {
@@ -1279,6 +1299,8 @@ model ResellerReturn {
   items          ResellerReturnItem[]
 
   @@index([resellerId, createdAt])
+  @@index([fromLocationId])
+  @@index([toLocationId])
 }
 
 model ResellerReturnItem {
@@ -1388,6 +1410,7 @@ model SupplierPayment {
   submissionKey String        @unique
 
   @@index([supplierId, paidAt])
+  @@index([shipmentId])
 }
 
 // ───────────── Individual items (every physical unit has its own identity) ─────────────
@@ -1447,6 +1470,7 @@ model InventoryItem {
   @@index([receiptId])
   @@index([saleItemId])
   @@index([saleId])
+  @@index([locationId])
 }
 
 // The history of an item. Append-only (database trigger): nothing here is ever edited or deleted.
@@ -1523,6 +1547,8 @@ model PickupNote {
   @@index([status, createdAt])
   @@index([locationId, status])
   @@index([createdAt])
+  @@index([createdById])
+  @@index([completedById])
 }
 
 // One line of a pickup note = one invoice line. Reserved = quantity - releasedQty - cancelledQty (all in base units).
@@ -1573,6 +1599,7 @@ model PickupReleaseItem {
 
   @@index([releaseId])
   @@index([noteItemId])
+  @@index([productId])
 }
 
 enum WarehouseEventType {
@@ -1607,6 +1634,8 @@ model WarehouseEvent {
   @@index([type, createdAt])
   @@index([userId, createdAt])
   @@index([createdAt])
+  @@index([productId])
+  @@index([locationId])
 }
 
 // Every page a signed-in person opens, with who, when and from where. Append-only (database trigger). Together with the audit log
@@ -1662,4 +1691,5 @@ model StockProblem {
   @@index([reportedAt])
   @@index([action])
   @@index([productId])
+  @@index([locationId])
 }

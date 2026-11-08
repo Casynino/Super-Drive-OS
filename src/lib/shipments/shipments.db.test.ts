@@ -14,8 +14,8 @@ let categoryId: string;
 
 beforeAll(async () => {
   const role = await db.role.create({ data: { key: `T_${randomUUID()}`, name: "Test role" } });
-  ownerId = (await db.user.create({ data: { username: `o_${randomUUID()}`, name: "Owner", passwordHash: "x", roleId: role.id } })).id;
-  shopId = (await db.user.create({ data: { username: `s_${randomUUID()}`, name: "Attendant", passwordHash: "x", roleId: role.id } })).id;
+  ownerId = (await db.user.create({ data: { username: `o_${randomUUID()}`, email: `o_${randomUUID()}@test.local`, name: "Owner", passwordHash: "x", roleId: role.id } })).id;
+  shopId = (await db.user.create({ data: { username: `s_${randomUUID()}`, email: `s_${randomUUID()}@test.local`, name: "Attendant", passwordHash: "x", roleId: role.id } })).id;
   bottle = (await db.unit.create({ data: { name: `Bottle ${randomUUID()}`, symbol: randomUUID().slice(0, 8) } })).id;
   carton = (await db.unit.create({ data: { name: `Carton ${randomUUID()}`, symbol: randomUUID().slice(0, 8) } })).id;
   categoryId = (await db.category.create({ data: { name: `Cat ${randomUUID()}` } })).id;

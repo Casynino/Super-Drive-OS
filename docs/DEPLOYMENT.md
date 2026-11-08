@@ -5,20 +5,25 @@ Nothing here is done automatically. **Do not push or deploy until Nino says "pus
 ## 1. Environment variables (Vercel project settings — never commit them)
 | Name | What it is |
 |---|---|
-| `DATABASE_URL` | The Neon **pooled** connection string (production database). |
-| `ADMIN_NAME`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Used **only once** by `npm run db:seed` to create the owner (password 12+ characters). Remove after the first run. |
+| `DATABASE_URL` | The Neon **pooled** connection string (the host contains `-pooler`, with `?sslmode=require`). The running app uses this one. |
+| `DIRECT_URL` | The Neon **direct** (unpooled) connection string. `prisma migrate deploy` and the seed use it when it is set. Set it on the machine that runs the migrations; the app does not need it. |
+| `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Used **only once** by `npm run db:seed` to create the first Director (a real email address, password 12+ characters). Staff sign in with their EMAIL. Remove these after the first run. |
+| `APP_URL` | The public address, no trailing slash (links inside WhatsApp reports). |
+| `CRON_SECRET` | A long random value (16+ characters). Vercel sends it as `Authorization: Bearer …` to every `/api/cron/*` job (daily report, payment reminders, weekly and monthly reports). |
 | `CALLMEBOT_API_KEY` | From callmebot.com after linking the owner's WhatsApp number. Optional; without it the WhatsApp report is off. |
-| `CRON_SECRET` | A long random value (16+ characters). Vercel sends it as `Authorization: Bearer …` to `/api/cron/daily-report`. |
+| `WHATSAPP_CLOUD_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` | Only for automatic payment reminders (WhatsApp Business Cloud API). Optional; the reminders stay off without them. |
+
+Region: put the Vercel functions in the same region as the Neon database (every page makes several queries; distance multiplies them). The camera scanner needs the site on **https** (Vercel gives that) and the browser's camera permission.
 
 ## 2. First deploy of the database
-1. Create the Neon project/branch for production. **Never point a local command at it by accident**: check `DATABASE_URL` first.
-2. `npx prisma migrate deploy` (applies every migration, including the guards/triggers).
-3. `npm run db:seed` (permissions, built-in roles, units, default location *Main Store*, cash accounts, starting expense categories, the owner account).
+1. Create the Neon project/branch for production. **Never point a local command at it by accident**: check `DATABASE_URL` / `DIRECT_URL` first.
+2. `npx prisma migrate deploy` (applies every migration, including the guards/triggers). Migrations added on 2026-11-08 that production does not have yet: `stock_problem`, `warehouse_can_add_products`, `warehouse_can_adjust_stock`, `stock_problem_from_returns`, `warehouse_can_edit_products`, `foreign_key_indexes` and `drop_redundant_stock_balance_index` (additive indexes), `staff_sign_in_with_email` (every account gets a unique lowercase email; accounts without one get `<username>@superdrive.local`, so an EMPTY production database is unaffected).
+3. `npm run db:seed` (permissions, built-in roles, units, default location, cash accounts, starting expense categories, the first Director).
 4. `npm run db:import-catalog` (the 11 products with pictures; **no prices, no stock**).
 5. After any release that adds permissions, run `npm run db:seed` again so the built-in roles receive them (the owner's edits are never overwritten).
 
 ## 3. First-day setup (done by the owner, in this order)
-1. Sign in, change the password. Create the shop attendant account(s) (Employees → role *Shop Attendant*).
+1. Sign in with the email and password from the seed, change the password. Create the staff accounts (Roles → Add member: full name, EMAIL, role, temporary password; they change it at first sign-in). There is no public sign-up and no self-service password reset: the Director resets a forgotten password from the member's page.
 2. Products: set selling prices (and wholesale prices). Upload the two missing pictures (Total 15W-40 1L, Castrol 5W-30 5L).
 3. Settings → Business: name, phone, address (printed on receipts). Settings → Expenses and daily closing: the expense limit without approval and the allowed cash difference (both start at 0 = everything needs approval).
 4. Stock: announce the first shipment (Incoming Stock) or have the attendant record opening stock (Stock Receiving → Opening stock).
@@ -36,4 +41,4 @@ Nothing here is done automatically. **Do not push or deploy until Nino says "pus
 - Login: 5 wrong passwords lock the account for 15 minutes; sessions last 12 hours and are stored hashed.
 
 ## 6. Before the first real day
-`npm test`, `npm run test:db`, `npm run typecheck`, `npm run build` must all pass (they did at the last commit).
+`npm run typecheck`, `npm test`, `npm run test:db`, `npm run build` must pass, and a production build (`next build`, then `next start`) was driven page by page at phone, tablet and desktop widths (see the final audit report in `docs/AUDIT-2026-11-08.md`). After the real deploy: sign in on the live address, open the Warehouse scanner on a phone (the camera must ask for permission), make one test sale and release it, and check the browser console and the Vercel logs.
