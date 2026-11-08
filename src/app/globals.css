@@ -263,6 +263,9 @@ html:not(.dark) .glass-panel {
 .glass-row { transition: color 0.15s ease; }
 /* the search: a plain line, no box */
 .glass-field { background: transparent; box-shadow: inset 0 -1px 0 var(--glass-line); }
+/* no browser focus box in the search (the global :focus-visible outline would win over a utility class); a thin yellow line shows it is active */
+.glass-field input:focus-visible, .glass-field input:focus { outline: none; box-shadow: none; }
+.glass-field:focus-within { box-shadow: inset 0 -1px 0 #fdc400; }
 .glass-kbd { background: transparent; box-shadow: none; }
 /* a group's pages hang off a thin line with a curved elbow at each one, like branches */
 .glass-tree { position: relative; border-left: 1px solid var(--glass-line); }
