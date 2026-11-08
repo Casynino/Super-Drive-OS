@@ -12,13 +12,13 @@
 //
 // Lock order: shipment row -> (receipt: GRN counter -> products -> balances) / (new order: PO counter). Call inside db.$transaction.
 import { Prisma, type IssueAction, type IssueKind } from "@/generated/prisma/client";
-import { applyIncomingCost, lockProducts, type Tx } from "@/lib/inventory/engine";
+import { lockProducts, type Tx } from "@/lib/inventory/engine";
 import { postReceipt } from "@/lib/inventory/documents";
-import { disposeDamagedItems, isTracked, moveStockTracked } from "@/lib/inventory/items";
-import { parseMoney } from "@/lib/money";
+import { disposeDamagedItems, isTracked } from "@/lib/inventory/items";
 import { resolveLines } from "@/lib/inventory/lines";
 import { todayYmd } from "@/lib/dashboard/range";
 import { largestPack } from "@/lib/qty";
+import { putOnDiscount } from "./discount";
 import { ShipmentError, createShipment } from "./engine";
 
 const D = Prisma.Decimal;
@@ -290,50 +290,25 @@ export async function decideIssue(tx: Tx, input: DecideInput) {
     movedToShipmentId = order.id;
     newOrderNo = order.shipmentNo;
   } else if (input.action === "DISCOUNT_SELL") {
-    // The pieces go back on sale as their own "(damaged packaging)" product at the price the owner sets. The normal product and its price are untouched.
-    const orig = await tx.product.findUniqueOrThrow({ where: { id: rec.productId }, include: { units: true } });
-    const pack = [...orig.units].filter((u) => u.factor.gt(1)).sort((a, b) => b.factor.comparedTo(a.factor))[0] ?? null;
-    const typed = parseMoney(input.discountPrice ?? "", input.currencyDecimals);
-    if (!typed || typed.lte(0)) throw new ShipmentError("Enter the discounted selling price.", { discountPrice: "Enter a price above zero." });
-    const normal = pack ? (pack.sellingPrice ?? orig.sellingPrice.mul(pack.factor)) : orig.sellingPrice;
-    if (typed.gte(normal)) throw new ShipmentError("The discounted price must be lower than the normal price.", { discountPrice: `Lower than the normal ${normal.toFixed(0)}.` });
-    const perBase = (pack ? typed.div(pack.factor) : typed).toDecimalPlaces(2);
-    const sku = `${orig.sku}-DMG`;
-    let variant = await tx.product.findUnique({ where: { sku }, include: { units: true } });
-    if (!variant) {
-      variant = await tx.product.create({
-        data: {
-          sku,
-          name: `${orig.name} (damaged packaging)`,
-          description: `Same oil as ${orig.name}, packaging damaged, sold at a discount.`,
-          categoryId: orig.categoryId,
-          brandId: orig.brandId,
-          packagingType: orig.packagingType,
-          size: orig.size,
-          baseUnitId: orig.baseUnitId,
-          defaultSalesUnitId: orig.defaultSalesUnitId,
-          defaultPurchaseUnitId: orig.defaultPurchaseUnitId,
-          allowPieceSales: orig.allowPieceSales,
-          purchasePrice: orig.purchasePrice,
-          sellingPrice: perBase,
-          createdById: input.user.id,
-          units: { create: orig.units.map((u) => ({ unitId: u.unitId, factor: u.factor, sellingPrice: pack && u.unitId === pack.unitId ? typed : null })) },
-        },
-        include: { units: true },
-      });
-      await tx.productPriceHistory.create({ data: { productId: variant.id, field: "sellingPrice", oldValue: null, newValue: perBase, changedById: input.user.id } });
-    } else if (!variant.sellingPrice.eq(perBase)) {
-      // asked again with another price: the product follows the newest price
-      await tx.productPriceHistory.create({ data: { productId: variant.id, field: "sellingPrice", oldValue: variant.sellingPrice, newValue: perBase, changedById: input.user.id } });
-      await tx.product.update({ where: { id: variant.id }, data: { sellingPrice: perBase, status: "ACTIVE" } });
-      if (pack) await tx.productUnit.updateMany({ where: { productId: variant.id, unitId: pack.unitId }, data: { sellingPrice: typed } });
-    }
-    await lockProducts(tx, [orig.id, variant.id]);
-    await applyIncomingCost(tx, variant.id, qty, unitCost);
-    await moveStockTracked(tx, { productId: variant.id, locationId: shipment.locationId, type: "ADJUSTMENT", delta: qty, unitCost, referenceType: "Shipment", referenceId: shipment.id, referenceNo: shipment.shipmentNo, reason: `Damaged packaging from ${shipment.shipmentNo}, put on sale at a discount${note ? `: ${note}` : ""}`, userId: input.user.id });
-    await disposeDamagedItems(tx, { shipmentId: shipment.id, productId: orig.id, qty, referenceType: "Shipment", referenceId: shipment.id, referenceNo: shipment.shipmentNo, note: `Moved to ${variant.name} to be sold at a discount`, userId: input.user.id });
-    variantProductId = variant.id;
-    discountPerBase = perBase;
+    // The pieces go back on sale as their own "(damaged packaging)" product at the price set here. The normal product and its price are untouched.
+    const moved = await putOnDiscount(tx, {
+      productId: rec.productId,
+      qty,
+      discountPrice: input.discountPrice ?? "",
+      unitCost,
+      locationId: shipment.locationId,
+      currencyDecimals: input.currencyDecimals,
+      user: input.user,
+      referenceType: "Shipment",
+      referenceId: shipment.id,
+      referenceNo: shipment.shipmentNo,
+      reason: `Damaged packaging from ${shipment.shipmentNo}, put on sale at a discount${note ? `: ${note}` : ""}`,
+      disposeOriginal: async (variantName) => {
+        await disposeDamagedItems(tx, { shipmentId: shipment.id, productId: rec.productId, qty, referenceType: "Shipment", referenceId: shipment.id, referenceNo: shipment.shipmentNo, note: `Moved to ${variantName} to be sold at a discount`, userId: input.user.id });
+      },
+    });
+    variantProductId = moved.variantProductId;
+    discountPerBase = moved.perBase;
   } else if (input.action === "WRITE_OFF") {
     await disposeDamagedItems(tx, { shipmentId: shipment.id, productId: rec.productId, qty, referenceType: "Shipment", referenceId: shipment.id, referenceNo: shipment.shipmentNo, note: note ?? `Written off after investigation (${shipment.shipmentNo})`, userId: input.user.id });
   }

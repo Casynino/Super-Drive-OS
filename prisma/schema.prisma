@@ -119,6 +119,8 @@ model User {
   pickupReleases      PickupRelease[]
   warehouseEvents     WarehouseEvent[]
   activity            ActivityLog[]
+  problemsReported    StockProblem[]          @relation("ProblemReporter")
+  problemsDecided     StockProblem[]          @relation("ProblemDecider")
 
   @@index([roleId])
 }
@@ -140,17 +142,17 @@ model Session {
 // ───────────── Business setup ─────────────
 
 model Location {
-  id        String       @id @default(cuid())
-  code      String       @unique
-  name      String       @unique
-  type      LocationType @default(WAREHOUSE)
-  address   String?
-  isDefault Boolean      @default(false)
-  status    RecordStatus @default(ACTIVE)
+  id             String       @id @default(cuid())
+  code           String       @unique
+  name           String       @unique
+  type           LocationType @default(WAREHOUSE)
+  address        String?
+  isDefault      Boolean      @default(false)
+  status         RecordStatus @default(ACTIVE)
   // true = sales from this location RESERVE the stock and make a pickup note; the stock leaves only when the goods are released (Store Warehouse)
-  pickupRequired Boolean  @default(false)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  pickupRequired Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   pickupNotes         PickupNote[]
   warehouseEvents     WarehouseEvent[]
@@ -172,6 +174,7 @@ model Location {
   resellerIssuesTo    ResellerIssue[]   @relation("IssueTo")
   resellerReturnsFrom ResellerReturn[]  @relation("ReturnFrom")
   resellerReturnsTo   ResellerReturn[]  @relation("ReturnTo")
+  problems            StockProblem[]
 }
 
 model Setting {
@@ -274,6 +277,8 @@ model Product {
   pickupItems           PickupNoteItem[]
   pickupReleaseItems    PickupReleaseItem[]
   warehouseEvents       WarehouseEvent[]
+  problems              StockProblem[]          @relation("ProblemProduct")
+  problemVariants       StockProblem[]          @relation("ProblemVariant")
 
   @@index([categoryId])
   @@index([brandId])
@@ -500,6 +505,8 @@ model StockAdjustment {
   createdBy     User                  @relation(fields: [createdById], references: [id])
   createdAt     DateTime              @default(now())
   items         StockAdjustmentItem[]
+  problemReport StockProblem?         @relation("ProblemReport")
+  problemFound  StockProblem?         @relation("ProblemFound")
 
   @@index([createdAt])
   @@index([kind])
@@ -627,22 +634,22 @@ model Sale {
 }
 
 model SaleItem {
-  id            String         @id @default(cuid())
+  id            String          @id @default(cuid())
   saleId        String
-  sale          Sale           @relation(fields: [saleId], references: [id])
+  sale          Sale            @relation(fields: [saleId], references: [id])
   productId     String
-  product       Product        @relation(fields: [productId], references: [id])
-  enteredQty    Decimal        @db.Decimal(14, 3)
+  product       Product         @relation(fields: [productId], references: [id])
+  enteredQty    Decimal         @db.Decimal(14, 3)
   enteredUnitId String
-  enteredUnit   Unit           @relation(fields: [enteredUnitId], references: [id])
-  factor        Decimal        @db.Decimal(14, 4)
-  quantity      Decimal        @db.Decimal(14, 3) // base units deducted from stock
-  listPrice     Decimal        @db.Decimal(14, 2) // per entered unit, from the price list
-  unitPrice     Decimal        @db.Decimal(14, 2) // per entered unit, actually charged
-  discount      Decimal        @default(0) @db.Decimal(14, 2) // line total at list price - lineTotal
-  lineTotal     Decimal        @db.Decimal(14, 2)
-  unitCost      Decimal        @db.Decimal(16, 4) // average cost per base unit at sale time
-  costTotal     Decimal        @db.Decimal(14, 2)
+  enteredUnit   Unit            @relation(fields: [enteredUnitId], references: [id])
+  factor        Decimal         @db.Decimal(14, 4)
+  quantity      Decimal         @db.Decimal(14, 3) // base units deducted from stock
+  listPrice     Decimal         @db.Decimal(14, 2) // per entered unit, from the price list
+  unitPrice     Decimal         @db.Decimal(14, 2) // per entered unit, actually charged
+  discount      Decimal         @default(0) @db.Decimal(14, 2) // line total at list price - lineTotal
+  lineTotal     Decimal         @db.Decimal(14, 2)
+  unitCost      Decimal         @db.Decimal(16, 4) // average cost per base unit at sale time
+  costTotal     Decimal         @db.Decimal(14, 2)
   reversalItems ReversalItem[]
   pickupItem    PickupNoteItem?
 
@@ -1462,7 +1469,6 @@ model ItemMovement {
   @@index([itemId, createdAt])
 }
 
-
 // ───────────── Store Warehouse: reservations, pickup notes, collection ─────────────
 
 enum PickupStatus {
@@ -1483,29 +1489,29 @@ enum PickupAuth {
 // The document that lets goods leave the warehouse. One per sale made from a pickup location. The QR code carries only `token`;
 // everything else is looked up on the server after the scan.
 model PickupNote {
-  id            String       @id @default(cuid())
-  noteNo        String       @unique // PU-2026-000125
-  token         String       @unique // random, not guessable; QR text is SDOPU:<token>
-  saleId        String       @unique
-  sale          Sale         @relation(fields: [saleId], references: [id])
+  id            String           @id @default(cuid())
+  noteNo        String           @unique // PU-2026-000125
+  token         String           @unique // random, not guessable; QR text is SDOPU:<token>
+  saleId        String           @unique
+  sale          Sale             @relation(fields: [saleId], references: [id])
   locationId    String
-  location      Location     @relation(fields: [locationId], references: [id])
-  status        PickupStatus @default(NEW)
+  location      Location         @relation(fields: [locationId], references: [id])
+  status        PickupStatus     @default(NEW)
   auth          PickupAuth
   createdById   String
-  createdBy     User         @relation("PickupCreator", fields: [createdById], references: [id])
-  createdAt     DateTime     @default(now())
+  createdBy     User             @relation("PickupCreator", fields: [createdById], references: [id])
+  createdAt     DateTime         @default(now())
   startedById   String?
-  startedBy     User?        @relation("PickupStarter", fields: [startedById], references: [id])
+  startedBy     User?            @relation("PickupStarter", fields: [startedById], references: [id])
   startedAt     DateTime?
   readyById     String?
-  readyBy       User?        @relation("PickupReadier", fields: [readyById], references: [id])
+  readyBy       User?            @relation("PickupReadier", fields: [readyById], references: [id])
   readyAt       DateTime?
   completedById String?
-  completedBy   User?        @relation("PickupCompleter", fields: [completedById], references: [id])
+  completedBy   User?            @relation("PickupCompleter", fields: [completedById], references: [id])
   completedAt   DateTime?
   cancelledById String?
-  cancelledBy   User?        @relation("PickupCanceller", fields: [cancelledById], references: [id])
+  cancelledBy   User?            @relation("PickupCanceller", fields: [cancelledById], references: [id])
   cancelledAt   DateTime?
   cancelReason  String?
   items         PickupNoteItem[]
@@ -1519,16 +1525,16 @@ model PickupNote {
 
 // One line of a pickup note = one invoice line. Reserved = quantity - releasedQty - cancelledQty (all in base units).
 model PickupNoteItem {
-  id           String     @id @default(cuid())
+  id           String              @id @default(cuid())
   noteId       String
-  note         PickupNote @relation(fields: [noteId], references: [id])
-  saleItemId   String     @unique
-  saleItem     SaleItem   @relation(fields: [saleItemId], references: [id])
+  note         PickupNote          @relation(fields: [noteId], references: [id])
+  saleItemId   String              @unique
+  saleItem     SaleItem            @relation(fields: [saleItemId], references: [id])
   productId    String
-  product      Product    @relation(fields: [productId], references: [id])
-  quantity     Decimal    @db.Decimal(14, 3)
-  releasedQty  Decimal    @default(0) @db.Decimal(14, 3)
-  cancelledQty Decimal    @default(0) @db.Decimal(14, 3) // reservation given back because the sale was cancelled / returned before collection
+  product      Product             @relation(fields: [productId], references: [id])
+  quantity     Decimal             @db.Decimal(14, 3)
+  releasedQty  Decimal             @default(0) @db.Decimal(14, 3)
+  cancelledQty Decimal             @default(0) @db.Decimal(14, 3) // reservation given back because the sale was cancelled / returned before collection
   releaseItems PickupReleaseItem[]
 
   @@index([noteId])
@@ -1537,16 +1543,16 @@ model PickupNoteItem {
 
 // A goods collection record: who released what, when. Append-only (database trigger).
 model PickupRelease {
-  id            String     @id @default(cuid())
-  releaseNo     String     @unique // COL-2026-000001
+  id            String              @id @default(cuid())
+  releaseNo     String              @unique // COL-2026-000001
   noteId        String
-  note          PickupNote @relation(fields: [noteId], references: [id])
+  note          PickupNote          @relation(fields: [noteId], references: [id])
   releasedById  String
-  releasedBy    User       @relation(fields: [releasedById], references: [id])
+  releasedBy    User                @relation(fields: [releasedById], references: [id])
   collectedBy   String? // who took the goods (name), optional
   remark        String?
-  submissionKey String     @unique // blocks a double submit
-  createdAt     DateTime   @default(now())
+  submissionKey String              @unique // blocks a double submit
+  createdAt     DateTime            @default(now())
   items         PickupReleaseItem[]
 
   @@index([noteId])
@@ -1601,7 +1607,6 @@ model WarehouseEvent {
   @@index([createdAt])
 }
 
-
 // Every page a signed-in person opens, with who, when and from where. Append-only (database trigger). Together with the audit log
 // (what they changed) and the sign-in records, this lets the owner follow everything everyone does.
 model ActivityLog {
@@ -1618,4 +1623,39 @@ model ActivityLog {
 
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+/// A problem the warehouse person (or the owner) reports by hand on a product that is already in stock: damaged on the shelf, or lost / cannot be found.
+/// Reporting takes the pieces off the sellable stock at once (a normal DAMAGE or DECREASE stock adjustment, `adjustmentId`), so they can never be sold.
+/// It is decided ONCE: found (a stock increase puts them back, `foundAdjustmentId`), written off (nothing more to move), or (damaged only) sold at a discount as the
+/// separate "(damaged packaging)" product. Never deleted; a decided row never changes (DB trigger).
+model StockProblem {
+  id                String           @id @default(cuid())
+  productId         String
+  product           Product          @relation("ProblemProduct", fields: [productId], references: [id])
+  locationId        String
+  location          Location         @relation(fields: [locationId], references: [id])
+  kind              IssueKind // DAMAGED or MISSING (lost); EXTRA is never reported by hand
+  quantity          Decimal          @db.Decimal(14, 3) // base units, taken off the sellable stock when reported
+  note              String
+  adjustmentId      String           @unique
+  adjustment        StockAdjustment  @relation("ProblemReport", fields: [adjustmentId], references: [id])
+  submissionKey     String           @unique
+  reportedById      String
+  reportedBy        User             @relation("ProblemReporter", fields: [reportedById], references: [id])
+  reportedAt        DateTime         @default(now())
+  action            IssueAction? // null = still under investigation
+  decisionNote      String?
+  foundAdjustmentId String?          @unique
+  foundAdjustment   StockAdjustment? @relation("ProblemFound", fields: [foundAdjustmentId], references: [id])
+  discountPrice     Decimal?         @db.Decimal(14, 2) // per base unit, for DISCOUNT_SELL
+  variantProductId  String?
+  variantProduct    Product?         @relation("ProblemVariant", fields: [variantProductId], references: [id])
+  decidedById       String?
+  decidedBy         User?            @relation("ProblemDecider", fields: [decidedById], references: [id])
+  decidedAt         DateTime?
+
+  @@index([reportedAt])
+  @@index([action])
+  @@index([productId])
 }

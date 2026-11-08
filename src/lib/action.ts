@@ -1,6 +1,8 @@
 import type { ZodError } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { AuthError, ForbiddenError, authorize } from "@/lib/auth/guard";
+import { canAny } from "@/lib/auth/can";
+import { getSessionUser } from "@/lib/auth/session";
 import type { SessionUser } from "@/lib/auth/session";
 import type { PermissionKey } from "@/lib/permissions";
 
@@ -42,6 +44,20 @@ export async function guarded(
 ): Promise<ActionState> {
   try {
     const user = await authorize(permission);
+    return await fn(user);
+  } catch (e) {
+    if (e instanceof AuthError) return fail("Your session has expired. Please sign in again.");
+    if (e instanceof ForbiddenError) return fail("You do not have permission to do this.");
+    throw e;
+  }
+}
+
+/** Like `guarded`, for an action that more than one kind of person may do (for example the owner or the warehouse person). Checked on the server, never only in the screen. */
+export async function guardedAny(permissions: readonly PermissionKey[], fn: (user: SessionUser) => Promise<ActionState>): Promise<ActionState> {
+  try {
+    const user = await getSessionUser();
+    if (!user) throw new AuthError();
+    if (!canAny(user, permissions)) throw new ForbiddenError(permissions[0]);
     return await fn(user);
   } catch (e) {
     if (e instanceof AuthError) return fail("Your session has expired. Please sign in again.");

@@ -7,11 +7,13 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
-import { fail, formString, guarded, isUniqueViolation, type ActionState } from "@/lib/action";
+import { fail, formString, guarded, guardedAny, isUniqueViolation, type ActionState } from "@/lib/action";
 import { notifyPermission } from "@/lib/notifications";
 import { generateSku, nextBarcode, uniqueSku } from "@/lib/product-codes";
 import { ImageError, processProductImage } from "@/lib/product-images";
+import { InsufficientStockError } from "@/lib/inventory/engine";
 import { decideIssue } from "@/lib/shipments/issues";
+import { decideProblem, reportProblem } from "@/lib/shipments/problems";
 import { ShipmentError, cancelShipment, confirmSession, createShipment, markArrived, resolveIssue, saveDraft } from "@/lib/shipments/engine";
 import { getCurrency } from "@/lib/settings";
 import { parseMoney } from "@/lib/money";
@@ -150,9 +152,19 @@ const decideSchema = z.object({
   submissionKey: z.string().min(16).max(80),
 });
 
+const ACTION_TEXT: Record<"FOUND" | "NOT_DELIVERED" | "WRITE_OFF" | "KEEP" | "DISCOUNT_SELL" | "DISMISS", string> = {
+  FOUND: "Found and returned to stock",
+  NOT_DELIVERED: "Confirmed not delivered",
+  WRITE_OFF: "Written off",
+  KEEP: "Kept in stock",
+  DISCOUNT_SELL: "Put on sale at a discount",
+  DISMISS: "Removed from the list",
+};
+
 export async function decideIssueAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  // Returning goods to stock, writing them off and crediting the supplier are owner decisions: checked here, never only in the screen.
-  return guarded("shipments.manage", async (user) => {
+  // The owner AND the warehouse person decide investigations (Nino 2026-11-08: "he has all the power as well as the admin, they are the ones dealing with the products").
+  // Checked here, never only in the screen. The warehouse person still never sees costs: the money side of a decision is worked out on the server.
+  return guardedAny(["shipments.manage", "shipments.receive"], async (user) => {
     const parsed = decideSchema.safeParse({
       shipmentId: formString(fd, "shipmentId"),
       shipmentItemId: formString(fd, "shipmentItemId"),
@@ -168,7 +180,7 @@ export async function decideIssueAction(_prev: ActionState, fd: FormData): Promi
     const p = parsed.data;
     const currency = await getCurrency();
     // Setting a new selling price is a pricing right, not just an investigation right (the server checks it, whatever the screen shows).
-    if (p.action === "DISCOUNT_SELL" && !can(user, "products.price")) return fail("You are not allowed to set selling prices.");
+    if (p.action === "DISCOUNT_SELL" && !can(user, "products.price") && !can(user, "shipments.receive")) return fail("You are not allowed to set selling prices.");
     // Quantities are typed in cartons first; the engine counts in base units, so a carton quantity is converted here from the product's own pack size.
     if (formString(fd, "qtyUnit") === "pack") {
       const it = await db.shipmentItem.findUnique({ where: { id: p.shipmentItemId }, select: { productId: true } });
@@ -185,6 +197,8 @@ export async function decideIssueAction(_prev: ActionState, fd: FormData): Promi
           if (!res.repeated) {
             const sh = await tx.shipment.findUniqueOrThrow({ where: { id: p.shipmentId }, select: { shipmentNo: true } });
             await writeAudit(tx, { user, action: "shipment.issue_decision", entityType: "Shipment", entityId: p.shipmentId, reference: sh.shipmentNo, reason: p.note || undefined, after: { kind: p.kind, action: p.action, quantity: p.quantity, productId: res.decision.productId, receipt: res.receiptNo, newOrder: res.newOrderNo, closed: res.closed } });
+            // the owners always know what the warehouse decided
+            if (!can(user, "shipments.manage")) await notifyPermission(tx, "shipments.manage", { type: "shipment.issue_decided", title: `${user.name} decided a problem on ${sh.shipmentNo}`, body: `${ACTION_TEXT[p.action]}${p.note ? `: ${p.note}` : ""}`, link: `/shipments/${p.shipmentId}` }, user.id);
           }
           return res;
         },
@@ -367,4 +381,96 @@ export async function createProductForShipment(fd: FormData): Promise<{ ok: true
   });
   if (result.error || !out.product) return { ok: false, error: result.error ?? "Could not create the product." };
   return { ok: true, product: out.product };
+}
+
+
+// ───────────── Warehouse / owner: report a problem on a product that is already in stock ─────────────
+
+const reportSchema = z.object({
+  productId: z.string().min(1),
+  kind: z.enum(["DAMAGED", "MISSING"]),
+  quantity: z.string().min(1).max(24),
+  /** "pack" = typed in cartons (converted with the product's own carton size), otherwise pieces */
+  qtyUnit: z.enum(["pack", "base"]),
+  note: z.string().trim().min(3).max(300),
+  submissionKey: z.string().min(16).max(80),
+});
+
+export async function reportProblemAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return guardedAny(["inventory.report_damage", "shipments.manage"], async (user) => {
+    const parsed = reportSchema.safeParse({ productId: formString(fd, "productId"), kind: formString(fd, "kind"), quantity: formString(fd, "quantity"), qtyUnit: formString(fd, "qtyUnit") || "base", note: formString(fd, "note"), submissionKey: formString(fd, "submissionKey") });
+    if (!parsed.success) return fail("Choose the product, say what happened and how many.", { note: "Say what happened, in a few words." });
+    const p = parsed.data;
+    let quantity = p.quantity;
+    if (p.qtyUnit === "pack") {
+      const packs = await db.productUnit.findMany({ where: { productId: p.productId }, select: { factor: true } });
+      const factor = packs.map((u) => Number(u.factor)).sort((a, b) => b - a)[0];
+      const typed = Number(p.quantity.trim());
+      if (!factor || factor <= 1 || !Number.isFinite(typed)) return fail("Enter how many.", { quantity: "Enter a number." });
+      quantity = String(Number((typed * factor).toFixed(3)));
+    }
+    const location = await db.location.findFirst({ where: { isDefault: true }, select: { id: true } });
+    if (!location) return fail("No warehouse is set up.");
+    try {
+      const r = await db.$transaction(
+        async (tx) => {
+          const res = await reportProblem(tx, { productId: p.productId, locationId: location.id, kind: p.kind, quantity, note: p.note, submissionKey: p.submissionKey, user });
+          if (!res.repeated) {
+            const prod = await tx.product.findUniqueOrThrow({ where: { id: p.productId }, select: { name: true } });
+            await writeAudit(tx, { user, action: "stock_problem.reported", entityType: "StockProblem", entityId: res.problem.id, reference: res.adjustmentNo, reason: p.note, after: { product: prod.name, kind: p.kind, quantity } });
+            await notifyPermission(tx, "shipments.manage", { type: "stock_problem.reported", title: `${prod.name}: ${p.kind === "DAMAGED" ? "damaged" : "lost"} at the warehouse`, body: `${user.name} reported ${quantity} pieces. ${p.note}`, link: "/shipments?tab=investigation" }, user.id);
+          }
+          return res;
+        },
+        { timeout: 30000, maxWait: 15000 },
+      );
+      revalidatePath("/shipments");
+      revalidatePath("/inventory");
+      revalidatePath("/warehouse", "layout");
+      revalidatePath("/products");
+      return { ok: true, message: r.repeated ? "Already reported." : "Reported. The pieces are off the shelf now and under investigation." };
+    } catch (e) {
+      if (e instanceof ShipmentError) return fail(e.message, e.fieldErrors);
+      if (e instanceof InsufficientStockError) return fail(`Only ${Number(e.available)} pieces are free to report. The rest are reserved for customers waiting to collect.`, { quantity: `At most ${Number(e.available)} pieces.` });
+      throw e;
+    }
+  });
+}
+
+const decideProblemSchema = z.object({
+  problemId: z.string().min(1),
+  action: z.enum(["FOUND", "WRITE_OFF", "DISCOUNT_SELL"]),
+  note: z.string().trim().max(300),
+  discountPrice: z.string().max(24),
+});
+
+export async function decideProblemAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return guardedAny(["shipments.manage", "shipments.receive"], async (user) => {
+    const parsed = decideProblemSchema.safeParse({ problemId: formString(fd, "problemId"), action: formString(fd, "action"), note: formString(fd, "note"), discountPrice: formString(fd, "discountPrice") });
+    if (!parsed.success) return fail(BAD);
+    const p = parsed.data;
+    if (p.action === "DISCOUNT_SELL" && !can(user, "products.price") && !can(user, "shipments.receive")) return fail("You are not allowed to set selling prices.");
+    // typed per carton, like the investigation of an order; the engine counts in pieces
+    const currency = await getCurrency();
+    try {
+      const r = await db.$transaction(
+        async (tx) => {
+          const res = await decideProblem(tx, { problemId: p.problemId, action: p.action, note: p.note || null, discountPrice: p.discountPrice, user, currencyDecimals: currency.decimals });
+          await writeAudit(tx, { user, action: "stock_problem.decided", entityType: "StockProblem", entityId: p.problemId, reason: p.note || undefined, after: { action: p.action, product: res.productName, quantity: String(res.quantity) } });
+          if (!can(user, "shipments.manage")) await notifyPermission(tx, "shipments.manage", { type: "stock_problem.decided", title: `${user.name} decided a problem on ${res.productName}`, body: `${ACTION_TEXT[p.action]}${p.note ? `: ${p.note}` : ""}`, link: "/shipments?tab=investigation" }, user.id);
+          return res;
+        },
+        { timeout: 30000, maxWait: 15000 },
+      );
+      void r;
+      revalidatePath("/shipments");
+      revalidatePath("/inventory");
+      revalidatePath("/warehouse", "layout");
+      revalidatePath("/products");
+      return { ok: true, message: p.action === "FOUND" ? "Back in stock." : p.action === "WRITE_OFF" ? "Written off." : "On sale at the discounted price, as a separate \"damaged packaging\" product." };
+    } catch (e) {
+      if (e instanceof ShipmentError) return fail(e.message, e.fieldErrors);
+      throw e;
+    }
+  });
 }

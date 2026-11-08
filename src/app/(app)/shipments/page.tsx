@@ -5,6 +5,9 @@ import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
 import ReceiptsTable from "@/components/inventory/ReceiptsTable";
 import IssueRecords from "@/components/shipments/IssueRecords";
+import ProblemReports from "@/components/shipments/ProblemReports";
+import { loadProblems } from "@/lib/shipments/problems";
+import { largestPack } from "@/lib/qty";
 import { loadIssueRecords } from "@/lib/shipments/issues";
 import { toIssueViews } from "@/lib/shipments/issue-view";
 import { getUnitMode } from "@/lib/unit-mode";
@@ -18,7 +21,7 @@ import { formatMoney } from "@/lib/money";
 import { canCount, canMarkArrived, shipmentPhase, type ShipmentPhase } from "@/lib/shipments/phase";
 import { getCurrency } from "@/lib/settings";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
-import { decideIssueAction, markArrivedAction } from "./actions";
+import { decideIssueAction, decideProblemAction, markArrivedAction, reportProblemAction } from "./actions";
 import { PhaseBadge } from "./badges";
 
 export async function generateMetadata() {
@@ -80,6 +83,27 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   const list = tab === "deliveries" ? [] : inTab(tab);
   // Investigation shows the problem products themselves (not just the orders), each with its choices
   const issueViews = tab === "investigation" && list.length > 0 ? toIssueViews(await loadIssueRecords(db, { shipmentIds: list.map((r) => r.s.id), withCost: manage })) : [];
+  // Problems reported by hand on products already in stock (the warehouse person AND the owner can report and decide them)
+  const canReport = can(user, "inventory.report_damage") || manage;
+  const canDecide = manage || receive;
+  const openProblemCount = await db.stockProblem.count({ where: { action: null } });
+  const problems = tab === "investigation" ? await loadProblems(db) : { open: [], decided: [] };
+  const reportProducts =
+    tab === "investigation" && canReport
+      ? await (async () => {
+          const wh = await db.location.findFirst({ where: { isDefault: true }, select: { id: true } });
+          if (!wh) return [];
+          const bal = await db.stockBalance.findMany({
+            where: { locationId: wh.id, quantity: { gt: 0 }, product: { status: "ACTIVE" } },
+            select: { quantity: true, reserved: true, product: { select: { id: true, name: true, sku: true, baseUnit: { select: { symbol: true } }, image: { select: { updatedAt: true } }, units: { select: { factor: true, unit: { select: { symbol: true } } } } } } },
+          });
+          return bal
+            .map((b) => ({ id: b.product.id, name: b.product.name, sku: b.product.sku, imageV: b.product.image ? b.product.image.updatedAt.getTime() : null, available: Number(b.quantity.minus(b.reserved)), baseSymbol: b.product.baseUnit.symbol, pack: largestPack(b.product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor }))) }))
+            .filter((p) => p.available > 0)
+            .sort((x, y) => x.name.localeCompare(y.name));
+        })()
+      : [];
+  const asRow = (v: (typeof problems.open)[number]) => ({ ...v, baseSymbol: v.unit, reportedAt: v.reportedAt.toISOString(), decidedAt: v.decidedAt ? v.decidedAt.toISOString() : null });
 
   // The list scales: soonest / oldest first, search by number, cargo or supplier, 20 per page, and how much of each delivery is counted
   const q = (sp.q ?? "").trim();
@@ -124,7 +148,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
     { key: "history", label: "History" },
     ...(deliveriesAllowed ? [{ key: "deliveries" as const, label: "Deliveries" }] : []),
   ];
-  const countOf = (k: Tab) => (k === "deliveries" ? receiptCount : counts[k]);
+  const countOf = (k: Tab) => (k === "deliveries" ? receiptCount : k === "investigation" ? counts.investigation + openProblemCount : counts[k]);
   const empty: Record<PhaseTab, { title: string; text: string }> = {
     way: { title: staff ? "No delivery is expected" : "Nothing is on the way", text: manage ? "Make a purchase order and it shows up here." : "When the Director announces a delivery it shows up here." },
     check: { title: staff ? "Nothing to count" : "Nothing to check", text: "When a delivery is marked as arrived it waits here to be counted." },
@@ -194,7 +218,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
               className={cn("inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition", active ? "border-navy-700 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900")}
             >
               {t.label}
-              <span className={cn("rounded-full px-1.5 text-xs font-semibold", active ? "bg-white/20 text-white" : t.key === "investigation" && counts.investigation > 0 ? "bg-brand-red text-white" : "bg-slate-100 text-slate-600")}>{countOf(t.key)}</span>
+              <span className={cn("rounded-full px-1.5 text-xs font-semibold", active ? "bg-white/20 text-white" : t.key === "investigation" && counts.investigation + openProblemCount > 0 ? "bg-brand-red text-white" : "bg-slate-100 text-slate-600")}>{countOf(t.key)}</span>
             </Link>
           );
         })}
@@ -215,7 +239,16 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
             showCost={showCost}
           />
         </section>
-      ) : tab === "investigation" && list.length > 0 ? (
+      ) : tab === "investigation" ? (
+        <>
+        <ProblemReports open={problems.open.map(asRow)} decided={problems.decided.map(asRow)} products={reportProducts} canReport={canReport} reportAction={reportProblemAction} decideAction={decideProblemAction} currencySymbol={currency.symbol} />
+        {list.length === 0 ? (
+          !canReport && problems.open.length === 0 && problems.decided.length === 0 ? (
+            <section className="card overflow-hidden">
+              <EmptyState icon={<SearchIcon size={22} />} title={empty.investigation.title} description={empty.investigation.text} />
+            </section>
+          ) : null
+        ) : (
         <div className="space-y-4">
           {list.map((r) => {
             const s = r.s;
@@ -240,7 +273,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
                   <span className="badge-red">{open > 0 ? `${open} product${open === 1 ? "" : "s"} to decide · ${inQuestionText} in question` : "Open"}</span>
                 </div>
                 {mine.length > 0 ? (
-                  <IssueRecords mode={unitMode} currencySymbol={currency.symbol} records={mine} canAct={manage} action={decideIssueAction} />
+                  <IssueRecords mode={unitMode} currencySymbol={currency.symbol} records={mine} canAct={canDecide} action={decideIssueAction} />
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-slate-600">
                     <span>This order has a problem on record. Open it to see the details.</span>
@@ -253,11 +286,13 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
             );
           })}
         </div>
+        )}
+        </>
       ) : (
       <section className="card overflow-hidden">
         {list.length === 0 ? (
           <EmptyState
-            icon={tab === "way" ? <Truck size={22} /> : tab === "check" ? <ClipboardCheck size={22} /> : tab === "investigation" ? <SearchIcon size={22} /> : <PackageOpen size={22} />}
+            icon={tab === "way" ? <Truck size={22} /> : tab === "check" ? <ClipboardCheck size={22} /> : <PackageOpen size={22} />}
             title={empty[tab].title}
             description={empty[tab].text}
             action={

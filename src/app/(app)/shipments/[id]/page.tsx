@@ -158,12 +158,12 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
                 {shipment.issue === "OPEN"
                   ? manage
                     ? "These pieces are not on the shelf. Decide what happens to each one. You can decide part of a quantity now and the rest later."
-                    : "These pieces are not on the shelf. The owner has been told and will decide what happens to them."
+                    : "These pieces are not on the shelf. The owner has been told. You or the owner can decide what happens to them."
                   : "Everything on this order was looked into. The history of each product is below."}
               </p>
             </div>
           </div>
-          <IssueRecords mode={await getUnitMode()} currencySymbol={currency.symbol} records={issueViews} canAct={manage} closed={shipment.issue === "RESOLVED" && issueViews.some((r) => r.open > 0)} action={decideIssueAction} />
+          <IssueRecords mode={await getUnitMode()} currencySymbol={currency.symbol} records={issueViews} canAct={manage || receive} closed={shipment.issue === "RESOLVED" && issueViews.some((r) => r.open > 0)} action={decideIssueAction} />
           {manage && shipment.issue === "OPEN" && (
             <details className="border-t border-line px-5 py-3">
               <summary className="cursor-pointer select-none text-sm font-medium text-slate-600 hover:text-slate-900">Close the whole investigation with one note instead</summary>
@@ -196,7 +196,7 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
                   <ResolveIssueForm shipmentId={id} action={resolveIssueAction} />
                 </div>
               )}
-              {!manage && <p className="mt-2 text-sm text-slate-600">The owner has been told and will look into it.</p>}
+              {!manage && <p className="mt-2 text-sm text-slate-600">The owner has been told. You can decide each product below.</p>}
             </div>
           </div>
         </div>

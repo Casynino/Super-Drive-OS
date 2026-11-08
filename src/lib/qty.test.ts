@@ -3,14 +3,15 @@ import { inPacks, largestPack, packNote, qtyText } from "./qty";
 
 const ctn = { symbol: "CTN", factor: 12 };
 
-describe("carton quantities (never mixed with pieces)", () => {
-  it("writes cartons only", () => {
+describe("carton quantities (cartons first, the loose pieces of an opened carton after them)", () => {
+  it("writes whole cartons only when the carton is full", () => {
     expect(qtyText(120, ctn, "PCS")).toEqual({ main: "10 CTN", pieces: null });
-    expect(qtyText(0, ctn, "PCS").main).toBe("0 CTN");
+    expect(qtyText(0, ctn, "PCS").main).toBe("0 PCS");
   });
-  it("shows a leftover as a fraction of a carton instead of hiding it or mixing units", () => {
-    expect(qtyText(125, ctn, "PCS").main).toBe("10.42 CTN");
-    expect(qtyText(6, ctn, "PCS").main).toBe("0.5 CTN");
+  it("shows the loose pieces of an opened carton after the cartons", () => {
+    expect(qtyText(125, ctn, "PCS").main).toBe("10 CTN + 5 PCS");
+    expect(qtyText(6, ctn, "PCS").main).toBe("6 PCS");
+    expect(qtyText(14, { symbol: "CTN", factor: 4 }, "PCS").main).toBe("3 CTN + 2 PCS");
   });
   it("uses the product's own carton size, not a fixed 12", () => {
     expect(qtyText(300, { symbol: "CTN", factor: 6 }, "PCS").main).toBe("50 CTN");

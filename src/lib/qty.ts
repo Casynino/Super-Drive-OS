@@ -1,5 +1,5 @@
 // Carton-first quantities. Stock is always KEPT in the base unit (pieces); these helpers only decide what people SEE first.
-//   125 PCS with 12 per carton  ->  "10 CTN + 5 PCS"  (and "125 PCS" as the small secondary text)
+//   125 PCS with 12 per carton  ->  "10 CTN + 5 PCS"
 // Pure functions: no database, safe on the server and in the browser.
 
 export type Pack = { symbol: string; factor: number };
@@ -17,14 +17,19 @@ export function largestPack(units: Loose[]): Pack | null {
 }
 
 /**
- * A base quantity written in cartons only, never "cartons + pieces" (Nino: "don't mix PCS and CTN").
- * 120 PCS at 12 per carton -> "10 CTN"; a leftover shows as a fraction (125 -> "10.42 CTN") so nothing is hidden; a product with no pack keeps its own unit.
- * `pieces` is kept in the result for callers but is always null now.
+ * A base quantity as people say it: whole cartons, and the loose pieces of an opened carton after them (Nino 2026-11-08: "5 cartons and 2 pcs, just like that").
+ *   120 PCS at 12 per carton -> "10 CTN"      125 -> "10 CTN + 5 PCS"      5 -> "5 PCS"
+ * In PCS mode (the product's CTN | PCS switch) and for a product with no pack, the plain piece count. `pieces` is kept in the result for callers but is always null.
  */
 export function qtyText(base: number, pack: Pack | null, baseSymbol: string, mode: UnitMode = "ctn"): { main: string; pieces: string | null } {
   if (!pack || mode === "pcs" || !Number.isFinite(base)) return { main: `${fmtQty(base)} ${baseSymbol}`.trim(), pieces: null };
-  const packs = base / pack.factor;
-  return { main: `${fmtQty(Number(packs.toFixed(2)))} ${pack.symbol}`, pieces: null };
+  const sign = base < 0 ? "-" : "";
+  const abs = Math.abs(base);
+  const cartons = Math.floor(abs / pack.factor + 1e-9);
+  const rest = Number((abs - cartons * pack.factor).toFixed(3));
+  if (cartons === 0) return { main: `${sign}${fmtQty(rest)} ${baseSymbol}`, pieces: null };
+  if (rest === 0) return { main: `${sign}${fmtQty(cartons)} ${pack.symbol}`, pieces: null };
+  return { main: `${sign}${fmtQty(cartons)} ${pack.symbol} + ${fmtQty(rest)} ${baseSymbol}`, pieces: null };
 }
 
 /** What one carton holds, shown beside a product: "1 CTN = 12 PCS". */

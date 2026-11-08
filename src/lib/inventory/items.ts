@@ -313,6 +313,22 @@ export async function disposeDamagedItems(tx: Tx, i: { shipmentId: string; produ
   return rows.length;
 }
 
+/**
+ * Same as disposeDamagedItems, for a problem reported by hand: the pieces that went DAMAGED because of that stock adjustment are marked DISPOSED.
+ * (Lost pieces stay MISSING: nothing to throw away.) No stock changes.
+ */
+export async function disposeReportedItems(tx: Tx, i: { adjustmentId: string; productId: string; qty: Dec } & Refs): Promise<number> {
+  if (!(await isTracked(tx, i.productId))) return 0;
+  const n = whole(i.qty);
+  const rows = await tx.$queryRaw<Row[]>`
+    SELECT it."id", it."status", it."locationId" FROM "InventoryItem" it
+     WHERE it."productId" = ${i.productId} AND it."status" = 'DAMAGED'
+       AND EXISTS (SELECT 1 FROM "ItemMovement" m WHERE m."itemId" = it."id" AND m."toStatus" = 'DAMAGED' AND m."referenceType" = 'StockAdjustment' AND m."referenceId" = ${i.adjustmentId})
+     ORDER BY it."itemNo" DESC LIMIT ${n} FOR UPDATE OF it`;
+  if (rows.length) await transition(tx, rows, { kind: "DISPOSED", toStatus: "DISPOSED", auto: false, referenceType: i.referenceType, referenceId: i.referenceId, referenceNo: i.referenceNo, note: i.note, userId: i.userId });
+  return rows.length;
+}
+
 // ───────────── Looking items up ─────────────
 
 /** Turns scanned codes into item ids (same order). An unknown or mistyped code is a plain ItemError. */
