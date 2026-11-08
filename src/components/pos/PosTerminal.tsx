@@ -837,7 +837,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
       </div>
 
       {/* Mobile / tablet: the total and the button are always in reach */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,27,45,0.08)] backdrop-blur lg:left-64 xl:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 lg:bottom-0 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,27,45,0.08)] backdrop-blur lg:left-[15.5rem] xl:hidden">
         <div className="mx-auto flex max-w-xl items-center gap-3">
           <button type="button" className="min-w-0 flex-1 text-left" onClick={() => document.getElementById("pos-cart")?.scrollIntoView({ behavior: "smooth" })}>
             <p className={cn("text-xs", saleError ? "font-medium text-brand-red-dark" : "text-slate-500")} role={saleError ? "alert" : undefined}>

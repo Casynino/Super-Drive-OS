@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, CircleCheck, ClipboardList, Boxes, Lock, PackageCheck, PackageOpen, ScanLine, Search, Timer } from "lucide-react";
 import KpiCard from "@/components/dashboard/KpiCard";
+import HomeBanner from "@/components/HomeBanner";
 import BarList from "@/components/reports/BarList";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -13,7 +14,6 @@ import { cn, formatDateTime } from "@/lib/utils";
 export const metadata = { title: "Warehouse" };
 
 const nf = (v: number) => new Intl.NumberFormat("en-US").format(Math.round(v));
-const hour = () => Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Africa/Dar_es_Salaam" }).format(new Date()));
 const dayWord = (d: Date) => {
   const n = Math.floor((Date.now() - d.getTime()) / 86_400_000);
   return n <= 0 ? "today" : n === 1 ? "yesterday" : `${n} days ago`;
@@ -27,8 +27,6 @@ export default async function WarehouseHome() {
     getWarehouseSnapshot(db),
     db.warehouseEvent.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 8, include: { pickupNote: { select: { noteNo: true } }, product: { select: { name: true } } } }),
   ]);
-  const h = hour();
-  const greeting = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
   const arrived = s.inbound.filter((i) => i.arrivedAt);
   const onTheWay = s.inbound.filter((i) => !i.arrivedAt);
 
@@ -46,14 +44,9 @@ export default async function WarehouseHome() {
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Store Warehouse · Dar es Salaam</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-            {greeting}, {user.name.split(" ")[0]}
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">Here is what is happening at the warehouse today.</p>
-        </div>
+      <HomeBanner user={user} />
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+        <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Store Warehouse · Dar es Salaam</p>
         <Link href="/warehouse/scan" className="btn-primary h-11 px-5">
           <ScanLine size={17} /> Scan &amp; release
         </Link>

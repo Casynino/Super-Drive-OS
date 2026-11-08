@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { trackPage } from "@/lib/auth/track-page";
 import { useEffect, useRef, useState } from "react";
-import { Bell, ChevronDown, ChevronLeft, ChevronRight, Menu, Search, X } from "lucide-react";
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, House, Menu, Search, X } from "lucide-react";
 import SidebarFooter from "@/components/SidebarFooter";
 import UserMenu from "@/components/UserMenu";
 import { cn } from "@/lib/utils";
@@ -116,6 +116,13 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   const dot = "absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-brand-red shadow-[0_0_8px_rgba(237,28,36,0.7)] ring-2 ring-white dark:ring-[#0f1c33]";
   const count = (item: NavItem) => (item.badge ? badges[item.badge] : 0);
   const nameOf = (item: NavItem) => labels?.[item.href] ?? item.label;
+
+  // The phone bar at the bottom (like the Target Express phone look): Home, Search, two pages that matter for this person, Menu.
+  const pick = (...hrefs: string[]) => hrefs.map((h) => allItems.find((i) => i.href === h)).find(Boolean);
+  const homeItem = pick("/pos", "/warehouse", "/dashboard") ?? allItems[0];
+  const tabItems = [pick("/sales", "/warehouse/orders", "/inventory"), pick("/ledger", "/closing", "/warehouse/stock", "/payments")].filter((t, i, a): t is NavItem => Boolean(t) && a.findIndex((x) => x?.href === t?.href) === i && t?.href !== homeItem?.href);
+  const tabCls = "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[10.5px] font-medium";
+  const tabOn = (href?: string) => Boolean(href) && href === active;
   const countBadge = (n: number) => <span className="shrink-0 rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white shadow-[0_0_10px_rgba(237,28,36,0.45)]">{n > 99 ? "99+" : n}</span>;
 
   // search: filters the pages the person may open; Enter goes to the first
@@ -336,7 +343,50 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         </header>
       </div>
 
-      <main className="mx-auto w-full max-w-[1920px] px-4 pb-6 pt-3 sm:px-6 lg:pt-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
+      <main className="mx-auto w-full max-w-[1920px] px-4 pb-6 pt-3 max-lg:pb-24 sm:px-6 lg:pt-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
+
+      {/* Phone and tablet: the bottom bar. Only icons and short words, the open page has a thin yellow bar on top and a yellow icon. */}
+      <nav aria-label="Quick" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden print:hidden">
+        <div className="mx-auto flex h-[3.75rem] max-w-xl">
+          {homeItem && (
+            <Link href={homeItem.href} className={cn(tabCls, tabOn(homeItem.href) ? "text-slate-900" : "text-slate-500")} aria-current={tabOn(homeItem.href) ? "page" : undefined}>
+              {tabOn(homeItem.href) && <span className="absolute left-1/2 top-0 h-[3px] w-8 -translate-x-1/2 rounded-full bg-[#fdc400]" aria-hidden />}
+              <House size={20} className={tabOn(homeItem.href) ? "text-oil-500" : ""} />
+              Home
+            </Link>
+          )}
+          <button
+            type="button"
+            className={cn(tabCls, "text-slate-500")}
+            onClick={() => {
+              setOpen(true);
+              setTimeout(() => searchRef.current?.focus(), 120);
+            }}
+          >
+            <Search size={20} />
+            Search
+          </button>
+          {tabItems.map((item) => {
+            const on = tabOn(item.href);
+            const Icon = item.icon;
+            const n = count(item);
+            return (
+              <Link key={item.href} href={item.href} className={cn(tabCls, on ? "text-slate-900" : "text-slate-500")} aria-current={on ? "page" : undefined}>
+                {on && <span className="absolute left-1/2 top-0 h-[3px] w-8 -translate-x-1/2 rounded-full bg-[#fdc400]" aria-hidden />}
+                <span className="relative">
+                  <Icon size={20} className={on ? "text-oil-500" : ""} />
+                  {n > 0 && <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold leading-none text-white">{n > 9 ? "9+" : n}</span>}
+                </span>
+                <span className="max-w-full truncate">{nameOf(item).split(/\s+/)[0]}</span>
+              </Link>
+            );
+          })}
+          <button type="button" className={cn(tabCls, "text-slate-500")} onClick={() => setOpen(true)}>
+            <Menu size={20} />
+            Menu
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }

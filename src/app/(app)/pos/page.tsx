@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { EmptyState } from "@/components/ui";
-import { BannerBell, bannerDate } from "@/components/BannerBell";
-import BannerTheme from "@/components/BannerTheme";
+import HomeBanner from "@/components/HomeBanner";
 import PosTerminal from "@/components/pos/PosTerminal";
 import { getUnitMode } from "@/lib/unit-mode";
 import { can } from "@/lib/auth/can";
@@ -84,30 +83,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
   // the shop person's home: a small banner like the Director's, with the words in the middle and the shop's real products at the side
   return (
     <>
-      <section className="relative mb-5 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_220px_at_88%_55%,rgba(47,111,208,0.42),transparent_62%)]" aria-hidden />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(520px_170px_at_50%_0%,rgba(253,196,0,0.10),transparent_72%)]" aria-hidden />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/banner-products.webp" alt="" aria-hidden className="pointer-events-none absolute bottom-0 right-0 hidden h-full w-auto max-w-[32%] select-none object-contain object-right-bottom lg:block" />
-        {/* the bell and the night / light look: small icons at the left side, in the middle (a phone has them in its own top bar and menu) */}
-        <div className="absolute left-6 top-1/2 z-10 flex -translate-y-1/2 items-center gap-2">
-          <BannerBell userId={user.id} className="relative h-8 w-8" />
-          <BannerTheme className="h-8 w-8" />
-        </div>
-        <div className="relative flex min-h-[7.5rem] flex-col items-center justify-center px-5 py-5 text-center">
-          {/* the person's name, big, and under it his position (Nino 2026-11-08), then the date */}
-          <h1 className="flex max-w-full items-center gap-4 text-3xl font-semibold uppercase tracking-[0.35em] text-white sm:text-4xl">
-            <span className="hidden h-px w-10 shrink-0 bg-oil-400/60 sm:block" aria-hidden />
-            <span className="min-w-0 truncate pl-[0.35em]">{user.name.trim().split(/\s+/)[0]}</span>
-            <span className="hidden h-px w-10 shrink-0 bg-oil-400/60 sm:block" aria-hidden />
-          </h1>
-          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400">{user.roleName}</p>
-          {/* the date, small, under the position */}
-          <p className="mt-1.5 text-sm text-white/65" suppressHydrationWarning>
-            {bannerDate()}
-          </p>
-        </div>
-      </section>
+      <HomeBanner user={user} />
       {posProducts.length === 0 || locations.length === 0 ? (
         <div className="card">
           <EmptyState

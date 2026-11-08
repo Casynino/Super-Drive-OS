@@ -187,10 +187,10 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/banner-products.webp" alt="" aria-hidden className="pointer-events-none absolute bottom-0 right-0 hidden h-full w-auto max-w-[56%] select-none object-contain object-right-bottom xl:block" />
 
-        <div className="relative px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-7">
+        <div className="relative px-5 pb-6 pt-6 max-lg:text-center sm:px-8 sm:pb-8 sm:pt-7 max-sm:px-3">
           {/* the person's name big, his position small in yellow under it, then the date (Nino 2026-11-08, like the Target Express banner) */}
           <h1 className="truncate text-3xl font-semibold uppercase tracking-[0.3em] sm:text-4xl">{firstName}</h1>
-          <p className="mt-2 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400">
+          <p className="mt-2 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400 max-lg:justify-center">
             {user.roleName}
             <BannerBell userId={user.id} className="relative h-6 w-6" />
             <BannerTheme className="h-6 w-6" />
@@ -198,26 +198,39 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
           <p className="mt-1.5 text-sm text-white/60">
             {todayLabel} · {profile.name}
           </p>
-          <dl className="mt-5 flex flex-wrap gap-x-9 gap-y-4">
+          <dl className="mt-5 grid grid-cols-3 gap-x-3 gap-y-4 lg:flex lg:flex-wrap lg:gap-x-9">
             {balances.length > 0 && (
               <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">You can use now</dt>
-                <dd className="mt-0.5 text-xl font-bold tabular-nums">{m(usable)}</dd>
+                <dt className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/55 sm:text-[11px] sm:tracking-[0.14em]">You can use now</dt>
+                <dd className="mt-0.5 text-[12px] font-bold tabular-nums sm:text-xl">{m(usable)}</dd>
               </div>
             )}
             <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Collected today</dt>
-              <dd className="mt-0.5 text-xl font-bold tabular-nums text-emerald-300">{m(o.today.collected)}</dd>
+              <dt className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/55 sm:text-[11px] sm:tracking-[0.14em]">Collected today</dt>
+              <dd className="mt-0.5 text-[12px] font-bold tabular-nums text-emerald-300 sm:text-xl">{m(o.today.collected)}</dd>
             </div>
             <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Owed by customers</dt>
-              <dd className="mt-0.5 text-xl font-bold tabular-nums text-oil-400">{m(k.debt.value)}</dd>
+              <dt className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/55 sm:text-[11px] sm:tracking-[0.14em]">Owed by customers</dt>
+              <dd className="mt-0.5 text-[12px] font-bold tabular-nums text-oil-400 sm:text-xl">{m(k.debt.value)}</dd>
             </div>
           </dl>
         </div>
       </section>
 
-      <nav className="-mx-1 mb-6 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" aria-label="Shortcuts">
+      {/* phone: the shortcuts as a row of clean icons with a short name under each (like the Target Express phone look) */}
+      <nav className="-mx-1 mb-5 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:hidden" aria-label="Shortcuts">
+        {pills.map((l) => (
+          <Link key={l.href} href={l.href} className="flex w-[4.6rem] shrink-0 flex-col items-center gap-1.5 rounded-xl py-2 text-[11px] font-medium text-slate-600 hover:text-slate-900">
+            <span className="relative">
+              <l.icon size={22} className="text-slate-500" />
+              {l.badge ? <span className="absolute -right-2 -top-1.5 rounded-full bg-brand-red px-1 text-[10px] font-bold leading-4 text-white">{l.badge}</span> : null}
+            </span>
+            <span className="max-w-full truncate">{l.label}</span>
+          </Link>
+        ))}
+      </nav>
+
+      <nav className="-mx-1 mb-6 hidden gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:flex" aria-label="Shortcuts">
         {pills.map((l) => (
           <Link key={l.href} href={l.href} className={cn("inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition", PILL[l.tone])}>
             <l.icon size={15} className="text-sky-500" /> {l.label}
