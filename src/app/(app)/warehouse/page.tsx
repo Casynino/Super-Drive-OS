@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, CircleCheck, ClipboardList, Boxes, Lock, PackageCheck, PackageOpen, ScanLine, Search, Timer } from "lucide-react";
+import { ChevronRight, CircleCheck, ClipboardList, Boxes, Lock, Package, PackageCheck, PackageOpen, ScanLine, ScrollText, Search, Timer, TriangleAlert, Truck } from "lucide-react";
 import KpiCard from "@/components/dashboard/KpiCard";
 import HomeBanner from "@/components/HomeBanner";
 import BarList from "@/components/reports/BarList";
+import { qtyText } from "@/lib/qty";
+import { getUnitMode } from "@/lib/unit-mode";
 import { can } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
@@ -11,7 +13,7 @@ import { getWarehouseSnapshot } from "@/lib/warehouse/dashboard";
 import { EVENT_LABEL } from "@/lib/warehouse/labels";
 import { cn, formatDateTime } from "@/lib/utils";
 
-export const metadata = { title: "Warehouse" };
+export const metadata = { title: "Home" };
 
 const nf = (v: number) => new Intl.NumberFormat("en-US").format(Math.round(v));
 const dayWord = (d: Date) => {
@@ -27,6 +29,7 @@ export default async function WarehouseHome() {
     getWarehouseSnapshot(db),
     db.warehouseEvent.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 8, include: { pickupNote: { select: { noteNo: true } }, product: { select: { name: true } } } }),
   ]);
+  const unitMode = await getUnitMode();
   const arrived = s.inbound.filter((i) => i.arrivedAt);
   const onTheWay = s.inbound.filter((i) => !i.arrivedAt);
 
@@ -42,15 +45,33 @@ export default async function WarehouseHome() {
   const totalIn = s.days.reduce((t, d) => t + d.received, 0);
   const totalOut = s.days.reduce((t, d) => t + d.released, 0);
 
+  // the five things he does all day, one tap each (a phone shows them as icons)
+  const quick: { href: string; label: string; icon: typeof ScanLine; n?: number; primary?: boolean }[] = [
+    { href: "/warehouse/scan", label: "Scan", icon: ScanLine, primary: true },
+    { href: "/shipments", label: "Receiving", icon: Truck, n: arrived.length },
+    { href: "/warehouse/orders", label: "Pickups", icon: ClipboardList, n: s.isNew },
+    { href: "/warehouse/stock", label: "Stock", icon: Boxes, n: s.out + s.low },
+    { href: "/warehouse/discrepancies", label: "Issues", icon: ScrollText, n: s.issuesOpen },
+  ];
+  const okN = Math.max(s.activeProducts - s.out - s.low, 0);
+  const totalN = Math.max(s.activeProducts, 1);
+
   return (
     <>
       <HomeBanner user={user} />
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-        <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Store Warehouse · Dar es Salaam</p>
-        <Link href="/warehouse/scan" className="btn-primary h-11 px-5">
-          <ScanLine size={17} /> Scan &amp; release
-        </Link>
-      </div>
+
+      <nav aria-label="Quick actions" className="mb-5 grid grid-cols-5 gap-2 sm:gap-3">
+        {quick.map((q) => (
+          <Link key={q.href} href={q.href} className={cn("relative flex flex-col items-center gap-1.5 rounded-2xl border px-1 py-3 text-[11px] font-semibold transition hover:-translate-y-0.5 sm:text-[13px]", q.primary ? "border-navy-600 bg-navy-600 text-[#ffffff] hover:bg-navy-700" : "border-line bg-white text-slate-700 hover:border-navy-300 hover:text-slate-900")}>
+            <span className={cn("flex h-10 w-10 items-center justify-center rounded-xl sm:h-11 sm:w-11", q.primary ? "bg-white/15 text-[#ffffff]" : "bg-navy-50 text-navy-700")}>
+              <q.icon size={21} />
+            </span>
+            {q.label}
+            {q.n ? <span className="absolute right-1.5 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold leading-none text-white sm:right-3 sm:top-3">{q.n > 99 ? "99+" : q.n}</span> : null}
+          </Link>
+        ))}
+      </nav>
+
 
       <form action="/warehouse/orders" method="get" className="mb-5 flex gap-2">
         <input type="hidden" name="f" value="open" />
@@ -90,15 +111,108 @@ export default async function WarehouseHome() {
         )}
       </section>
 
-      <section className="mb-5 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(13.5rem,1fr))]" aria-label="The warehouse in numbers">
-        <KpiCard icon={Boxes} tone="navy" label="Products in the warehouse" value={nf(s.products)} hint="with stock on the shelf" href="/warehouse/stock" />
-        <KpiCard icon={PackageCheck} tone="green" label="Available stock" value={nf(s.available)} hint="pieces that can still be sold" href="/warehouse/stock" />
-        <KpiCard icon={Lock} tone="yellow" label="Reserved stock" value={nf(s.reserved)} hint="sold, waiting to be collected" href="/warehouse/stock?s=reserved" />
-        <KpiCard icon={ClipboardList} tone="navy" label="New orders" value={nf(s.isNew)} hint="not started yet" href="/warehouse/orders?f=new" />
-        <KpiCard icon={Timer} tone="yellow" label="Pending preparation" value={nf(s.preparing)} hint="being prepared now" href="/warehouse/orders?f=preparing" />
+      <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Orders going out</h2>
+      <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Orders going out">
+        <KpiCard icon={ClipboardList} tone="navy" label="New orders" value={nf(s.isNew)} hint="waiting for you" href="/warehouse/orders?f=new" />
+        <KpiCard icon={Timer} tone="yellow" label="Being prepared" value={nf(s.preparing)} hint="you are on them now" href="/warehouse/orders?f=preparing" />
         <KpiCard icon={PackageOpen} tone="green" label="Ready for collection" value={nf(s.ready)} hint="picked and set aside" href="/warehouse/orders?f=ready" />
         <KpiCard icon={CircleCheck} tone="slate" label="Collected today" value={nf(s.collectedToday)} hint={`${nf(s.completed)} collected in total`} href="/warehouse/history?range=today" />
       </section>
+
+      <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Stock on the shelf</h2>
+      <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Stock on the shelf">
+        <KpiCard icon={PackageCheck} tone="green" label="Available" value={nf(s.available)} hint="pieces you can still sell" href="/warehouse/stock" />
+        <KpiCard icon={Lock} tone="yellow" label="Reserved" value={nf(s.reserved)} hint="sold, waiting to be collected" href="/warehouse/stock?s=reserved" />
+        <KpiCard icon={Boxes} tone="navy" label="Products in stock" value={nf(s.inStockProducts)} hint={`of ${nf(s.activeProducts)} products`} href="/warehouse/stock" />
+        <KpiCard icon={TriangleAlert} tone={s.out + s.low > 0 ? "red" : "green"} label="Low or out" value={nf(s.out + s.low)} hint={`${s.out} out · ${s.low} running low`} href="/warehouse/stock?s=out" />
+      </section>
+
+      <div className="mb-5 grid gap-4 lg:grid-cols-2">
+        <section className="card overflow-hidden" aria-label="Stock to watch">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Stock to watch</h2>
+              <p className="text-xs text-slate-500">{s.watch.length === 0 ? "Everything is in stock." : `${s.out} out of stock, ${s.low} running low`}</p>
+            </div>
+            <Link href="/warehouse/stock" className="text-sm font-medium text-navy-700 hover:underline">
+              All stock
+            </Link>
+          </div>
+          <div className="px-4 pt-4 sm:px-5">
+            <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`${okN} healthy, ${s.low} running low, ${s.out} out of stock`}>
+              <div className="bg-emerald-500" style={{ width: `${(okN / totalN) * 100}%` }} />
+              <div className="bg-oil-400" style={{ width: `${(s.low / totalN) * 100}%` }} />
+              <div className="bg-rose-500" style={{ width: `${(s.out / totalN) * 100}%` }} />
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              <span className="font-semibold text-emerald-600">{okN} healthy</span> · <span className="font-semibold text-yellow-600">{s.low} low</span> · <span className="font-semibold text-rose-600">{s.out} out</span>
+            </p>
+          </div>
+          {s.watch.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-slate-500">{s.activeProducts === 0 ? "No products have been added yet." : "Nothing is running low."}</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-slate-100">
+              {s.watch.map((a) => {
+                const pct = a.isOut ? 0 : Math.min(100, Math.max(4, (Number(a.qty) / Math.max(Number(a.min), 1)) * 100));
+                return (
+                  <li key={a.id} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-gradient-to-b from-white to-slate-100">
+                      {a.imageV ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={`/api/product-image/${a.id}?size=thumb&v=${a.imageV}`} alt="" loading="lazy" className="h-full w-full object-contain" />
+                      ) : (
+                        <Package size={18} className="text-slate-300" />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-slate-900">{a.name}</span>
+                      <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-slate-100">
+                        <span className={`block h-full rounded-full ${a.isOut ? "bg-rose-500" : "bg-oil-400"}`} style={{ width: `${pct}%` }} />
+                      </span>
+                    </span>
+                    <span className={a.isOut ? "badge-red" : "badge-yellow"}>{a.isOut ? "Out of stock" : `${qtyText(Number(a.qty), a.pack, a.symbol, unitMode).main} left`}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <section className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Coming in</h2>
+              <p className="text-xs text-slate-500">
+                {onTheWay.length} on the way · {arrived.length} arrived, to count
+              </p>
+            </div>
+            <Link href="/shipments" className="text-sm font-medium text-navy-700 hover:underline">
+              Receiving
+            </Link>
+          </div>
+          {s.inbound.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-slate-500">No delivery is expected.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {s.inbound.map((i) => (
+                <li key={i.id}>
+                  <Link href={`/shipments/${i.id}`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition hover:bg-slate-50 sm:px-5">
+                    <span className="min-w-0">
+                      <span className="font-mono text-[13px] font-semibold text-slate-900">{i.shipmentNo}</span>
+                      <span className="ml-2 text-slate-600">{i.cargoName ?? i.supplier?.name ?? i.reference ?? ""}</span>
+                      <span className="block text-xs text-slate-500">
+                        {i._count.items} product{i._count.items === 1 ? "" : "s"}
+                        {i.expectedDate ? ` · expected ${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(i.expectedDate)}` : ""}
+                      </span>
+                    </span>
+                    <span className={cn("shrink-0 text-xs font-medium", i.arrivedAt ? "text-amber-600" : "text-slate-500")}>{i.arrivedAt ? (i.status === "PARTIAL" ? "Part counted" : "Arrived, count it") : "On the way"}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
 
       <div className="mb-5 grid gap-4 lg:grid-cols-2">
         <section className="card card-pad">
@@ -140,42 +254,7 @@ export default async function WarehouseHome() {
         </section>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">Coming in</h2>
-              <p className="text-xs text-slate-500">
-                {onTheWay.length} on the way · {arrived.length} arrived, to count
-              </p>
-            </div>
-            <Link href="/shipments" className="text-sm font-medium text-navy-700 hover:underline">
-              Receiving
-            </Link>
-          </div>
-          {s.inbound.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-slate-500">No delivery is expected.</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {s.inbound.map((i) => (
-                <li key={i.id}>
-                  <Link href={`/shipments/${i.id}`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition hover:bg-slate-50 sm:px-5">
-                    <span className="min-w-0">
-                      <span className="font-mono text-[13px] font-semibold text-slate-900">{i.shipmentNo}</span>
-                      <span className="ml-2 text-slate-600">{i.cargoName ?? i.supplier?.name ?? i.reference ?? ""}</span>
-                      <span className="block text-xs text-slate-500">
-                        {i._count.items} product{i._count.items === 1 ? "" : "s"}
-                        {i.expectedDate ? ` · expected ${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(i.expectedDate)}` : ""}
-                      </span>
-                    </span>
-                    <span className={cn("shrink-0 text-xs font-medium", i.arrivedAt ? "text-amber-600" : "text-slate-500")}>{i.arrivedAt ? (i.status === "PARTIAL" ? "Part counted" : "Arrived, count it") : "On the way"}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
+      <div className="grid gap-4">
         <section className="card overflow-hidden">
           <div className="border-b border-line px-4 py-3 sm:px-5">
             <h2 className="text-base font-semibold text-slate-900">Your activity</h2>

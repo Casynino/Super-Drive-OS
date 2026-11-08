@@ -73,6 +73,10 @@ export async function getWarehouseSnapshot(db: Db) {
     issuesOpen,
     low: alerts.low.length,
     out: alerts.out.length,
+    /** products that are out or running low, out first (quantities only, no costs) */
+    watch: [...alerts.out.map((a) => ({ ...a, isOut: true })), ...alerts.low.map((a) => ({ ...a, isOut: false }))].slice(0, 8),
+    activeProducts: alerts.active,
+    inStockProducts: alerts.inStock,
   };
 }
 export type WarehouseSnapshot = Awaited<ReturnType<typeof getWarehouseSnapshot>>;

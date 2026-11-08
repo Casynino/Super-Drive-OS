@@ -138,8 +138,10 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
 
   // The phone bar at the bottom (like the Target Express phone look): Home, Search, two pages that matter for this person, Menu.
   const pick = (...hrefs: string[]) => hrefs.map((h) => allItems.find((i) => i.href === h)).find(Boolean);
-  const homeItem = pick("/pos", "/warehouse", "/dashboard") ?? allItems[0];
-  const tabItems = [pick("/sales", "/warehouse/orders", "/inventory"), pick("/ledger", "/closing", "/warehouse/stock", "/payments")].filter((t, i, a): t is NavItem => Boolean(t) && a.findIndex((x) => x?.href === t?.href) === i && t?.href !== homeItem?.href);
+  const homeItem = pick("/pos", "/dashboard") ?? allItems[0];
+  const warehouseMan = allItems.some((i) => i.href === "/warehouse/scan"); // his three jobs get their own tabs: Pickups, Receiving, Stock
+  const tabItems = (warehouseMan ? [pick("/warehouse/orders"), pick("/shipments"), pick("/warehouse/stock")] : [pick("/sales", "/inventory"), pick("/ledger", "/closing", "/payments")]).filter((t, i, arr): t is NavItem => Boolean(t) && arr.findIndex((x) => x?.href === t?.href) === i && t?.href !== homeItem?.href);
+  const showSearchTab = tabItems.length < 3;
   const tabCls = "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[10.5px] font-medium";
   const tabOn = (href?: string) => Boolean(href) && href === active;
   const countBadge = (n: number) => <span className="shrink-0 rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white shadow-[0_0_10px_rgba(237,28,36,0.45)]">{n > 99 ? "99+" : n}</span>;
@@ -374,17 +376,19 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
               Home
             </Link>
           )}
-          <button
-            type="button"
-            className={cn(tabCls, "text-slate-500")}
-            onClick={() => {
-              setOpen(true);
-              setTimeout(() => searchRef.current?.focus(), 120);
-            }}
-          >
-            <Search size={20} />
-            Search
-          </button>
+          {showSearchTab && (
+            <button
+              type="button"
+              className={cn(tabCls, "text-slate-500")}
+              onClick={() => {
+                setOpen(true);
+                setTimeout(() => searchRef.current?.focus(), 120);
+              }}
+            >
+              <Search size={20} />
+              Search
+            </button>
+          )}
           {tabItems.map((item) => {
             const on = tabOn(item.href);
             const Icon = item.icon;
@@ -396,7 +400,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
                   <Icon size={20} className={on ? "text-oil-500" : ""} />
                   {n > 0 && <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold leading-none text-white">{n > 9 ? "9+" : n}</span>}
                 </span>
-                <span className="max-w-full truncate">{nameOf(item).split(/\s+/)[0]}</span>
+                <span className="max-w-full truncate">{warehouseMan && item.href === "/shipments" ? "Receiving" : nameOf(item).split(/\s+/)[0]}</span>
               </Link>
             );
           })}
