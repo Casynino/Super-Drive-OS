@@ -1,4 +1,5 @@
 import { BannerBell } from "@/components/BannerBell";
+import BannerTheme from "@/components/BannerTheme";
 import { qtyText } from "@/lib/qty";
 import { getUnitMode } from "@/lib/unit-mode";
 import Link from "next/link";
@@ -195,6 +196,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
           <p className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-oil-400">
             Management · Owner
             <BannerBell userId={user.id} className="relative h-6 w-6" />
+            <BannerTheme className="h-6 w-6" />
           </p>
           <h1 className="mt-2 text-[1.7rem] font-bold leading-tight tracking-tight sm:text-4xl">
             {greeting()}, {firstName}
