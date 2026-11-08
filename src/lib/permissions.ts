@@ -158,6 +158,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       "shipments.receive",
       "inventory.count",
       "inventory.report_damage",
+      "inventory.adjust", // adds and removes stock by hand from a product (Nino 2026-11-08), always with a note; audited, owners are told
       "warehouse.operate",
     ],
   },

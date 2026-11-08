@@ -7,7 +7,8 @@ import type { AdjustmentKind } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
-import { fail, formString, formValues, guarded, type ActionState } from "@/lib/action";
+import { fail, formString, formValues, guarded, guardedAny, isUniqueViolation, type ActionState } from "@/lib/action";
+import { notifyPermission } from "@/lib/notifications";
 import { parseMoney } from "@/lib/money";
 import { getCurrency } from "@/lib/settings";
 import { InsufficientStockError, type Dec } from "@/lib/inventory/engine";
@@ -276,4 +277,61 @@ export async function createAdjustment(_prev: ActionState, fd: FormData): Promis
   });
   if (result.ok && result.message) redirect(`/inventory/adjustments/${result.message}?created=1`);
   return result;
+}
+
+
+// ───────────── Add or remove stock by hand, from a product (Nino 2026-11-08) ─────────────
+// For stock that comes without a purchase order ("from the boss in China") and for taking stock out. It is a normal INCREASE / DECREASE adjustment
+// (numbered document, ledger rows, item history), at the default warehouse, always with a note; the owners are told.
+
+const stockChangeSchema = z.object({
+  productId: z.string().min(1),
+  mode: z.enum(["ADD", "REMOVE", "COUNT"]),
+  quantity: z.string().min(1).max(24),
+  note: z.string().trim().min(5, "Say where it came from or why, in a few words.").max(300),
+  submissionKey: keySchema,
+});
+
+export async function adjustStockAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return guardedAny(["inventory.adjust", "inventory.count"], async (user) => {
+    const parsed = stockChangeSchema.safeParse({ productId: formString(fd, "productId"), mode: formString(fd, "mode"), quantity: formString(fd, "quantity"), note: formString(fd, "note"), submissionKey: formString(fd, "submissionKey") });
+    if (!parsed.success) return fail(parsed.error.issues[0]?.path[0] === "note" ? parsed.error.issues[0].message : "Enter how many, and a short note.", headErrors(parsed.error.issues));
+    const p = parsed.data;
+    // adding and removing need the adjust right; setting a counted quantity needs the count right (checked here, never only in the screen)
+    if (p.mode === "COUNT" ? !can(user, "inventory.count") : !can(user, "inventory.adjust")) return fail("You do not have permission to do this.");
+    const qty = Number(p.quantity);
+    if (!Number.isFinite(qty) || (p.mode === "COUNT" ? qty < 0 : qty <= 0)) return fail("Enter how many.", { quantity: p.mode === "COUNT" ? "Enter the counted number." : "Enter a number above zero." });
+    const location = await db.location.findFirst({ where: { isDefault: true, status: "ACTIVE" }, select: { id: true, name: true } });
+    if (!location) return fail("No warehouse is set up.");
+    const kind: AdjustmentKind = p.mode === "ADD" ? "INCREASE" : p.mode === "REMOVE" ? "DECREASE" : "COUNT";
+    const reason = `${p.mode === "ADD" ? "Added by hand (no purchase order)" : p.mode === "REMOVE" ? "Removed by hand" : "Counted by hand"}: ${p.note}`;
+    try {
+      const out = await db.$transaction(async (tx) => {
+        const product = await tx.product.findUnique({ where: { id: p.productId }, select: { name: true, baseUnitId: true, status: true } });
+        if (!product || product.status !== "ACTIVE") throw new FormError(fail("This product is not available."));
+        const lines = unwrapResolve(await resolveLines(tx, [{ productId: p.productId, unitId: product.baseUnitId, quantity: p.quantity }], { allowZero: p.mode === "COUNT" }), {});
+        const { adjustment } = await postAdjustment(tx, { kind, locationId: location.id, reason, submissionKey: `hand:${p.submissionKey}`, lines, user });
+        await writeAudit(tx, {
+          user,
+          action: AUDIT_ACTION[kind],
+          entityType: "StockAdjustment",
+          entityId: adjustment.id,
+          reference: adjustment.adjustmentNo,
+          reason,
+          after: { location: location.name, lines: [{ product: product.name, baseQty: p.quantity }] },
+        });
+        await notifyPermission(tx, "inventory.valuation", { type: p.mode === "ADD" ? "stock.added_by_hand" : p.mode === "REMOVE" ? "stock.removed_by_hand" : "stock.counted_by_hand", title: `${user.name} ${p.mode === "ADD" ? "added" : p.mode === "REMOVE" ? "removed" : "counted"} stock of ${product.name}`, body: `${p.quantity} ${p.mode === "ADD" ? "added without a purchase order" : p.mode === "REMOVE" ? "taken out" : "counted on the shelf"}. ${p.note}`, link: `/inventory/adjustments/${adjustment.id}` }, user.id);
+        return adjustment;
+      });
+      revalidatePath("/inventory", "layout");
+      revalidatePath("/products", "layout");
+      revalidatePath("/warehouse", "layout");
+      return { ok: true, message: out.adjustmentNo };
+    } catch (e) {
+      if (e instanceof FormError) return e.state;
+      if (e instanceof InsufficientStockError) return fail(`Only ${e.available.toString()} pieces can be removed. The rest is reserved for customers waiting to collect.`, { quantity: `At most ${e.available.toString()} pieces.` });
+      if (isUniqueViolation(e)) return { ok: true, message: "Already saved." };
+      throw e;
+    }
+  });
 }

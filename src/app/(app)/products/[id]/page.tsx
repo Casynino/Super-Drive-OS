@@ -151,10 +151,11 @@ export default async function EditProductPage({ params, searchParams }: { params
         stock={stock}
         pack={largestPack(product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })))}
         baseSymbol={product.baseUnit.symbol}
+        adjust={can(user, "inventory.adjust") && product.status === "ACTIVE" ? { productId: product.id, name: product.name, sku: product.sku, imageV: image ? image.updatedAt.getTime() : null } : undefined}
       />
       {sp.created && (
         <div className="mb-4">
-          <Alert kind="success">Product created. Stock is added through Deliveries or a purchase order.</Alert>
+          <Alert kind="success">Product created. Add its stock with the Add stock button below, or through Deliveries or a purchase order.</Alert>
         </div>
       )}
 

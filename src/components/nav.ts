@@ -60,6 +60,8 @@ export const NAV: NavGroup[] = [
     items: [
       // the shop attendant's home IS the POS (Home is hidden for them, see (app)/layout.tsx); the overview of the day is its own page
       { label: "Home", href: "/dashboard", icon: House, permissions: [], ready: true, also: ["/warehouse"] },
+      // the warehouse attendant scans pickup notes all day: Scan sits right under Home (Nino 2026-11-08)
+      { label: "Scan", href: "/warehouse/scan", icon: ScanLine, permissions: ["warehouse.operate"], ready: true },
       { label: "POS", href: "/pos", icon: ShoppingCart, permissions: ["sales.pos"], ready: true },
       { label: "Today", href: "/overview", icon: LayoutDashboard, permissions: ["sales.pos"], hideIfAny: ["dashboard.view"], ready: true },
     ],
@@ -96,7 +98,6 @@ export const NAV: NavGroup[] = [
       { label: "Overview", href: "/warehouse/overview", icon: Warehouse, permissions: ["warehouse.view"], ready: true },
       { label: "Receiving", href: "/shipments", icon: Truck, permissions: ["shipments.receive"], ready: true, badge: "incoming", hideIfAny: ["shipments.manage"], also: ["/inventory/receiving"] },
       { label: "Pickups", href: "/warehouse/orders", icon: ClipboardCheck, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
-      { label: "Scan", href: "/warehouse/scan", icon: ScanLine, permissions: ["warehouse.operate"], ready: true },
       { label: "Stock", href: "/warehouse/stock", icon: Boxes, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
       { label: "Collected", href: "/warehouse/history", icon: PackageCheck, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
       { label: "Issues", href: "/warehouse/discrepancies", icon: ScrollText, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
