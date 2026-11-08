@@ -2,9 +2,11 @@ import Link from "next/link";
 import { randomUUID } from "node:crypto";
 import { EmptyState } from "@/components/ui";
 import HomeBanner from "@/components/HomeBanner";
+import QuickIcons from "@/components/QuickIcons";
+import { CalendarCheck, Handshake, LayoutDashboard, Receipt, ReceiptText, Users } from "lucide-react";
 import PosTerminal from "@/components/pos/PosTerminal";
 import { getUnitMode } from "@/lib/unit-mode";
-import { can } from "@/lib/auth/can";
+import { can, canAny } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
@@ -84,6 +86,18 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
   return (
     <>
       <HomeBanner user={user} />
+      {/* the same plain icon row as the other homes, on a phone and tablet (the till needs the room on a computer) */}
+      <QuickIcons
+        className="mb-4 lg:hidden"
+        items={[
+          { href: "/overview", label: "Today", icon: LayoutDashboard },
+          canAny(user, ["sales.view_own", "sales.view_all"]) && { href: "/sales", label: "Sales", icon: Receipt },
+          can(user, "resellers.view") && { href: "/resellers", label: "Winga", icon: Handshake },
+          can(user, "customers.view") && { href: "/customers", label: "Customers", icon: Users },
+          canAny(user, ["expenses.view", "expenses.create"]) && { href: "/expenses", label: "Expenses", icon: ReceiptText },
+          can(user, "closing.submit") && { href: "/closing", label: "Close", icon: CalendarCheck },
+        ].filter((x): x is { href: string; label: string; icon: typeof Receipt } => Boolean(x))}
+      />
       {posProducts.length === 0 || locations.length === 0 ? (
         <div className="card">
           <EmptyState
