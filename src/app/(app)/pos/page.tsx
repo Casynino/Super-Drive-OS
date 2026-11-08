@@ -95,13 +95,14 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
           <BannerTheme className="h-8 w-8" />
         </div>
         <div className="relative flex min-h-[7.5rem] flex-col items-center justify-center px-5 py-5 text-center">
-          <h1 className="flex items-center gap-4 text-3xl font-semibold tracking-[0.5em] text-white sm:text-4xl">
-            <span className="hidden h-px w-10 bg-oil-400/60 sm:block" aria-hidden />
-            <span className="pl-[0.5em]">POS</span>
-            <span className="hidden h-px w-10 bg-oil-400/60 sm:block" aria-hidden />
+          {/* the person's name, big, and under it his position (Nino 2026-11-08), then the date */}
+          <h1 className="flex max-w-full items-center gap-4 text-3xl font-semibold uppercase tracking-[0.35em] text-white sm:text-4xl">
+            <span className="hidden h-px w-10 shrink-0 bg-oil-400/60 sm:block" aria-hidden />
+            <span className="min-w-0 truncate pl-[0.35em]">{user.name.trim().split(/\s+/)[0]}</span>
+            <span className="hidden h-px w-10 shrink-0 bg-oil-400/60 sm:block" aria-hidden />
           </h1>
-          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400">Super Drive Oil</p>
-          {/* the date, small, under the shop name */}
+          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400">{user.roleName}</p>
+          {/* the date, small, under the position */}
           <p className="mt-1.5 text-sm text-white/65" suppressHydrationWarning>
             {bannerDate()}
           </p>

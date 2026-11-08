@@ -18,11 +18,6 @@ import { formatMoney } from "@/lib/money";
 import { getBusinessProfile, getCurrency } from "@/lib/settings";
 import { cn, formatDateTime } from "@/lib/utils";
 
-const greeting = () => {
-  const h = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Africa/Dar_es_Salaam" }).format(new Date()));
-  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-};
-
 function Section({ title, hint, action, children, className }: { title: string; hint?: string; action?: { href: string; label: string }; children: React.ReactNode; className?: string }) {
   return (
     <section className={cn("card card-pad", className)}>
@@ -186,22 +181,21 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
 
   return (
     <>
-      {/* ── Banner: the greeting, the three numbers that matter, and the shop's real products ── */}
+      {/* ── Banner: his name and position, the three numbers that matter, and the shop's real products ── */}
       <section className="relative mb-4 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_380px_at_78%_25%,rgba(47,111,208,0.42),transparent_62%)]" aria-hidden />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/banner-products.webp" alt="" aria-hidden className="pointer-events-none absolute bottom-0 right-0 hidden h-full w-auto max-w-[56%] select-none object-contain object-right-bottom xl:block" />
 
         <div className="relative px-5 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-7">
-          <p className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-oil-400">
-            Management · Owner
+          {/* the person's name big, his position small in yellow under it, then the date (Nino 2026-11-08, like the Target Express banner) */}
+          <h1 className="truncate text-3xl font-semibold uppercase tracking-[0.3em] sm:text-4xl">{firstName}</h1>
+          <p className="mt-2 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400">
+            {user.roleName}
             <BannerBell userId={user.id} className="relative h-6 w-6" />
             <BannerTheme className="h-6 w-6" />
           </p>
-          <h1 className="mt-2 text-[1.7rem] font-bold leading-tight tracking-tight sm:text-4xl">
-            {greeting()}, {firstName}
-          </h1>
-          <p className="mt-1 text-sm text-white/60">
+          <p className="mt-1.5 text-sm text-white/60">
             {todayLabel} · {profile.name}
           </p>
           <dl className="mt-5 flex flex-wrap gap-x-9 gap-y-4">
