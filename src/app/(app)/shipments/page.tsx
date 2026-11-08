@@ -35,7 +35,7 @@ const TAB_PHASES: Record<PhaseTab, ShipmentPhase[]> = {
   history: ["DONE", "CANCELLED"],
 };
 
-export default async function ShipmentsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function ShipmentsPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string; page?: string }> }) {
   const unitMode = await getUnitMode();
   const user = await requireUser();
   if (!canAny(user, ["shipments.manage", "shipments.receive"])) redirect("/forbidden");
@@ -80,6 +80,29 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   const list = tab === "deliveries" ? [] : inTab(tab);
   // Investigation shows the problem products themselves (not just the orders), each with its choices
   const issueViews = tab === "investigation" && list.length > 0 ? toIssueViews(await loadIssueRecords(db, { shipmentIds: list.map((r) => r.s.id), withCost: manage })) : [];
+
+  // The list scales: soonest / oldest first, search by number, cargo or supplier, 20 per page, and how much of each delivery is counted
+  const q = (sp.q ?? "").trim();
+  const ts = (d: Date | null | undefined) => d?.getTime() ?? Number.MAX_SAFE_INTEGER;
+  const ordered = [...list].sort((x, y) =>
+    tab === "way" ? ts(x.s.expectedDate) - ts(y.s.expectedDate) : tab === "check" ? ts(x.s.arrivedAt) - ts(y.s.arrivedAt) : y.s.createdAt.getTime() - x.s.createdAt.getTime(),
+  );
+  const needle = q.toLowerCase();
+  const shown = needle ? ordered.filter((r) => [r.s.shipmentNo, r.s.cargoName, r.s.reference, r.s.supplier?.name].some((v) => v?.toLowerCase().includes(needle))) : ordered;
+  const PAGE = 20;
+  const pages = Math.max(1, Math.ceil(shown.length / PAGE));
+  const pageNo = Math.min(pages, Math.max(1, Math.floor(Number(sp.page)) || 1));
+  const pageRows = shown.slice((pageNo - 1) * PAGE, pageNo * PAGE);
+  const pageHref = (n: number) => `/shipments?tab=${tab}${q ? `&q=${encodeURIComponent(q)}` : ""}${n > 1 ? `&page=${n}` : ""}`;
+  const countedIds = tab === "deliveries" || tab === "investigation" ? [] : pageRows.filter((r) => r.phase !== "ON_THE_WAY" && r.phase !== "CANCELLED").map((r) => r.s.id);
+  const counted = new Map<string, number>();
+  if (countedIds.length > 0) {
+    const done = await db.shipmentReceivingItem.findMany({
+      where: { receiving: { shipmentId: { in: countedIds }, status: "CONFIRMED" }, shipmentItemId: { not: null } },
+      select: { goodQty: true, damagedQty: true, receiving: { select: { shipmentId: true } } },
+    });
+    for (const d of done) counted.set(d.receiving.shipmentId, (counted.get(d.receiving.shipmentId) ?? 0) + Number(d.goodQty) + Number(d.damagedQty));
+  }
 
   const units = (s: (typeof shipments)[number]) => s.items.filter((i) => !i.unexpected).reduce((sum, i) => sum + Number(i.expectedQty), 0);
   const productCount = (s: (typeof shipments)[number]) => s.items.filter((i) => !i.unexpected).length;
@@ -145,7 +168,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <div className={`mb-5 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 ${staff ? "hidden md:grid" : "grid"}`}>
+      <div className={staff ? "hidden" : "mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"}>
         <KpiCard
           icon={Truck}
           tone="blue"
@@ -246,98 +269,140 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
             }
           />
         ) : (
-          staff ? (
-            <ul className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
-              {list.map((r) => {
-                const s = r.s;
-                return (
-                  <li key={s.id} className="flex flex-col overflow-hidden rounded-2xl border border-line">
-                    <Link href={`/shipments/${s.id}`} className="block flex-1 px-4 py-3.5 transition hover:bg-slate-50/60">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="font-mono text-[13px] font-semibold text-slate-900">{s.shipmentNo}</span>
-                        <PhaseBadge phase={r.phase} />
-                      </div>
-                      <p className="mt-2 text-base font-semibold text-slate-900">{s.cargoName ?? s.supplier?.name ?? s.reference ?? "Delivery"}</p>
-                      {s.supplier?.name && s.cargoName && <p className="text-xs text-slate-500">from {s.supplier.name}</p>}
-                      <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-line pt-3 text-sm">
-                        <div>
-                          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">What is coming</dt>
-                          <dd className="mt-0.5 font-medium text-slate-900">
-                            {productCount(s)} product{productCount(s) === 1 ? "" : "s"}
-                            <span className="block text-xs font-normal text-slate-500">{Math.round(units(s))} items</span>
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{r.phase === "ON_THE_WAY" ? "Expected" : "Arrived"}</dt>
-                          <dd className="mt-0.5 font-medium text-slate-900">
-                            {r.phase === "ON_THE_WAY" ? (s.expectedDate ? formatDate(s.expectedDate) : "No date") : s.arrivedAt ? formatDate(s.arrivedAt) : "—"}
-                            <span className="block text-xs font-normal text-slate-500">{r.phase === "ON_THE_WAY" ? (isLate(s) ? "Late" : "On the way") : s.arrivedBy ? `by ${s.arrivedBy.name}` : ""}</span>
-                          </dd>
-                        </div>
-                      </dl>
-                    </Link>
-                    <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-2.5">{action(r)}</div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th className="hidden md:table-cell">Items</th>
-                  <th className="hidden sm:table-cell">{tab === "way" ? "Expected" : "Arrived"}</th>
-                  <th>Status</th>
-                  {manage && <th className="hidden text-right lg:table-cell">Cost</th>}
-                  <th className="text-right">&nbsp;</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((r) => {
-                  const s = r.s;
-                  return (
-                    <tr key={s.id}>
-                      <td>
-                        <Link href={`/shipments/${s.id}`} className="font-semibold text-navy-700 hover:underline">
-                          {s.shipmentNo}
-                        </Link>
-                        <span className="block text-xs text-slate-500">{[s.supplier?.name, s.cargoName ?? s.reference].filter(Boolean).join(" · ") || `Announced ${formatDate(s.createdAt)}`}</span>
-                      </td>
-                      <td className="hidden md:table-cell">
-                        {productCount(s)} product{productCount(s) === 1 ? "" : "s"}
-                        <span className="block text-xs text-slate-500">{Math.round(units(s))} items</span>
-                      </td>
-                      <td className="hidden sm:table-cell">
-                        {r.phase === "ON_THE_WAY" ? (
-                          <>
-                            {s.expectedDate ? formatDate(s.expectedDate) : <span className="text-slate-400">No date</span>}
-                            {isLate(s) && <span className="badge-red ml-2">Late</span>}
-                          </>
-                        ) : r.phase === "CANCELLED" ? (
-                          <span className="text-slate-400">Cancelled</span>
-                        ) : s.arrivedAt ? (
-                          <>
-                            {formatDateTime(s.arrivedAt)}
-                            {s.arrivedBy && <span className="block text-xs text-slate-500">by {s.arrivedBy.name}</span>}
-                          </>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td>
-                        <PhaseBadge phase={r.phase} />
-                      </td>
-                      {manage && <td className="hidden text-right font-medium lg:table-cell">{formatMoney(cost(s), currency)}</td>}
-                      <td className="text-right">{action(r)}</td>
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
+              <p className="text-sm text-slate-600">
+                <span className="font-semibold text-slate-900">{shown.length}</span> {tab === "way" ? "on the way" : tab === "check" ? (staff ? "to count" : "to check") : tab === "history" ? "finished" : "in investigation"}
+                {" · "}
+                {Math.round(shown.reduce((t, r) => t + units(r.s), 0))} items
+                {tab === "way" ? " · soonest first" : tab === "check" ? " · waiting longest first" : ""}
+              </p>
+              <form action="/shipments" className="flex items-center gap-2">
+                <input type="hidden" name="tab" value={tab} />
+                <input name="q" defaultValue={q} placeholder="Search deliveries" autoComplete="off" className="input h-9 w-full min-w-0 text-sm sm:w-64" aria-label="Search deliveries" />
+                <button type="submit" className="btn-secondary btn-sm h-9">
+                  Search
+                </button>
+                {q && (
+                  <Link href={`/shipments?tab=${tab}`} className="text-sm text-slate-500 hover:text-slate-800">
+                    Clear
+                  </Link>
+                )}
+              </form>
+            </div>
+            {pageRows.length === 0 ? (
+              <p className="px-4 py-10 text-center text-sm text-slate-500">Nothing matches &ldquo;{q}&rdquo;.</p>
+            ) : (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>{staff ? "Delivery" : "Order"}</th>
+                      <th className="hidden md:table-cell">Items</th>
+                      <th className="hidden sm:table-cell">{tab === "way" ? "Expected" : "Arrived"}</th>
+                      {staff && tab !== "way" && <th className="hidden lg:table-cell">Counted</th>}
+                      <th className={staff ? "hidden sm:table-cell" : undefined}>Status</th>
+                      {manage && <th className="hidden text-right lg:table-cell">Cost</th>}
+                      <th className="text-right">&nbsp;</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          )
+                  </thead>
+                  <tbody>
+                    {pageRows.map((r) => {
+                      const s = r.s;
+                      const late = r.phase === "ON_THE_WAY" && isLate(s);
+                      const edge = late || r.phase === "INVESTIGATION" ? "border-l-brand-red" : r.phase === "ARRIVED" || r.phase === "CHECKING" ? "border-l-oil-400" : "border-l-transparent";
+                      const total = units(s);
+                      const got = counted.get(s.id) ?? 0;
+                      const pct = total > 0 ? Math.min(100, Math.round((got / total) * 100)) : 0;
+                      return (
+                        <tr key={s.id}>
+                          <td className={cn(staff && "border-l-[3px]", staff && edge)}>
+                            <Link href={`/shipments/${s.id}`} className="whitespace-nowrap font-semibold text-navy-700 hover:underline">
+                              {s.shipmentNo}
+                            </Link>
+                            <span className="block text-xs text-slate-500">{[s.supplier?.name, s.cargoName ?? s.reference].filter(Boolean).join(" · ") || `Announced ${formatDate(s.createdAt)}`}</span>
+                            {staff && (
+                              <span className="mt-0.5 block text-xs text-slate-500 md:hidden">
+                                {productCount(s)} product{productCount(s) === 1 ? "" : "s"} · {Math.round(total)} items
+                              </span>
+                            )}
+                            {staff && (
+                              <span className="mt-1.5 block sm:hidden">
+                                <PhaseBadge phase={r.phase} />
+                              </span>
+                            )}
+                          </td>
+                          <td className="hidden md:table-cell">
+                            {productCount(s)} product{productCount(s) === 1 ? "" : "s"}
+                            <span className="block text-xs text-slate-500">{Math.round(total)} items</span>
+                          </td>
+                          <td className="hidden sm:table-cell">
+                            {r.phase === "ON_THE_WAY" ? (
+                              <>
+                                {s.expectedDate ? formatDate(s.expectedDate) : <span className="text-slate-400">No date</span>}
+                                {late && <span className="badge-red ml-2">Late</span>}
+                              </>
+                            ) : r.phase === "CANCELLED" ? (
+                              <span className="text-slate-400">Cancelled</span>
+                            ) : s.arrivedAt ? (
+                              <>
+                                {formatDateTime(s.arrivedAt)}
+                                {s.arrivedBy && <span className="block text-xs text-slate-500">by {s.arrivedBy.name}</span>}
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          {staff && tab !== "way" && (
+                            <td className="hidden lg:table-cell">
+                              {r.phase === "CANCELLED" ? (
+                                <span className="text-slate-400">—</span>
+                              ) : got <= 0 ? (
+                                <span className="text-xs text-slate-500">Not counted yet</span>
+                              ) : (
+                                <div className="w-36">
+                                  <p className="text-xs tabular-nums text-slate-600">
+                                    <span className="font-semibold text-slate-900">{Math.round(got)}</span> of {Math.round(total)} items
+                                  </p>
+                                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Counted so far">
+                                    <div className={cn("h-full rounded-full", pct >= 100 ? "bg-emerald-500" : "bg-oil-400")} style={{ width: `${pct}%` }} />
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          )}
+                          <td className={staff ? "hidden sm:table-cell" : undefined}>
+                            <PhaseBadge phase={r.phase} />
+                          </td>
+                          {manage && <td className="hidden text-right font-medium lg:table-cell">{formatMoney(cost(s), currency)}</td>}
+                          <td className="whitespace-nowrap text-right">{action(r)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {pages > 1 && (
+              <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm text-slate-600">
+                <span>
+                  {(pageNo - 1) * PAGE + 1}&ndash;{Math.min(pageNo * PAGE, shown.length)} of {shown.length}
+                </span>
+                <span className="flex items-center gap-2">
+                  {pageNo > 1 ? (
+                    <Link href={pageHref(pageNo - 1)} className="btn-secondary btn-sm">
+                      Previous
+                    </Link>
+                  ) : null}
+                  {pageNo < pages ? (
+                    <Link href={pageHref(pageNo + 1)} className="btn-secondary btn-sm">
+                      Next
+                    </Link>
+                  ) : null}
+                </span>
+              </div>
+            )}
+          </>
         )}
       </section>
       )}
