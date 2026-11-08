@@ -47,7 +47,7 @@ export default function ProductLevelCard({ p, href, active, showStock = true, mo
   ];
   if (compact) {
     return (
-      <Link href={href} className={cn("card flex h-full flex-col p-3 transition hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md", p.inactive && "opacity-70")}>
+      <Link href={href} className={cn("card flex h-full flex-col p-3 transition hover:border-navy-200", p.inactive && "opacity-70")}>
         <div className="flex items-start gap-2.5">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-white">
             {p.imageV ? (
@@ -65,7 +65,7 @@ export default function ProductLevelCard({ p, href, active, showStock = true, mo
         {showStock ? (
           <>
             <div className="mt-2 flex items-center justify-between gap-2">
-              <p className="min-w-0 truncate text-lg font-bold leading-tight tracking-tight text-slate-900">{fmt(p.available)}</p>
+              <p className="min-w-0 truncate text-lg font-semibold leading-tight tracking-tight text-slate-900">{fmt(p.available)}</p>
               {p.inactive ? <span className="badge-gray shrink-0">Off</span> : out ? <span className="badge-red shrink-0">Out</span> : low ? <span className="badge-yellow shrink-0">Low</span> : p.pack ? <QtySwitch mode={mode} onChange={setMode} /> : null}
             </div>
             <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={segments.filter((s) => s.n > 0).map((s) => `${s.n} ${s.label}`).join(", ")}>
@@ -81,7 +81,7 @@ export default function ProductLevelCard({ p, href, active, showStock = true, mo
             </div>
           </>
         ) : (
-          p.price && <p className="mt-2 text-base font-bold text-slate-900">{p.price}</p>
+          p.price && <p className="mt-2 text-base font-semibold text-slate-900">{p.price}</p>
         )}
       </Link>
     );
@@ -90,7 +90,7 @@ export default function ProductLevelCard({ p, href, active, showStock = true, mo
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={cn("card block px-4 py-3.5 transition hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md", active && "border-navy-500 ring-1 ring-navy-500/40")}
+      className={cn("card block px-4 py-3.5 transition hover:border-navy-200", active && "border-navy-500 ring-1 ring-navy-500/40")}
     >
       <div className="flex items-start gap-3">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-white">
@@ -112,7 +112,7 @@ export default function ProductLevelCard({ p, href, active, showStock = true, mo
       {showStock ? (
         <>
         <div className="mt-3 flex items-baseline justify-between gap-2">
-          <p className="text-2xl font-bold leading-none tracking-tight text-slate-900">
+          <p className="text-2xl font-semibold leading-none tracking-tight text-slate-900">
             {fmt(p.available)}
             <span className="ml-1.5 text-xs font-medium text-slate-500">in the shop</span>
           </p>
@@ -135,7 +135,7 @@ export default function ProductLevelCard({ p, href, active, showStock = true, mo
         </div>
         </>
       ) : (
-        p.price && <p className="mt-3 text-lg font-bold text-slate-900">{p.price}</p>
+        p.price && <p className="mt-3 text-lg font-semibold text-slate-900">{p.price}</p>
       )}
     </Link>
   );

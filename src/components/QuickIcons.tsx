@@ -17,7 +17,7 @@ export default function QuickIcons({ items, fill, className, label = "Shortcuts"
         <Link key={q.href} href={q.href} className={cn("flex shrink-0 flex-col items-center gap-1.5 rounded-xl px-1 py-2 text-[11px] font-medium text-slate-600 transition hover:text-slate-900 sm:text-[13px]", fill ? "min-w-0" : "w-[4.6rem] sm:w-24")}>
           <span className="relative">
             <q.icon size={26} strokeWidth={1.75} className={q.accent ? "text-blue-600" : "text-slate-500"} />
-            {q.n ? <span className="absolute -right-2.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold leading-none text-white">{q.n > 99 ? "99+" : q.n}</span> : null}
+            {q.n ? <span className="absolute -right-2.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-semibold leading-none text-white">{q.n > 99 ? "99+" : q.n}</span> : null}
           </span>
           <span className={cn("max-w-full truncate", q.accent && "font-semibold text-slate-900")}>{q.label}</span>
         </Link>

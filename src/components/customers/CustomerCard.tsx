@@ -35,7 +35,7 @@ export default function CustomerCard({
   action: { href: string; label: string; primary: boolean } | null;
 }) {
   return (
-    <div className={cn("card group relative flex flex-col overflow-hidden border-l-4 transition hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md", EDGE[status.tone])}>
+    <div className={cn("card group relative flex flex-col overflow-hidden border-l-4 transition hover:border-navy-200", EDGE[status.tone])}>
       <div className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -52,12 +52,12 @@ export default function CustomerCard({
           <div className="shrink-0 text-right">
             {onTimePct === null ? (
               <>
-                <p className="text-2xl font-bold leading-none text-slate-300">—</p>
+                <p className="text-2xl font-semibold leading-none text-slate-300">—</p>
                 <p className="mt-1 text-[11px] text-slate-500">no payment due yet</p>
               </>
             ) : (
               <>
-                <p className={cn("text-2xl font-bold leading-none tabular-nums", pctTone(onTimePct))}>
+                <p className={cn("text-2xl font-semibold leading-none tabular-nums", pctTone(onTimePct))}>
                   {onTimePct}
                   <span className="text-sm">%</span>
                 </p>
@@ -74,13 +74,13 @@ export default function CustomerCard({
         <div className={cn("mt-4 grid border-t border-line", left && right ? "grid-cols-2" : "grid-cols-1")}>
           {left && (
             <div className="min-w-0 px-4 py-3">
-              <p className="text-lg font-bold leading-tight tabular-nums text-slate-900">{left.value}</p>
+              <p className="text-lg font-semibold leading-tight tabular-nums text-slate-900">{left.value}</p>
               <p className="mt-0.5 text-xs text-slate-500">{left.hint}</p>
             </div>
           )}
           {right && (
             <div className={cn("min-w-0 px-4 py-3", left && "border-l border-line")}>
-              <p className={cn("text-lg font-bold leading-tight tabular-nums", right.tone === "red" ? "text-brand-red-dark" : right.tone === "muted" ? "text-slate-400" : "text-slate-900")}>{right.value}</p>
+              <p className={cn("text-lg font-semibold leading-tight tabular-nums", right.tone === "red" ? "text-brand-red-dark" : right.tone === "muted" ? "text-slate-400" : "text-slate-900")}>{right.value}</p>
               <p className={cn("mt-0.5 text-xs", right.tone === "red" ? "font-medium text-brand-red-dark" : "text-slate-500")}>{right.hint}</p>
             </div>
           )}

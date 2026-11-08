@@ -158,7 +158,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
           ].map(([label, value, note]) => (
             <div key={String(label)} className="rounded-xl border border-line px-3.5 py-3">
               <dt className="text-xs text-slate-500">{String(label)}</dt>
-              <dd className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">{money(value as Prisma.Decimal)}</dd>
+              <dd className="mt-0.5 text-lg font-semibold tabular-nums text-slate-900">{money(value as Prisma.Decimal)}</dd>
               <p className="mt-0.5 text-[11px] text-slate-500">{String(note)}</p>
             </div>
           ))}
@@ -194,7 +194,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
           {compare.map((x) => (
             <div key={x.label} className="rounded-xl border border-line px-3.5 py-3">
               <dt className="text-xs text-slate-500">{x.label}</dt>
-              <dd className="mt-0.5 text-lg font-bold tabular-nums text-slate-900">{money(x.value)}</dd>
+              <dd className="mt-0.5 text-lg font-semibold tabular-nums text-slate-900">{money(x.value)}</dd>
               <p className={cn("mt-0.5 flex items-center gap-1 text-xs", x.change === null ? "text-slate-500" : x.change >= 0 ? "font-medium text-emerald-700" : "font-medium text-brand-red-dark")}>
                 {x.change === null ? null : x.change >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
                 {x.change === null ? x.hint : `${x.change >= 0 ? "Up" : "Down"} ${Math.abs(x.change)}% · ${x.hint}`}
@@ -258,7 +258,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
                       </a>
                     )}
                     <div className="min-w-0 text-sm">
-                      <p className="text-lg font-bold tabular-nums text-slate-900">{money(d.amount)}</p>
+                      <p className="text-lg font-semibold tabular-nums text-slate-900">{money(d.amount)}</p>
                       <p className="text-slate-600">
                         into <strong>{acc?.name ?? "the bank"}</strong>
                         {acc?.accountNumber ? ` · ${acc.accountNumber}` : ""}

@@ -47,7 +47,7 @@ export default function StockCard(p: StockCardProps) {
   const min = p.minBase !== null ? f(p.minBase) : null;
   const note = [min ? `Min ${min}` : "No minimum", (p.reservedBase ?? 0) > 0 ? `${f(p.reservedBase!)} waiting` : null, (p.awayBase ?? 0) > 0 ? `${f(p.awayBase!)} with winga` : null].filter(Boolean).join(" · ");
   return (
-    <div className={cn("card group relative flex h-full flex-col p-3 transition", p.href && "cursor-pointer hover:border-navy-300 hover:shadow-md")}>
+    <div className={cn("card group relative flex h-full flex-col p-3 transition", p.href && "cursor-pointer hover:border-navy-300")}>
       <div className="flex items-start gap-2.5">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
           {p.imageV ? (
@@ -86,7 +86,7 @@ export default function StockCard(p: StockCardProps) {
         )}
       </div>
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-lg font-bold leading-tight tracking-tight text-slate-900">{f(p.qtyBase)}</p>
+        <p className="min-w-0 truncate text-lg font-semibold leading-tight tracking-tight text-slate-900">{f(p.qtyBase)}</p>
         <span className={cn("shrink-0", BADGE[p.status])}>{WORD[p.status]}</span>
       </div>
 

@@ -51,7 +51,7 @@ function Detail({ result, canSell }: { result: ScanResult; canSell: boolean }) {
           {p.name}
         </Link>
         <p className="text-sm text-slate-500">{[p.brand, p.size].filter(Boolean).join(" · ") || "—"}</p>
-        {p.price && <p className="mt-1 text-xl font-bold text-slate-900">{p.price}</p>}
+        {p.price && <p className="mt-1 text-xl font-semibold text-slate-900">{p.price}</p>}
         <p className="font-mono text-xs text-slate-400">{p.sku}</p>
       </div>
     </div>
@@ -66,11 +66,11 @@ function Detail({ result, canSell }: { result: ScanResult; canSell: boolean }) {
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-lg bg-slate-50 px-3 py-2">
               <dt className="text-xs text-slate-500">On the shelf</dt>
-              <dd className="text-xl font-bold text-slate-900">{result.stock.shelf}</dd>
+              <dd className="text-xl font-semibold text-slate-900">{result.stock.shelf}</dd>
             </div>
             <div className="rounded-lg bg-slate-50 px-3 py-2">
               <dt className="text-xs text-slate-500">With winga</dt>
-              <dd className="text-xl font-bold text-slate-900">{result.stock.withResellers}</dd>
+              <dd className="text-xl font-semibold text-slate-900">{result.stock.withResellers}</dd>
             </div>
           </dl>
         )}
@@ -85,7 +85,7 @@ function Detail({ result, canSell }: { result: ScanResult; canSell: boolean }) {
       <div className={cn("flex items-center gap-3 border-b px-4 py-3", tone.box)}>
         {tone.icon === "ok" ? <CircleCheck size={26} className="shrink-0" /> : <CircleAlert size={26} className="shrink-0" />}
         <div className="min-w-0">
-          <p className="text-lg font-bold leading-tight">{it.statusLabel}</p>
+          <p className="text-lg font-semibold leading-tight">{it.statusLabel}</p>
           <p className="text-sm">{result.note ?? `At ${it.location}. Ready to sell.`}</p>
         </div>
       </div>

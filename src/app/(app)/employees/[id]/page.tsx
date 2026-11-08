@@ -110,7 +110,7 @@ export default async function EmployeePage({
       {/* who this is */}
       <section className="card mb-5 overflow-hidden">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 py-5">
-          <span className={cn("grid h-16 w-16 shrink-0 place-items-center rounded-full text-2xl font-bold", employee.role.isSuperAdmin ? "bg-oil-400 text-[#0a1424]" : "bg-navy-700 text-white")} aria-hidden>
+          <span className={cn("grid h-16 w-16 shrink-0 place-items-center rounded-full text-2xl font-semibold", employee.role.isSuperAdmin ? "bg-oil-400 text-[#0a1424]" : "bg-navy-700 text-white")} aria-hidden>
             {employee.name.trim().charAt(0).toUpperCase()}
           </span>
           <div className="min-w-0 flex-1">

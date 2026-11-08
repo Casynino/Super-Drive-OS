@@ -73,7 +73,7 @@ export default async function StockProductPage({ params, searchParams }: { param
   const tile = (label: string, value: string, hint?: string, tone?: string) => (
     <div className="min-w-0">
       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={cn("mt-0.5 truncate text-xl font-bold leading-tight tracking-tight text-slate-900", tone)}>{value}</p>
+      <p className={cn("mt-0.5 truncate text-xl font-semibold leading-tight tracking-tight text-slate-900", tone)}>{value}</p>
       {hint && <p className="truncate text-xs text-slate-500">{hint}</p>}
     </div>
   );
@@ -190,7 +190,7 @@ export default async function StockProductPage({ params, searchParams }: { param
                           </span>
                         )}
                       </div>
-                      <span className={cn("inline-flex items-center gap-1 text-sm font-bold tabular-nums lg:justify-end", neg ? "text-brand-red-dark" : "text-emerald-700")}>
+                      <span className={cn("inline-flex items-center gap-1 text-sm font-semibold tabular-nums lg:justify-end", neg ? "text-brand-red-dark" : "text-emerald-700")}>
                         {neg ? <ArrowUpFromLine size={14} /> : <ArrowDownToLine size={14} />}
                         {neg ? "−" : "+"}
                         {say(Math.abs(num(m.quantity)))}

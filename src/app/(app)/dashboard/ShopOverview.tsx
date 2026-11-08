@@ -119,7 +119,7 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Today</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Today</h1>
           <p className="mt-1 text-sm text-slate-500">{new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: TZ }).format(new Date())}</p>
         </div>
         {/* a closing that is waiting is the first row of "Needs your attention" below, so only "done today" is said here */}
@@ -158,7 +158,7 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
           <section className="card flex flex-col px-4 py-4 sm:px-5" aria-label="Money received today">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="text-sm font-semibold text-slate-900">Money received today</h2>
-              <span className="text-sm font-bold tabular-nums text-slate-900">{m(collected)}</span>
+              <span className="text-sm font-semibold tabular-nums text-slate-900">{m(collected)}</span>
             </div>
             <div className="mt-2 h-44">
               <DonutChart data={methods.filter((x) => x.value > 0)} money={chart} centre={m(collected)} centreLabel="Received" empty="Nothing received yet today" />
@@ -182,7 +182,7 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
           </div>
           <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] md:divide-x md:divide-line">
             <div className="px-4 py-5 sm:px-5">
-              <p className="text-3xl font-bold tabular-nums text-slate-900">
+              <p className="text-3xl font-semibold tabular-nums text-slate-900">
                 {alerts.inStock}
                 <span className="ml-2 text-base font-medium text-slate-500">of {alerts.active} products in stock</span>
               </p>
@@ -290,20 +290,20 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
           <dl className="grid grid-cols-2 divide-line md:grid-cols-4 md:divide-x">
             <div className="px-4 py-4 sm:px-5">
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cash received today</dt>
-              <dd className="mt-1 text-xl font-bold tabular-nums text-emerald-700">+ {m(till.received)}</dd>
+              <dd className="mt-1 text-xl font-semibold tabular-nums text-emerald-700">+ {m(till.received)}</dd>
             </div>
             <div className="px-4 py-4 sm:px-5">
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Used for expenses</dt>
-              <dd className="mt-1 text-xl font-bold tabular-nums text-slate-900">− {m(till.expenses)}</dd>
+              <dd className="mt-1 text-xl font-semibold tabular-nums text-slate-900">− {m(till.expenses)}</dd>
               {till.otherOut.gt(0) && <p className="text-[11px] text-slate-500">and {m(till.otherOut)} for refunds, suppliers or the owner</p>}
             </div>
             <div className="px-4 py-4 sm:px-5">
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Deposited today</dt>
-              <dd className="mt-1 text-xl font-bold tabular-nums text-slate-900">− {m(till.deposited)}</dd>
+              <dd className="mt-1 text-xl font-semibold tabular-nums text-slate-900">− {m(till.deposited)}</dd>
             </div>
             <div className="bg-sky-500/[0.07] px-4 py-4 sm:px-5">
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Still at the shop</dt>
-              <dd className="mt-1 text-xl font-bold tabular-nums text-slate-900 lg:text-2xl">{m(till.balance)}</dd>
+              <dd className="mt-1 text-xl font-semibold tabular-nums text-slate-900 lg:text-2xl">{m(till.balance)}</dd>
             </div>
           </dl>
         </section>
@@ -333,7 +333,7 @@ function Fact({ label, value, note }: { label: string; value: string; note?: str
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 truncate text-base font-bold tabular-nums text-slate-900" title={value}>
+      <dd className="mt-0.5 truncate text-base font-semibold tabular-nums text-slate-900" title={value}>
         {value}
       </dd>
       {note && <p className="text-[11px] text-slate-500">{note}</p>}

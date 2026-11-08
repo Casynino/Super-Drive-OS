@@ -134,7 +134,7 @@ export default function ReleaseForm({
             </span>
             {mode === "all" ? (
               <span className="shrink-0 text-right">
-                <span className="block text-base font-bold tabular-nums text-slate-900">{l.waitingText}</span>
+                <span className="block text-base font-semibold tabular-nums text-slate-900">{l.waitingText}</span>
                 <span className="block text-[11px] tabular-nums text-slate-500">{l.waitingText.endsWith(l.symbol) ? "" : `${l.waiting} ${l.symbol}`}</span>
               </span>
             ) : (
@@ -211,7 +211,7 @@ export default function ReleaseForm({
                   )}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{l.name}</span>
-                <span className="shrink-0 text-sm font-bold tabular-nums text-slate-900">{say(l, n)}</span>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{say(l, n)}</span>
               </li>
             ))}
           </ul>

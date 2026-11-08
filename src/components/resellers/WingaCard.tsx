@@ -50,7 +50,7 @@ export default function WingaCard({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className={cn("card overflow-hidden border-l-4 transition hover:border-navy-200 hover:shadow-md", EDGE[status.tone])}>
+    <div className={cn("card overflow-hidden border-l-4 transition hover:border-navy-200", EDGE[status.tone])}>
     <Link href={href} className="group block">
       <div className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="min-w-0">
@@ -63,12 +63,12 @@ export default function WingaCard({
         <div className="shrink-0 text-right">
           {onTimePct === null ? (
             <>
-              <p className="text-2xl font-bold leading-none text-slate-300">—</p>
+              <p className="text-2xl font-semibold leading-none text-slate-300">—</p>
               <p className="mt-1 text-[11px] text-slate-500">no payment due yet</p>
             </>
           ) : (
             <>
-              <p className={cn("text-2xl font-bold leading-none tabular-nums", pctTone(onTimePct))}>
+              <p className={cn("text-2xl font-semibold leading-none tabular-nums", pctTone(onTimePct))}>
                 {onTimePct}
                 <span className="text-sm">%</span>
               </p>
@@ -82,11 +82,11 @@ export default function WingaCard({
 
       <div className="mt-4 grid grid-cols-2 border-t border-line">
         <div className="min-w-0 px-4 py-3">
-          <p className="text-lg font-bold leading-tight tabular-nums text-slate-900">{stockValue}</p>
+          <p className="text-lg font-semibold leading-tight tabular-nums text-slate-900">{stockValue}</p>
           <p className="mt-0.5 text-xs text-slate-500">{stockItems}</p>
         </div>
         <div className="min-w-0 border-l border-line px-4 py-3">
-          <p className={cn("text-lg font-bold leading-tight tabular-nums", owesTone === "red" ? "text-brand-red-dark" : owesTone === "muted" ? "text-slate-400" : "text-slate-900")}>{owes}</p>
+          <p className={cn("text-lg font-semibold leading-tight tabular-nums", owesTone === "red" ? "text-brand-red-dark" : owesTone === "muted" ? "text-slate-400" : "text-slate-900")}>{owes}</p>
           <p className={cn("mt-0.5 text-xs", owesTone === "red" ? "font-medium text-brand-red-dark" : "text-slate-500")}>{owesHint}</p>
         </div>
       </div>

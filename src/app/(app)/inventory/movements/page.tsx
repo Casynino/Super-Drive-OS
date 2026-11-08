@@ -205,7 +205,7 @@ export default async function MovementsPage({ searchParams }: { searchParams: Pr
                           <span className={t.badge}>{t.label}</span>
                           {m.reason && <span className="mt-0.5 block truncate text-xs text-slate-500" title={m.reason}>{m.reason}</span>}
                         </div>
-                        <span className={cn("inline-flex items-center gap-1 text-sm font-bold tabular-nums lg:justify-end", neg ? "text-brand-red-dark" : "text-emerald-700")}>
+                        <span className={cn("inline-flex items-center gap-1 text-sm font-semibold tabular-nums lg:justify-end", neg ? "text-brand-red-dark" : "text-emerald-700")}>
                           {neg ? <ArrowUpFromLine size={14} /> : <ArrowDownToLine size={14} />}
                           {neg ? "−" : "+"}
                           {qtyText(Math.abs(num(m.quantity)), pk, sym).main}

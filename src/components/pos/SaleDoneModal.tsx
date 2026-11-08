@@ -13,7 +13,7 @@ const SHEET_W = 559.37;
 const SHEET_H = 793.7;
 
 // small round icon buttons, one calm set, solid so nothing shows through (fixed hex colours: the dark theme swaps the named tokens)
-const dot = "group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-white/20 transition hover:scale-105";
+const dot = "group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-white/20 transition";
 const navy = "bg-[#152a4a] text-[#ffffff] hover:bg-[#1c3560]";
 const tip = "pointer-events-none absolute left-full top-1/2 ml-2.5 hidden -translate-y-1/2 whitespace-nowrap rounded-md bg-[#ffffff] px-2 py-1 text-xs font-semibold text-[#0e3d6e] opacity-0 shadow-lg transition group-hover:opacity-100 md:block";
 const xBtn = "grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#152a4a] text-[#ffffff] ring-1 ring-white/20 transition hover:bg-[#1c3560]";
@@ -92,7 +92,7 @@ export default function SaleDoneModal({ saleId, currency, onNewSale, onLoaded }:
           </div>
         ) : sale ? (
           <div className="w-[min(92vw,26rem)] rounded-xl bg-white px-6 py-6 text-center">
-            <p className="text-2xl font-bold text-slate-900">{fmt(sale.total)}</p>
+            <p className="text-2xl font-semibold text-slate-900">{fmt(sale.total)}</p>
             <p className="mt-1 text-sm text-slate-600">{sale.customer ?? "Walk-in customer"} · stock is updated</p>
             <Link href={`/sales/${sale.id}/receipt?first=1`} target="_blank" rel="noopener" className="mt-3 inline-block text-sm font-medium text-navy-700 underline">
               Print receipt

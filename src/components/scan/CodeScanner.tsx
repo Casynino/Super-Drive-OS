@@ -149,7 +149,7 @@ export default function CodeScanner({ onScan, busy, autoStart = false, compact =
             {(["left-0 top-0 border-l-4 border-t-4 rounded-tl-2xl", "right-0 top-0 border-r-4 border-t-4 rounded-tr-2xl", "bottom-0 left-0 border-b-4 border-l-4 rounded-bl-2xl", "bottom-0 right-0 border-b-4 border-r-4 rounded-br-2xl"] as const).map((c) => (
               <span key={c} className={cn("absolute h-9 w-9 border-oil-400", c)} />
             ))}
-            <span className="sd-scan-line absolute inset-x-3 h-0.5 rounded bg-oil-400/90 shadow-[0_0_12px_2px_rgba(253,196,0,0.7)]" style={{ animation: "sd-scan-line 2.4s ease-in-out infinite" }} />
+            <span className="sd-scan-line absolute inset-x-3 h-0.5 rounded bg-oil-400/90" style={{ animation: "sd-scan-line 2.4s ease-in-out infinite" }} />
           </div>
           <div className="absolute right-2 top-2 flex gap-2">
             {torchOk && (

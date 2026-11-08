@@ -44,25 +44,25 @@ const Heading = ({ children, right }: { children: React.ReactNode; right?: React
   </div>
 );
 
+/** The tone is only a small dot; the tile itself stays a plain surface (no coloured borders or washes). */
 const TONES = {
-  blue: { box: "border-sky-500/25 from-sky-500/[0.08]", icon: "bg-sky-500/15 text-sky-600 dark:text-sky-300", value: "text-sky-700 dark:text-sky-200" },
-  green: { box: "border-emerald-500/25 from-emerald-500/[0.08]", icon: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300", value: "text-emerald-700 dark:text-emerald-300" },
-  red: { box: "border-rose-500/25 from-rose-500/[0.08]", icon: "bg-rose-500/15 text-rose-600 dark:text-rose-300", value: "text-rose-700 dark:text-rose-300" },
-  amber: { box: "border-amber-500/30 from-amber-500/[0.09]", icon: "bg-amber-500/15 text-amber-600 dark:text-amber-300", value: "text-amber-700 dark:text-amber-300" },
-  violet: { box: "border-violet-500/25 from-violet-500/[0.08]", icon: "bg-violet-500/15 text-violet-600 dark:text-violet-300", value: "text-violet-700 dark:text-violet-200" },
-  slate: { box: "border-line from-slate-500/[0.06]", icon: "bg-slate-500/15 text-slate-600", value: "text-slate-900" },
+  blue: "bg-sky-500",
+  green: "bg-emerald-500",
+  red: "bg-brand-red",
+  amber: "bg-oil-400",
+  violet: "bg-navy-400",
+  slate: "bg-slate-400",
 } as const;
 
 function Metric({ icon: Icon, label, value, hint, change, upIsGood = true, tone, href }: { icon: typeof Package; label: string; value: React.ReactNode; hint?: React.ReactNode; change?: number | null; upIsGood?: boolean; tone: keyof typeof TONES; href?: string }) {
-  const t = TONES[tone];
+  const dot = TONES[tone];
   const good = change === null || change === undefined ? null : upIsGood ? change >= 0 : change <= 0;
   const body = (
-    <div className={cn("@container h-full rounded-xl border bg-gradient-to-br to-transparent p-4 transition", t.box, href && "hover:-translate-y-0.5 hover:shadow-lg")}>
+    <div className={cn("@container card h-full p-4 transition", href && "hover:border-navy-300")}>
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-[13px] font-medium text-slate-600">
-          <span className={cn("grid h-8 w-8 place-items-center rounded-lg", t.icon)}>
-            <Icon size={16} />
-          </span>
+          <span className={cn("h-2 w-2 shrink-0 rounded-full", dot)} aria-hidden />
+          <Icon size={16} className="text-slate-400" />
           {label}
         </span>
         {change !== null && change !== undefined && (
@@ -72,7 +72,7 @@ function Metric({ icon: Icon, label, value, hint, change, upIsGood = true, tone,
           </span>
         )}
       </div>
-      <p className={cn("mt-3 whitespace-nowrap text-[clamp(1.2rem,9cqw,1.75rem)] font-bold leading-none tracking-tight", t.value)}>{value}</p>
+      <p className={cn("mt-3 whitespace-nowrap text-[clamp(1.2rem,9cqw,1.75rem)] font-semibold leading-none tracking-tight text-slate-900")}>{value}</p>
       {hint && <p className="mt-2 text-xs text-slate-500">{hint}</p>}
     </div>
   );
@@ -216,7 +216,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
                       <Icon size={16} className="shrink-0 text-slate-400" />
                       <span className="min-w-0 flex-1">
                         <span className="block text-[13px] text-slate-500">{b.name}</span>
-                        <span className={cn("block text-base font-bold tabular-nums", b.balance.lt(0) ? "text-brand-red-dark" : "text-slate-900")}>{m(b.balance.toNumber())}</span>
+                        <span className={cn("block text-base font-semibold tabular-nums", b.balance.lt(0) ? "text-brand-red-dark" : "text-slate-900")}>{m(b.balance.toNumber())}</span>
                       </span>
                       <span className="hidden text-right text-[11px] text-slate-500 sm:block">
                         +{m(b.inToday.toNumber())}
@@ -240,10 +240,10 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
               )}
             </div>
             <dl className="divide-y divide-slate-100 text-sm">
-              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Sold today</dt><dd className="font-bold tabular-nums text-slate-900">{m(extras.today.sales)}</dd></div>
-              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Collected today</dt><dd className="font-bold tabular-nums text-emerald-600 dark:text-emerald-300">{m(o.today.collected)}</dd></div>
-              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Spent today</dt><dd className="font-bold tabular-nums text-slate-900">{m(o.today.spent)}</dd></div>
-              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Net cash today</dt><dd className={cn("font-bold tabular-nums", o.today.net < 0 ? "text-rose-600 dark:text-rose-300" : "text-emerald-600 dark:text-emerald-300")}>{o.today.net < 0 ? "−" : ""}{m(Math.abs(o.today.net))}</dd></div>
+              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Sold today</dt><dd className="font-semibold tabular-nums text-slate-900">{m(extras.today.sales)}</dd></div>
+              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Collected today</dt><dd className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-300">{m(o.today.collected)}</dd></div>
+              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Spent today</dt><dd className="font-semibold tabular-nums text-slate-900">{m(o.today.spent)}</dd></div>
+              <div className="flex items-center justify-between py-2.5"><dt className="text-slate-600">Net cash today</dt><dd className={cn("font-semibold tabular-nums", o.today.net < 0 ? "text-rose-600 dark:text-rose-300" : "text-emerald-600 dark:text-emerald-300")}>{o.today.net < 0 ? "−" : ""}{m(Math.abs(o.today.net))}</dd></div>
             </dl>
           </div>
         </div>
@@ -296,7 +296,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
                   <span className="block text-sm text-slate-800">{h.label}</span>
                   <span className="block text-[11px] text-slate-500">{h.note}</span>
                 </span>
-                <span className={cn("shrink-0 text-lg font-bold tabular-nums", h.cls)}>{h.value}</span>
+                <span className={cn("shrink-0 text-lg font-semibold tabular-nums", h.cls)}>{h.value}</span>
               </li>
             ))}
           </ul>
@@ -536,7 +536,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
                   return (
                     <li key={s.id}>
                       <Link href={`/sales?seller=${s.id}&from=${range.fromYmd}&to=${range.toYmd}`} className="flex items-center gap-3">
-                        <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold", i === 0 ? "bg-oil-400 text-navy-900" : "bg-navy-50 text-navy-700")}>
+                        <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-semibold", i === 0 ? "bg-oil-400 text-navy-900" : "bg-navy-50 text-navy-700")}>
                           {s.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
                         </span>
                         <span className="min-w-0 flex-1">
@@ -563,7 +563,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
                 <div className="flex items-center justify-between"><dt className="text-slate-600">Stock they hold</dt><dd className="font-semibold tabular-nums">{m(extras.resellers.held)}</dd></div>
                 <div className="flex items-center justify-between"><dt className="text-slate-600">They owe us</dt><dd className="font-semibold tabular-nums">{m(extras.resellers.owed)}</dd></div>
                 {extras.resellers.overdue > 0 && (
-                  <div className="flex items-center justify-between rounded-lg bg-brand-red-soft px-3 py-2 text-brand-red-dark"><dt>Overdue</dt><dd className="font-bold tabular-nums">{m(extras.resellers.overdue)}</dd></div>
+                  <div className="flex items-center justify-between rounded-lg bg-brand-red-soft px-3 py-2 text-brand-red-dark"><dt>Overdue</dt><dd className="font-semibold tabular-nums">{m(extras.resellers.overdue)}</dd></div>
                 )}
               </dl>
             </Section>

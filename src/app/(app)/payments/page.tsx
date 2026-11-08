@@ -295,7 +295,7 @@ export default async function IncomePage({ searchParams }: { searchParams: Promi
                               </div>
                               <div className="flex items-center justify-between gap-2 lg:block lg:text-right">
                                 <span className="text-xs text-slate-500 lg:hidden">Amount</span>
-                                <span className="text-sm font-bold tabular-nums text-emerald-700">+ {money(r.amount)}</span>
+                                <span className="text-sm font-semibold tabular-nums text-emerald-700">+ {money(r.amount)}</span>
                               </div>
                               <div className="col-span-2 min-w-0 truncate text-sm text-slate-600 lg:col-span-1">
                                 <span className="text-xs text-slate-500 lg:hidden">Received by </span>

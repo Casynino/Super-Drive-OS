@@ -124,7 +124,7 @@ export default function PackingList({
       <dl className="space-y-1.5 border-t border-line bg-slate-50/60 px-4 py-3 text-sm">
         <div className="flex justify-between">
           <dt className="text-slate-600">You pay</dt>
-          <dd className="font-bold text-slate-900">
+          <dd className="font-semibold text-slate-900">
             {currencySymbol} {money(t.cost)}
           </dd>
         </div>
@@ -138,7 +138,7 @@ export default function PackingList({
             </div>
             <div className="flex justify-between">
               <dt className="text-slate-600">{t.profit >= 0 ? "Expected profit" : "Expected loss"}</dt>
-              <dd className={cn("font-bold", t.profit >= 0 ? "text-emerald-700" : "text-brand-red-dark")}>
+              <dd className={cn("font-semibold", t.profit >= 0 ? "text-emerald-700" : "text-brand-red-dark")}>
                 {currencySymbol} {money(Math.abs(t.profit))}
                 {Number.isFinite(t.margin) && ` (${Math.round(t.margin)}%)`}
               </dd>

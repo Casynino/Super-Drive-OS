@@ -38,7 +38,7 @@ function Stat({ label, value, hint, href, tone }: { label: string; value: string
         <span className={cn("h-2 w-2 shrink-0 rounded-full", TONE[tone])} />
         <span className="truncate">{label}</span>
       </span>
-      <span className="mt-0.5 block text-2xl font-bold leading-tight tabular-nums text-slate-900">{value}</span>
+      <span className="mt-0.5 block text-2xl font-semibold leading-tight tabular-nums text-slate-900">{value}</span>
       <span className="block truncate text-[11px] text-slate-500">{hint}</span>
     </Link>
   );
@@ -171,7 +171,7 @@ export default async function WarehouseHome() {
                       <span className="min-w-0 flex-1 text-[13px] font-semibold leading-tight text-slate-900 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">{p.name}</span>
                     </div>
                     <div className="mt-2.5 flex items-end justify-between gap-2">
-                      <span className="text-xl font-bold leading-none tabular-nums text-slate-900">{qtyText(p.available, p.pack, p.symbol, unitMode).main}</span>
+                      <span className="text-xl font-semibold leading-none tabular-nums text-slate-900">{qtyText(p.available, p.pack, p.symbol, unitMode).main}</span>
                       {p.status !== "ok" && <span className={cn("text-[11px] font-semibold", p.status === "out" ? "text-rose-600" : "text-yellow-600")}>{p.status === "out" ? "Out" : "Low"}</span>}
                     </div>
                     <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-slate-100">

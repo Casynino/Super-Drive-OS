@@ -108,11 +108,11 @@ export default async function ItemLabelsPage({ searchParams }: { searchParams: P
               </div>
               <div className="flex min-w-0 flex-1 flex-col justify-between leading-tight">
                 <div>
-                  <p className="text-[6.5pt] font-extrabold uppercase tracking-wider text-[#0E3D6E]">Super Drive Oil</p>
-                  <p className="mt-[0.6mm] line-clamp-3 text-[8pt] font-bold">{it.product.name}</p>
+                  <p className="text-[6.5pt] font-semibold uppercase tracking-wider text-[#0E3D6E]">Super Drive Oil</p>
+                  <p className="mt-[0.6mm] line-clamp-3 text-[8pt] font-semibold">{it.product.name}</p>
                   <p className="text-[6.5pt] text-[#475569]">{[it.product.brand?.name, it.product.size].filter(Boolean).join(" · ")}</p>
                 </div>
-                <p className="font-mono text-[6.5pt] font-bold tracking-tight">{it.itemNo}</p>
+                <p className="font-mono text-[6.5pt] font-semibold tracking-tight">{it.itemNo}</p>
               </div>
             </div>
           ))}

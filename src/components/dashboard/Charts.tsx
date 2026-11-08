@@ -65,7 +65,7 @@ export function DonutChart({ data, money, centre, colors = CHART_COLORS, centreL
             return (
               <>
                 <span className="text-[10px] uppercase tracking-wide text-slate-500">{prefix ? `${centreLabel} · ${prefix}` : centreLabel}</span>
-                <span className={num.length > 9 ? "text-[13px] font-bold tabular-nums text-slate-900" : "text-base font-bold tabular-nums text-slate-900"}>{num}</span>
+                <span className={num.length > 9 ? "text-[13px] font-semibold tabular-nums text-slate-900" : "text-base font-semibold tabular-nums text-slate-900"}>{num}</span>
                 {suffix && <span className="text-[10px] text-slate-500">{suffix}</span>}
               </>
             );

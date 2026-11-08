@@ -287,7 +287,7 @@ function DecisionForm({ r, choice, action, currencySymbol, onClose }: { r: Probl
             <span className="block truncate font-semibold text-slate-900">{r.productName}</span>
             <span className="block truncate text-xs text-slate-500">{[r.saleNo, r.reference].filter(Boolean).join(" · ")}</span>
           </span>
-          <span className="shrink-0 text-right text-base font-bold tabular-nums text-slate-900">{qty}</span>
+          <span className="shrink-0 text-right text-base font-semibold tabular-nums text-slate-900">{qty}</span>
         </div>
         <p className="text-sm text-slate-600">{c.help(r)}</p>
         {choice === "DISCOUNT_SELL" && (
@@ -345,7 +345,7 @@ function ProblemItem({ r, onChoose }: { r: ProblemRow; onChoose: (r: ProblemRow,
             {r.saleNo ? ` · ${r.saleNo}` : ""}
           </p>
         </div>
-        <p className="text-right text-base font-bold leading-tight tabular-nums text-slate-900">
+        <p className="text-right text-base font-semibold leading-tight tabular-nums text-slate-900">
           {qty}
           {r.pack && whole && <span className="block text-[11px] font-normal text-slate-500">{nf.format(r.quantity)} {r.baseSymbol}</span>}
         </p>

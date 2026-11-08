@@ -228,7 +228,7 @@ function RecordRow({ r, canAct, closed, action, mode, currencySymbol }: { r: Iss
         </Cell>
         <div className="lg:text-right">
           <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 lg:hidden">{short.label}</p>
-          <p className={cn("text-lg font-bold leading-tight tabular-nums", done ? "text-slate-500" : short.tone)}>{qty(r, r.open, mode)}</p>
+          <p className={cn("text-lg font-semibold leading-tight tabular-nums", done ? "text-slate-500" : short.tone)}>{qty(r, r.open, mode)}</p>
           <p className="hidden text-xs text-slate-500 lg:block">{done ? "decided" : short.label}</p>
         </div>
         <div className="flex items-center gap-1.5 lg:justify-start">

@@ -487,7 +487,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                       <div className="border-b border-line px-4 py-3 sm:px-5">
                         <div className="flex items-baseline justify-between gap-3">
                           <h3 className="text-base font-semibold text-slate-900">{ACCOUNT_NAME[meth]}</h3>
-                          <p className={cn("text-base font-bold tabular-nums", inn - out >= 0 ? "text-emerald-600" : "text-brand-red-dark")}>
+                          <p className={cn("text-base font-semibold tabular-nums", inn - out >= 0 ? "text-emerald-600" : "text-brand-red-dark")}>
                             {inn - out >= 0 ? "+" : "−"} {m(Math.abs(inn - out))}
                           </p>
                         </div>

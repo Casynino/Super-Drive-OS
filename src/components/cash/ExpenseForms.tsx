@@ -185,7 +185,7 @@ function ExpenseForm({ action, categories, today, submissionKey, limitText, acco
           <Field label="How much?" name="amountShown" id={id("amount")} error={fe.amount} required>
             <div className="relative">
               <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">TSh</span>
-              <input ref={amountRef} id={id("amount")} inputMode="numeric" autoComplete="off" placeholder="0" value={amount ? Number(amount).toLocaleString("en-US") : ""} onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 12))} className={`${inputClass(fe.amount)} h-14 pl-14 text-3xl font-bold tabular-nums`} />
+              <input ref={amountRef} id={id("amount")} inputMode="numeric" autoComplete="off" placeholder="0" value={amount ? Number(amount).toLocaleString("en-US") : ""} onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 12))} className={`${inputClass(fe.amount)} h-14 pl-14 text-3xl font-semibold tabular-nums`} />
             </div>
           </Field>
 

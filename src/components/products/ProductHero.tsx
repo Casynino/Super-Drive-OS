@@ -73,7 +73,7 @@ export default function ProductHero({
             </div>
           </div>
           <p className="mt-3 text-sm text-slate-600">
-            Sells for <span className="text-lg font-bold text-slate-900">{price}</span>
+            Sells for <span className="text-lg font-semibold text-slate-900">{price}</span>
             {wholesale && <span className="ml-3 text-slate-500">Wholesale {wholesale}</span>}
           </p>
         </div>

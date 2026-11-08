@@ -52,7 +52,7 @@ export default function HealthPanel({ health }: { health: Health }) {
             <li key={ind.key}>
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-sm font-medium text-slate-800">{ind.label}</span>
-                <span className={cn("text-sm font-bold tabular-nums", TONE[ind.status].text)}>{ind.value}</span>
+                <span className={cn("text-sm font-semibold tabular-nums", TONE[ind.status].text)}>{ind.value}</span>
               </div>
               <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
                 <div className={cn("h-full rounded-full", TONE[ind.status].bar)} style={{ width: `${Math.max(ind.score, 3)}%` }} />

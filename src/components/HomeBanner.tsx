@@ -10,8 +10,6 @@ import BannerTheme from "@/components/BannerTheme";
 export default function HomeBanner({ user }: { user: { id: string; name: string; roleName: string } }) {
   return (
     <section className="relative mb-5 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_220px_at_88%_55%,rgba(47,111,208,0.42),transparent_62%)]" aria-hidden />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(520px_170px_at_50%_0%,rgba(253,196,0,0.10),transparent_72%)]" aria-hidden />
       {/* the shop's real products: a faint picture on a phone, full size from a computer */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/brand/banner-products.webp" alt="" aria-hidden className="pointer-events-none absolute bottom-0 right-0 block h-full w-auto max-w-[70%] select-none object-contain object-right-bottom opacity-25 lg:max-w-[32%] lg:opacity-100" />

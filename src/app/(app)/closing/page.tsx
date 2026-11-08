@@ -157,7 +157,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                   </dl>
                   <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
                     <span className="text-sm font-semibold text-slate-900">Left in the till (the balance)</span>
-                    <span className="text-lg font-bold tabular-nums text-slate-900">{money(closedInfo.left)}</span>
+                    <span className="text-lg font-semibold tabular-nums text-slate-900">{money(closedInfo.left)}</span>
                   </div>
                   <p className="mt-2 text-xs text-slate-500">The difference when you counted: {closedInfo.closing ? <Difference value={closedInfo.closing.difference.toString()} currency={currency} /> : "—"}</p>
                   {canDeposit && bankAccounts.length > 0 && (
@@ -188,7 +188,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
               <section className="card flex flex-col justify-between gap-4 px-5 py-5 xl:col-start-2 xl:row-start-1" aria-label="Closing">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Should be in the till</p>
-                  <p className="mt-1 text-3xl font-bold tabular-nums text-slate-900">{money(preview.expectedCash)}</p>
+                  <p className="mt-1 text-3xl font-semibold tabular-nums text-slate-900">{money(preview.expectedCash)}</p>
                   <p className="mt-2 text-sm text-slate-500">Count the cash, deposit it into the boss's account and close. What you keep in the till is the balance you start the next time with.</p>
                 </div>
                 <div className="space-y-2">
@@ -222,7 +222,7 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                   <section className="card px-4 py-4 sm:px-5" aria-label="Spent today">
                     <div className="flex items-baseline justify-between gap-2">
                       <h2 className="text-sm font-semibold text-slate-900">Spent today</h2>
-                      <span className="text-sm font-bold tabular-nums text-slate-900">{money(preview.summary.expenses.total)}</span>
+                      <span className="text-sm font-semibold tabular-nums text-slate-900">{money(preview.summary.expenses.total)}</span>
                     </div>
                     <div className="mt-4">
                       <BarList tone="red" empty="Nothing spent today." rows={preview.summary.expenses.byCategory.map((c) => ({ label: c.name, value: Number(c.amount), text: money(c.amount) }))} />
@@ -324,7 +324,7 @@ function Fact({ label, value, note }: { label: string; value: string; note?: str
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 truncate text-base font-bold tabular-nums text-slate-900" title={value}>
+      <dd className="mt-0.5 truncate text-base font-semibold tabular-nums text-slate-900" title={value}>
         {value}
       </dd>
       {note && <p className="text-[11px] text-slate-500">{note}</p>}
@@ -347,7 +347,7 @@ function MoneyInToday({ summary, money, chart }: { summary: ClosingSummary; mone
     <section className="card flex flex-col px-4 py-4 sm:px-5" aria-label="Money in today">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900">Money in today</h2>
-        <span className="text-sm font-bold tabular-nums text-slate-900">{money(total)}</span>
+        <span className="text-sm font-semibold tabular-nums text-slate-900">{money(total)}</span>
       </div>
       <div className="mt-2 h-44">
         <DonutChart data={data} money={chart} centre={money(total)} centreLabel="Received" empty="Nothing received yet today" />
@@ -381,7 +381,7 @@ function CashStatementCard({ title, summary, expected, money, className }: { tit
       </dl>
       <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
         <span className="text-sm font-semibold text-slate-900">Should be in the till</span>
-        <span className="text-lg font-bold tabular-nums text-slate-900">{money(expected)}</span>
+        <span className="text-lg font-semibold tabular-nums text-slate-900">{money(expected)}</span>
       </div>
     </section>
   );
@@ -393,7 +393,7 @@ function DayHeader({ date, state }: { date: string; state: { tone: "open" | "wai
     <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{date}</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Close &amp; deposit</h1>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Close &amp; deposit</h1>
       </div>
       <p className="min-w-0 text-sm font-medium text-slate-700">{state.text}</p>
     </div>

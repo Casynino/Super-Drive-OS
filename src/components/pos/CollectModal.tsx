@@ -91,7 +91,7 @@ export default function CollectModal({ open, onClose, customerId, customerName, 
             {fmt(done.paid)} received · {done.paymentNo}
           </p>
           <p className="mt-3 text-sm text-slate-500">Still owes</p>
-          <p className={cn("text-2xl font-bold", Number(done.summary.owed) > 0 ? "text-brand-red-dark" : "text-emerald-700")}>{fmt(Number(done.summary.owed))}</p>
+          <p className={cn("text-2xl font-semibold", Number(done.summary.owed) > 0 ? "text-brand-red-dark" : "text-emerald-700")}>{fmt(Number(done.summary.owed))}</p>
           <div className="mt-6 flex justify-center gap-2">
             <Link href={`/payments/${done.paymentId}`} target="_blank" rel="noopener" className="btn-secondary">
               Receipt
@@ -113,7 +113,7 @@ export default function CollectModal({ open, onClose, customerId, customerName, 
             <div className="flex items-end justify-between gap-3 rounded-xl border border-line bg-slate-50/70 px-4 py-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">He owes</p>
-                <p className="text-2xl font-bold text-brand-red-dark">{fmt(owed)}</p>
+                <p className="text-2xl font-semibold text-brand-red-dark">{fmt(owed)}</p>
               </div>
               <p className="text-right text-xs text-slate-500">
                 {data.summary.openOrders} open order{data.summary.openOrders === 1 ? "" : "s"}

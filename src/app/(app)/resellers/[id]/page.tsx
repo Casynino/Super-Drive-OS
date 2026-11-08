@@ -82,7 +82,7 @@ export default async function ResellerPage({ params, searchParams }: { params: P
       </BackLink>
       <section className="card mb-5 overflow-hidden">
         <div className="flex items-start gap-4 p-4 sm:p-5">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-navy-700 text-2xl font-bold text-white sm:h-16 sm:w-16" aria-hidden>
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-navy-700 text-2xl font-semibold text-white sm:h-16 sm:w-16" aria-hidden>
             {r.name.trim().charAt(0).toUpperCase()}
           </span>
           <div className="min-w-0 flex-1">
@@ -367,7 +367,7 @@ function PerfTile({ label, value, sub, tone = "plain" }: { label: string; value:
   return (
     <div className="min-w-0 rounded-xl border border-line bg-slate-50/60 px-3.5 py-3">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={cn("mt-1 text-xl font-bold tabular-nums", TILE_TONE[tone])}>{value}</p>
+      <p className={cn("mt-1 text-xl font-semibold tabular-nums", TILE_TONE[tone])}>{value}</p>
       <p className="mt-0.5 text-xs text-slate-500">{sub}</p>
     </div>
   );
@@ -378,7 +378,7 @@ function Meter({ label, pct, hint, color, pctClass }: { label: string; pct: numb
     <div>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-medium text-slate-800">{label}</span>
-        <span className={cn("text-lg font-bold tabular-nums", pctClass ?? (pct === null ? "text-slate-400" : "text-slate-900"))}>{pct === null ? "—" : `${pct}%`}</span>
+        <span className={cn("text-lg font-semibold tabular-nums", pctClass ?? (pct === null ? "text-slate-400" : "text-slate-900"))}>{pct === null ? "—" : `${pct}%`}</span>
       </div>
       <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
         <div className={cn("h-full rounded-full", color)} style={{ width: `${pct ?? 0}%` }} />

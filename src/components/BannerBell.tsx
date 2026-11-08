@@ -14,7 +14,7 @@ export async function BannerBell({ userId, className }: { userId: string; classN
     <Link href="/notifications" title={unread > 0 ? `Notifications (${unread} new)` : "Notifications"} className={cn("hidden place-items-center text-white/65 transition hover:text-white lg:inline-grid", className)}>
       <Bell size={15} />
       <span className="sr-only">Notifications{unread > 0 ? `, ${unread} unread` : ""}</span>
-      {unread > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold leading-none text-white">{unread > 9 ? "9+" : unread}</span>}
+      {unread > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-semibold leading-none text-white">{unread > 9 ? "9+" : unread}</span>}
     </Link>
   );
 }

@@ -131,7 +131,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
     };
   }, [open]);
 
-  const dot = "absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-brand-red shadow-[0_0_8px_rgba(237,28,36,0.7)] ring-2 ring-white dark:ring-[#0f1c33]";
+  const dot = "absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-brand-red ring-2 ring-white dark:ring-[#0f1c33]";
   const count = (item: NavItem) => (item.badge ? badges[item.badge] : 0);
   const nameOf = (item: NavItem) => labels?.[item.href] ?? item.label;
 
@@ -143,7 +143,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
   const showSearchTab = tabItems.length < 3;
   const tabCls = "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[10.5px] font-medium";
   const tabOn = (href?: string) => Boolean(href) && href === active;
-  const countBadge = (n: number) => <span className="shrink-0 rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white shadow-[0_0_10px_rgba(237,28,36,0.45)]">{n > 99 ? "99+" : n}</span>;
+  const countBadge = (n: number) => <span className="shrink-0 rounded-full bg-brand-red px-1.5 text-[11px] font-semibold leading-[18px] text-white shadow-[0_0_10px_rgba(237,28,36,0.45)]">{n > 99 ? "99+" : n}</span>;
 
   // search: filters the pages the person may open; Enter goes to the first
   const term = q.trim().toLowerCase();
@@ -318,7 +318,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
       <aside className={cn("fixed left-3 top-3 z-30 hidden lg:block print:hidden", collapsed ? "w-[4.5rem]" : "bottom-3 w-56")}>
         <div className={cn("glass-panel flex flex-col", collapsed ? "max-h-[calc(100dvh-1.5rem)]" : "h-full")}>{collapsed ? rail : full(false)}</div>
         <div className="group absolute -right-3.5 top-[1.65rem] z-10">
-          <button type="button" onClick={() => setRail(!collapsed)} aria-label={collapsed ? "Expand the menu" : "Collapse the menu"} className="grid h-7 w-7 place-items-center rounded-full bg-white text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.4)] ring-1 ring-black/10 transition hover:scale-105">
+          <button type="button" onClick={() => setRail(!collapsed)} aria-label={collapsed ? "Expand the menu" : "Collapse the menu"} className="grid h-7 w-7 place-items-center rounded-full bg-white text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.4)] ring-1 ring-black/10 transition">
             {collapsed ? <ChevronRight size={15} strokeWidth={2.5} /> : <ChevronLeft size={15} strokeWidth={2.5} />}
           </button>
           <span className="pointer-events-none absolute left-9 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 opacity-0 shadow-lg transition group-hover:opacity-100">
@@ -354,7 +354,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
             <Link href="/notifications" className="relative grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" title="Notifications">
               <Bell size={18} />
               <span className="sr-only">Notifications{unread > 0 ? `, ${unread} unread` : ""}</span>
-              {unread > 0 && <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
+              {unread > 0 && <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-semibold text-white">{unread > 9 ? "9+" : unread}</span>}
             </Link>
             <div className="lg:hidden">
               <UserMenu name={user.name} roleName={user.roleName} logoutAction={logoutAction} />
@@ -397,7 +397,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
                 {on && <span className="absolute left-1/2 top-0 h-[3px] w-8 -translate-x-1/2 rounded-full bg-[#fdc400]" aria-hidden />}
                 <span className="relative">
                   <Icon size={20} className={on ? "text-oil-500" : ""} />
-                  {n > 0 && <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold leading-none text-white">{n > 9 ? "9+" : n}</span>}
+                  {n > 0 && <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-semibold leading-none text-white">{n > 9 ? "9+" : n}</span>}
                 </span>
                 <span className="max-w-full truncate">{warehouseMan && item.href === "/shipments" ? "Receiving" : nameOf(item).split(/\s+/)[0]}</span>
               </Link>

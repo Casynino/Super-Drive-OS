@@ -84,7 +84,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
       </BackLink>
       <section className="card mb-5 p-4 sm:p-5">
         <div className="flex flex-wrap items-start gap-4">
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-navy-700 text-2xl font-bold text-white" aria-hidden>
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-navy-700 text-2xl font-semibold text-white" aria-hidden>
             {c.name.trim().charAt(0).toUpperCase()}
           </span>
           <div className="min-w-0 flex-1">

@@ -54,7 +54,7 @@ export default function HeroStockPanel({ stock, pack, baseSymbol, minStock, stoc
         {tiles.map((t) => (
           <div key={t.k}>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{t.k}</dt>
-            <dd className={`mt-0.5 text-2xl font-bold leading-tight ${t.tone}`}>{f(t.v)}</dd>
+            <dd className={`mt-0.5 text-2xl font-semibold leading-tight ${t.tone}`}>{f(t.v)}</dd>
           </div>
         ))}
       </dl>

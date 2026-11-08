@@ -7,7 +7,7 @@ export function PerfTile({ label, value, sub, tone = "plain" }: { label: string;
   return (
     <div className="min-w-0 rounded-xl border border-line bg-slate-50/60 px-3.5 py-3">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={cn("mt-1 text-xl font-bold tabular-nums", TILE_TONE[tone])}>{value}</p>
+      <p className={cn("mt-1 text-xl font-semibold tabular-nums", TILE_TONE[tone])}>{value}</p>
       <p className="mt-0.5 text-xs text-slate-500">{sub}</p>
     </div>
   );
@@ -19,7 +19,7 @@ export function Meter({ label, pct, hint, color, pctClass }: { label: string; pc
     <div>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-medium text-slate-800">{label}</span>
-        <span className={cn("text-lg font-bold tabular-nums", pctClass ?? (pct === null ? "text-slate-400" : "text-slate-900"))}>{pct === null ? "—" : `${pct}%`}</span>
+        <span className={cn("text-lg font-semibold tabular-nums", pctClass ?? (pct === null ? "text-slate-400" : "text-slate-900"))}>{pct === null ? "—" : `${pct}%`}</span>
       </div>
       <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
         <div className={cn("h-full rounded-full", color)} style={{ width: `${pct ?? 0}%` }} />

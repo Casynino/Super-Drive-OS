@@ -387,7 +387,7 @@ export default async function CreditPage({ searchParams }: { searchParams: Promi
                         <div className="flex items-center justify-between gap-2 lg:block lg:text-right">
                           <span className="text-xs text-slate-500 lg:hidden">Balance</span>
                           <span>
-                            <span className={cn("block text-sm font-bold tabular-nums", o.gt(0) ? (st.late ? "text-brand-red-dark" : "text-slate-900") : "text-emerald-700")}>{money(o.gt(0) ? o : new D(0))}</span>
+                            <span className={cn("block text-sm font-semibold tabular-nums", o.gt(0) ? (st.late ? "text-brand-red-dark" : "text-slate-900") : "text-emerald-700")}>{money(o.gt(0) ? o : new D(0))}</span>
                             {o.gt(0) && (
                               <span className="mt-0.5 inline-block lg:mt-1">
                                 <PaymentStatusBadge status={r.paymentStatus} />
@@ -469,7 +469,7 @@ export default async function CreditPage({ searchParams }: { searchParams: Promi
                         </div>
                         <div className="flex items-center justify-between gap-2 lg:block lg:text-right">
                           <span className="text-xs text-slate-500 lg:hidden">Owes</span>
-                          <span className="text-sm font-bold tabular-nums text-slate-900">{money(owes)}</span>
+                          <span className="text-sm font-semibold tabular-nums text-slate-900">{money(owes)}</span>
                         </div>
                         <div className="col-span-2 flex flex-wrap items-start gap-2 lg:col-span-1 lg:justify-end">
                           {late.gt(0) && (() => {

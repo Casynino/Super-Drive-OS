@@ -101,7 +101,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           </span>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">All money</p>
-            <p className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">{money(sum())}</p>
+            <p className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{money(sum())}</p>
           </div>
         </div>
         <p className="text-sm text-slate-500">in {accounts.filter((a) => a.status === "ACTIVE").length} accounts</p>
@@ -113,7 +113,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           const last = i === accounts.length - 1;
           const closed = a.status !== "ACTIVE";
           return (
-            <Link key={a.id} href={`/cash/${a.id}`} className={cn("card group flex flex-col overflow-hidden transition hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md", closed && "opacity-70", last && accounts.length % 2 === 1 && "md:col-span-2", last && XL_SPAN[xlLeft])}>
+            <Link key={a.id} href={`/cash/${a.id}`} className={cn("card group flex flex-col overflow-hidden transition hover:border-navy-200", closed && "opacity-70", last && accounts.length % 2 === 1 && "md:col-span-2", last && XL_SPAN[xlLeft])}>
               <div className="card-pad flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl", g.tint)}>
@@ -134,7 +134,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
                   {a.method === "CASH" ? "The till" : a.accountNumber ? <span className="font-mono text-slate-600">{a.accountNumber}</span> : "No number yet"}
                   {a.holderName && <span className="block truncate">{a.holderName}</span>}
                 </p>
-                <p className={cn("mt-3 text-2xl font-bold tracking-tight", a.balance.lt(0) ? "text-brand-red-dark" : "text-slate-900")}>{money(a.balance)}</p>
+                <p className={cn("mt-3 text-2xl font-semibold tracking-tight", a.balance.lt(0) ? "text-brand-red-dark" : "text-slate-900")}>{money(a.balance)}</p>
                 <p className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
                   <span className="inline-flex items-center gap-1">
                     <ArrowDownLeft size={13} className="text-emerald-600" /> In today {money(a.inToday)}

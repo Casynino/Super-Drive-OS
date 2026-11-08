@@ -435,7 +435,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                       disabled={!sellable}
                       className={cn(
                         "group relative flex h-full w-full flex-col rounded-2xl border bg-white p-2 text-left shadow-[0_1px_2px_rgba(15,27,45,0.05)] transition duration-150",
-                        sellable ? "border-line hover:-translate-y-0.5 hover:border-navy-300 hover:shadow-md active:translate-y-0 active:scale-[0.99]" : "cursor-not-allowed border-line opacity-60",
+                        sellable ? "border-line hover:border-navy-300 active:translate-y-0 active:scale-[0.99]" : "cursor-not-allowed border-line opacity-60",
                         inCart > 0 && "border-navy-600 ring-2 ring-navy-200",
                       )}
                     >
@@ -453,7 +453,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
                           {hasPrice ? (
                             <span className="min-w-0">
-                              <span className="block whitespace-nowrap text-[15px] font-bold leading-5 text-navy-800">{fmt(cuPrice)}</span>
+                              <span className="block whitespace-nowrap text-[15px] font-semibold leading-5 text-navy-800">{fmt(cuPrice)}</span>
                               <span className="block truncate text-[11px] text-slate-500">
                                 per {cu.symbol}
                                 {perPiece > 0 && ` · ${fmt(perPiece)} each`}
@@ -515,7 +515,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                           </p>
                         </div>
                         <span className="shrink-0 text-right">
-                          <span className="block text-sm font-bold text-slate-900">{fmt(r.lineTotal)}</span>
+                          <span className="block text-sm font-semibold text-slate-900">{fmt(r.lineTotal)}</span>
                           {r.price < r.list && r.valid && <span className="block text-[11px] text-emerald-700">−{fmt(r.lineList - r.lineTotal)}</span>}
                         </span>
                         <button type="button" className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-red-dark" onClick={() => setCart((c) => c.filter((_, idx) => idx !== i))} aria-label={`Remove ${r.p.name}`}>
@@ -624,7 +624,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                   <div className="mt-2 flex items-baseline justify-between gap-2 border-t border-line pt-2">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Balance</p>
-                      <p className={cn("text-base font-bold", owes > 0 ? "text-brand-red-dark" : "text-slate-900")}>{fmt(owes)}</p>
+                      <p className={cn("text-base font-semibold", owes > 0 ? "text-brand-red-dark" : "text-slate-900")}>{fmt(owes)}</p>
                     </div>
                     <p className="text-right text-xs text-slate-500">
                       <span className="block font-medium text-slate-700">{orderWord(customer.openOrders ?? 0)}</span>
@@ -803,7 +803,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
                   <dd>−{fmt(discount)}</dd>
                 </div>
               )}
-              <div className="flex items-baseline justify-between border-t border-line pt-2 text-xl font-bold text-slate-900">
+              <div className="flex items-baseline justify-between border-t border-line pt-2 text-xl font-semibold text-slate-900">
                 <dt>Total</dt>
                 <dd>{fmt(total)}</dd>
               </div>
@@ -843,7 +843,7 @@ export default function PosTerminal({ action, quickAddCustomer, quickAddWinga, i
             <p className={cn("text-xs", saleError ? "font-medium text-brand-red-dark" : "text-slate-500")} role={saleError ? "alert" : undefined}>
               {saleError ?? `${cartCount} item${cartCount === 1 ? "" : "s"}${!canSubmit ? ` · ${problems[0]}` : " · tap to review"}`}
             </p>
-            <p className="truncate text-lg font-bold text-slate-900">{fmt(total)}</p>
+            <p className="truncate text-lg font-semibold text-slate-900">{fmt(total)}</p>
           </button>
           <SubmitButton pendingLabel="Completing…" className="btn-primary min-h-12 px-6 text-base">
             Complete sale

@@ -117,7 +117,7 @@ export default function AttentionPanel({ items, tabs = DIRECTOR_TABS, empty = "N
     <section id="attention" aria-label="Needs your attention" className={cn("scroll-mt-20", className)}>
       <h2 className="mb-2.5 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
         Needs your attention
-        <span className="rounded-full bg-[#fdebc4] px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#3a2a00]">{items.length}</span>
+        <span className="rounded-full bg-[#fdebc4] px-2 py-0.5 text-[11px] font-semibold tracking-normal text-[#3a2a00]">{items.length}</span>
       </h2>
       <div className="mb-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Filter">
         {chips.map((t) => (
@@ -158,7 +158,7 @@ export default function AttentionPanel({ items, tabs = DIRECTOR_TABS, empty = "N
                       </span>
                       {(i.main || i.sub) && (
                         <span className="hidden shrink-0 text-right leading-tight sm:block">
-                          {i.main && <span className="block text-[13px] font-bold tabular-nums text-slate-900">{i.main}</span>}
+                          {i.main && <span className="block text-[13px] font-semibold tabular-nums text-slate-900">{i.main}</span>}
                           {i.sub && <span className="block text-[11px] tabular-nums text-slate-500">{i.sub}</span>}
                         </span>
                       )}

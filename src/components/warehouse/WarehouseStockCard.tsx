@@ -42,7 +42,7 @@ export default function WarehouseStockCard(p: WarehouseStockCardProps) {
   const f = (n: number) => qtyText(n, p.pack, p.baseSymbol, mode).main;
   const pct = p.min && p.min > 0 ? Math.min(100, (p.available / (3 * p.min)) * 100) : null;
   return (
-    <div className="card group relative flex h-full cursor-pointer flex-col p-3 transition hover:border-navy-300 hover:shadow-md">
+    <div className="card group relative flex h-full cursor-pointer flex-col p-3 transition hover:border-navy-300">
       <div className="flex items-start gap-2.5">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
           {p.imageV ? (
@@ -76,7 +76,7 @@ export default function WarehouseStockCard(p: WarehouseStockCardProps) {
         )}
       </div>
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-lg font-bold leading-tight tracking-tight text-slate-900">{f(p.available)}</p>
+        <p className="min-w-0 truncate text-lg font-semibold leading-tight tracking-tight text-slate-900">{f(p.available)}</p>
         <span className={cn("shrink-0", BADGE[p.status])}>{WORD[p.status]}</span>
       </div>
 

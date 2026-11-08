@@ -225,7 +225,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                       {e.requestedBy.name} · {formatDateTime(e.requestedAt)} · from {e.cashAccount?.name ?? methodLabel(e.method)}
                     </p>
                   </div>
-                  <span className="shrink-0 text-base font-bold tabular-nums text-slate-900">{money(e.amount)}</span>
+                  <span className="shrink-0 text-base font-semibold tabular-nums text-slate-900">{money(e.amount)}</span>
                 </div>
                 <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">“{e.description}”</p>
                 {canApprove && (
@@ -342,7 +342,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                             </div>
                             <div className="flex items-center justify-between gap-2 lg:block lg:text-right">
                               <span className="text-xs text-slate-500 lg:hidden">Amount</span>
-                              <span className={cn("text-sm font-bold tabular-nums", e.status === "APPROVED" ? "text-slate-900" : "text-slate-400")}>{e.status === "APPROVED" ? "− " : ""}{money(e.amount)}</span>
+                              <span className={cn("text-sm font-semibold tabular-nums", e.status === "APPROVED" ? "text-slate-900" : "text-slate-400")}>{e.status === "APPROVED" ? "− " : ""}{money(e.amount)}</span>
                             </div>
                             <div className="hidden lg:block">
                               <ExpenseStatusBadge status={e.status} />

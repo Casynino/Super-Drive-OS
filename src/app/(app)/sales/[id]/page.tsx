@@ -237,7 +237,7 @@ export default async function SalePage({ params, searchParams }: { params: Promi
           <section className="card overflow-hidden" aria-label="Payment">
             <div className="border-b border-line px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{cancelled ? "Cancelled sale" : balance.gt(0) ? "Still to be paid" : "Paid in full"}</p>
-              <p className={`mt-0.5 text-2xl font-bold tracking-tight ${cancelled ? "text-slate-500" : balance.gt(0) ? "text-brand-red-dark" : "text-emerald-600"}`}>{money(balance.gt(0) || cancelled ? balance : sale.total.minus(sale.returnedTotal))}</p>
+              <p className={`mt-0.5 text-2xl font-semibold tracking-tight ${cancelled ? "text-slate-500" : balance.gt(0) ? "text-brand-red-dark" : "text-emerald-600"}`}>{money(balance.gt(0) || cancelled ? balance : sale.total.minus(sale.returnedTotal))}</p>
               {!cancelled && sale.dueDate && balance.gt(0) && <p className="text-xs text-slate-500">Due {formatDate(sale.dueDate)}</p>}
             </div>
             <dl className="space-y-1.5 px-4 py-3 text-sm">

@@ -39,12 +39,12 @@ export default async function IssueDocumentPage({ params, searchParams }: { para
       <article className="card card-pad mx-auto max-w-3xl print:max-w-none print:border-0 print:shadow-none">
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
           <div>
-            <p className="text-lg font-bold text-slate-900">{biz.name}</p>
+            <p className="text-lg font-semibold text-slate-900">{biz.name}</p>
             <p className="text-sm text-slate-500">{[biz.address, biz.phone].filter(Boolean).join(" · ")}</p>
           </div>
           <div className="text-right">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Stock issuance document</p>
-            <p className="text-lg font-bold text-navy-800">{doc.issueNo}</p>
+            <p className="text-lg font-semibold text-navy-800">{doc.issueNo}</p>
             <p className="text-sm text-slate-500">{formatDateTime(doc.createdAt)}</p>
           </div>
         </header>
@@ -85,7 +85,7 @@ export default async function IssueDocumentPage({ params, searchParams }: { para
           <tfoot>
             <tr className="border-t-2 border-slate-300">
               <td colSpan={3} className="py-3 text-right font-semibold">Total expected value</td>
-              <td className="py-3 text-right text-lg font-bold tabular-nums">{formatMoney(doc.expectedValue, currency)}</td>
+              <td className="py-3 text-right text-lg font-semibold tabular-nums">{formatMoney(doc.expectedValue, currency)}</td>
             </tr>
           </tfoot>
         </table>

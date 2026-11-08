@@ -55,13 +55,13 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
         <header className="text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/logo-full.png" alt="" className={`mx-auto w-auto ${thermal ? "h-12" : "h-16"}`} />
-          <p className={`mt-1 font-bold tracking-wide ${thermal ? "text-sm" : "text-lg"}`}>{profile.name.toUpperCase()}</p>
+          <p className={`mt-1 font-semibold tracking-wide ${thermal ? "text-sm" : "text-lg"}`}>{profile.name.toUpperCase()}</p>
           {profile.address && <p className="text-slate-600">{profile.address}</p>}
           {profile.phone && <p className="text-slate-600">Tel: {profile.phone}</p>}
         </header>
 
         {isCopy && (
-          <p className="my-2 border-y-2 border-dashed border-slate-800 py-1 text-center text-sm font-extrabold tracking-[0.2em]">COPY · REPRINT</p>
+          <p className="my-2 border-y-2 border-dashed border-slate-800 py-1 text-center text-sm font-semibold tracking-[0.2em]">COPY · REPRINT</p>
         )}
 
         <div className="my-2 border-t border-dashed border-slate-400 pt-2">
@@ -106,7 +106,7 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
               <dd>−{m(sale.discountTotal)}</dd>
             </div>
           )}
-          <div className={`flex justify-between font-bold ${thermal ? "text-sm" : "text-base"}`}>
+          <div className={`flex justify-between font-semibold ${thermal ? "text-sm" : "text-base"}`}>
             <dt>TOTAL</dt>
             <dd>{m(sale.total)}</dd>
           </div>
@@ -123,7 +123,7 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
             </div>
           ))}
           {balance.gt(0) && (
-            <div className="flex justify-between font-bold">
+            <div className="flex justify-between font-semibold">
               <dt>BALANCE DUE</dt>
               <dd>{m(balance)}</dd>
             </div>
@@ -135,7 +135,7 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
             </div>
           )}
         </dl>
-        {sale.status === "CANCELLED" && <p className="mt-2 text-center font-bold">CANCELLED</p>}
+        {sale.status === "CANCELLED" && <p className="mt-2 text-center font-semibold">CANCELLED</p>}
 
         <footer className="mt-3 border-t border-dashed border-slate-400 pt-2 text-center">
           <p className="font-semibold">Thank you for choosing {profile.name}!</p>

@@ -5,7 +5,7 @@
 
 /* Brand palette taken from the Super Drive Oil logo: navy, signal red, oil yellow. */
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --color-navy-50: #eef4fa;
   --color-navy-100: #d9e6f3;
@@ -240,7 +240,6 @@ body { overflow-x: clip; padding-left: env(safe-area-inset-left); padding-right:
   border: 1px solid rgba(255, 255, 255, 0.15);
   background:
     radial-gradient(120% 45% at 50% 0%, rgba(255, 255, 255, 0.11), transparent 70%),
-    radial-gradient(120% 50% at 50% 100%, rgba(253, 196, 0, 0.22), rgba(237, 100, 36, 0.06) 55%, transparent 80%),
     rgba(17, 29, 50, 0.62);
   -webkit-backdrop-filter: blur(26px) saturate(150%);
   backdrop-filter: blur(26px) saturate(150%);
@@ -252,7 +251,6 @@ html:not(.dark) .glass-panel {
   border-color: rgba(255, 255, 255, 0.85);
   background:
     radial-gradient(120% 45% at 50% 0%, rgba(255, 255, 255, 0.9), transparent 70%),
-    radial-gradient(120% 50% at 50% 100%, rgba(253, 196, 0, 0.26), rgba(237, 100, 36, 0.07) 55%, transparent 80%),
     rgba(255, 255, 255, 0.66);
   box-shadow: 0 26px 70px -30px rgba(15, 27, 45, 0.4), 0 0 0 1px rgba(15, 27, 45, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }

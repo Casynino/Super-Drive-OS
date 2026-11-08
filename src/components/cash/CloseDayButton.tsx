@@ -135,7 +135,7 @@ function CloseDayForm({ action, day, expected, symbol, canDeposit, submissionKey
           <Field label="Cash counted" name="countedShown" id={id("counted")} error={fe.countedCash}>
             <div className="relative">
               <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">{symbol}</span>
-              <input ref={countRef} id={id("counted")} inputMode="numeric" autoComplete="off" placeholder="0" value={group(counted)} onChange={(e) => setCounted(digits(e.target.value))} className={cn(inputClass(fe.countedCash), "h-16 pl-14 text-3xl font-bold tabular-nums")} />
+              <input ref={countRef} id={id("counted")} inputMode="numeric" autoComplete="off" placeholder="0" value={group(counted)} onChange={(e) => setCounted(digits(e.target.value))} className={cn(inputClass(fe.countedCash), "h-16 pl-14 text-3xl font-semibold tabular-nums")} />
             </div>
           </Field>
           <div aria-live="polite" className={cn("rounded-lg border px-3.5 py-2.5 text-sm", diffTone)}>
@@ -283,7 +283,7 @@ function SummaryRow({ label, value, tone, strong }: { label: string; value: stri
   return (
     <div className="flex items-baseline justify-between gap-3 px-3.5 py-2.5">
       <dt className="text-slate-600">{label}</dt>
-      <dd className={cn("text-right tabular-nums", strong ? "text-base font-bold text-slate-900" : "font-medium text-slate-900", tone === "bad" && "text-brand-red-dark", tone === "warn" && "text-yellow-800")}>{value}</dd>
+      <dd className={cn("text-right tabular-nums", strong ? "text-base font-semibold text-slate-900" : "font-medium text-slate-900", tone === "bad" && "text-brand-red-dark", tone === "warn" && "text-yellow-800")}>{value}</dd>
     </div>
   );
 }

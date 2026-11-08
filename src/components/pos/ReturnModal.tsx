@@ -72,7 +72,7 @@ export default function ReturnModal({ open, onClose, customerId, customerName, c
           <p className="mt-3 text-lg font-semibold text-slate-900">Goods are back in the store</p>
           <p className="mt-1 text-sm text-slate-600">{done.saleNos.join(", ")} reduced.</p>
           <p className="mt-3 text-sm text-slate-500">He now owes</p>
-          <p className={cn("text-2xl font-bold", Number(done.summary.owed) > 0 ? "text-brand-red-dark" : "text-emerald-700")}>{fmt(Number(done.summary.owed))}</p>
+          <p className={cn("text-2xl font-semibold", Number(done.summary.owed) > 0 ? "text-brand-red-dark" : "text-emerald-700")}>{fmt(Number(done.summary.owed))}</p>
           <button type="button" className="btn-primary mt-6" onClick={onClose}>
             Done
           </button>

@@ -61,7 +61,7 @@ export default async function CollectionPage({ params, searchParams }: { params:
           <div className="mb-4 rounded-xl border border-line bg-slate-50 px-4 py-2.5 text-sm text-slate-700">All the goods on this note were handed over. It cannot be used again.</div>
         ) : block ? (
           <div className="mb-4 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-rose-900" role="alert">
-            <p className="text-sm font-bold">{block.message}</p>
+            <p className="text-sm font-semibold">{block.message}</p>
             <p className="text-xs">No goods can be released on this note.</p>
           </div>
         ) : sp.scanned ? (

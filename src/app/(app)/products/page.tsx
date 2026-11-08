@@ -184,7 +184,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           ].map((k) => (
             <div key={k.label} className="min-w-0 px-4 py-2.5">
               <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{k.label}</p>
-              <p className={cn("truncate text-lg font-bold leading-tight text-slate-900", k.tone)}>{k.value}</p>
+              <p className={cn("truncate text-lg font-semibold leading-tight text-slate-900", k.tone)}>{k.value}</p>
               <p className="truncate text-[11px] text-slate-500">{k.hint}</p>
             </div>
           ))}

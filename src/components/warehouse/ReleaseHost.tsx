@@ -92,7 +92,7 @@ function Dialog({ note, onClose, onNext }: { note: ListNote; onClose: () => void
                 )}
               </span>
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{l.name}</span>
-              <span className="shrink-0 text-sm font-bold tabular-nums text-slate-900">{say(l)}</span>
+              <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{say(l)}</span>
             </li>
           ))}
         </ul>

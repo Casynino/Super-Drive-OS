@@ -55,7 +55,7 @@ export default async function ProductLabelsPage({ searchParams }: { searchParams
           {labels.map(({ key, p }) => (
             <div key={key} style={{ background: "#fff", color: "#000" }} className="flex h-[38.1mm] w-[63.5mm] break-inside-avoid flex-col justify-between overflow-hidden rounded-md border border-dashed border-slate-300 p-[2.2mm] print:rounded-none print:border-transparent">
               <div className="leading-tight">
-                <p className="line-clamp-2 text-[9.5pt] font-bold">{p.name}</p>
+                <p className="line-clamp-2 text-[9.5pt] font-semibold">{p.name}</p>
                 <p className="text-[7pt] text-[#475569]">{[p.brand?.name, p.size].filter(Boolean).join(" · ")}</p>
               </div>
               <BarcodeImage value={p.barcode!} height={36} className="mx-auto max-h-[15mm]" />

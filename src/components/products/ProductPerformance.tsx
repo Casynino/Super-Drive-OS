@@ -51,7 +51,7 @@ export default async function ProductPerformance({ productId, pack, baseSymbol, 
   const tile = (label: string, value: string, hint?: string) => (
     <div className="min-w-0">
       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-0.5 truncate text-lg font-bold leading-tight tracking-tight text-slate-900">{value}</p>
+      <p className="mt-0.5 truncate text-lg font-semibold leading-tight tracking-tight text-slate-900">{value}</p>
       {hint && <p className="truncate text-xs text-slate-500">{hint}</p>}
     </div>
   );
