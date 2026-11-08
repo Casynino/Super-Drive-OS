@@ -4,10 +4,11 @@ import { redirect } from "next/navigation";
 import { Boxes, HandCoins, Wallet } from "lucide-react";
 import { getSessionUser } from "@/lib/auth/session";
 import LoginForm from "./LoginForm";
+import LoginGate from "./LoginGate";
 import LoginScene from "./LoginScene";
 import "./login.css";
 
-export const metadata = { title: "Sign in" };
+export const metadata = { title: "Log in" };
 
 const delay = (s: number) => ({ "--rd": `${s}s` }) as CSSProperties;
 
@@ -57,15 +58,21 @@ export default async function LoginPage() {
         </section>
 
         {/* Sign-in card, floating over the scene */}
-        <section className="flex flex-col items-center px-5 py-6 lg:justify-center lg:py-10">
-          <div className="ls-up ls-brand mb-6 self-center lg:hidden" style={delay(0.05)}>
-            <Logo className="h-20 sm:h-28" />
+        <section className="flex flex-col items-center px-5 py-6 max-md:pt-[9vh] lg:justify-center lg:py-10">
+          <div className="ls-up ls-brand mb-4 self-center md:mb-6 lg:hidden" style={delay(0.05)}>
+            <Logo className="h-28 sm:h-28" />
           </div>
-          <div className="ls-card ls-up w-full max-w-sm p-7 sm:p-8" style={delay(0.2)}>
-            <h1 className="ls-title text-2xl font-semibold tracking-tight text-slate-900">Sign in</h1>
-            <LoginForm />
-          </div>
-          <p className="mt-5 text-xs text-white/60">Super Drive Oil · Management System</p>
+          {/* phones: the scene stays in view, with one small button that opens the form */}
+          <p className="ls-up mb-5 mt-[12vh] max-w-[16rem] text-balance text-center text-[15px] leading-snug text-white/85 md:hidden" style={delay(0.25)}>
+            Sales, stock and credit in one place
+          </p>
+          <LoginGate>
+            <div className="ls-card ls-up w-full p-7 sm:p-8" style={delay(0.2)}>
+              <h1 className="ls-title text-2xl font-semibold tracking-tight text-slate-900">Log in</h1>
+              <LoginForm />
+            </div>
+          </LoginGate>
+          <p className="mt-5 text-xs text-white/60 max-md:fixed max-md:inset-x-0 max-md:bottom-[max(1rem,env(safe-area-inset-bottom))] max-md:z-10 max-md:text-center max-md:text-white/50">Super Drive Oil · Management System</p>
         </section>
       </div>
     </div>

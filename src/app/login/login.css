@@ -540,3 +540,11 @@ html.dark .ls-title {
     animation: none !important;
   }
 }
+
+/* the phone pop-up opens with a short fade and rise */
+@keyframes ls-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.ls-pop { animation: ls-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) { .ls-pop { animation: none; } }

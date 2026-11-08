@@ -44,9 +44,9 @@ export default function LoginForm() {
           </button>
         </div>
       </Field>
-      <SubmitButton pendingLabel="Signing in…" className="btn-primary h-11 w-full text-[15px]">
+      <SubmitButton pendingLabel="Logging in…" className="btn-primary h-11 w-full text-[15px]">
         <span className="inline-flex items-center gap-2">
-          Sign in
+          Log in
           <ArrowRight size={16} />
         </span>
       </SubmitButton>
