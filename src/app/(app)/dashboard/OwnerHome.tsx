@@ -1,4 +1,5 @@
 import { BannerBell } from "@/components/BannerBell";
+import QuickIcons from "@/components/QuickIcons";
 import BannerTheme from "@/components/BannerTheme";
 import { qtyText } from "@/lib/qty";
 import { getUnitMode } from "@/lib/unit-mode";
@@ -217,27 +218,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
         </div>
       </section>
 
-      {/* phone: the shortcuts as a row of clean icons with a short name under each (like the Target Express phone look) */}
-      <nav className="-mx-1 mb-5 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:hidden" aria-label="Shortcuts">
-        {pills.map((l) => (
-          <Link key={l.href} href={l.href} className="flex w-[4.6rem] shrink-0 flex-col items-center gap-1.5 rounded-xl py-2 text-[11px] font-medium text-slate-600 hover:text-slate-900">
-            <span className="relative">
-              <l.icon size={22} className="text-slate-500" />
-              {l.badge ? <span className="absolute -right-2 -top-1.5 rounded-full bg-brand-red px-1 text-[10px] font-bold leading-4 text-white">{l.badge}</span> : null}
-            </span>
-            <span className="max-w-full truncate">{l.label}</span>
-          </Link>
-        ))}
-      </nav>
-
-      <nav className="-mx-1 mb-6 hidden gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:flex" aria-label="Shortcuts">
-        {pills.map((l) => (
-          <Link key={l.href} href={l.href} className={cn("inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition", PILL[l.tone])}>
-            <l.icon size={15} className="text-sky-500" /> {l.label}
-            {l.badge ? <span className="rounded-full bg-brand-red px-1.5 text-[11px] font-bold leading-[18px] text-white">{l.badge}</span> : null}
-          </Link>
-        ))}
-      </nav>
+      <QuickIcons className="mb-5" items={pills.map((l) => ({ href: l.href, label: l.label, icon: l.icon, n: Number(l.badge) || undefined }))} />
 
       {alerts.active === 0 && (
         <div className="card card-pad mb-6 border-oil-400/50 bg-oil-soft/60">

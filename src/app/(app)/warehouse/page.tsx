@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, CircleCheck, ClipboardList, Boxes, Lock, Package, PackageCheck, PackageOpen, ScanLine, ScrollText, Search, Timer, TriangleAlert, Truck } from "lucide-react";
 import KpiCard from "@/components/dashboard/KpiCard";
+import { ColumnsChart, DonutChart } from "@/components/dashboard/Charts";
 import HomeBanner from "@/components/HomeBanner";
+import QuickIcons from "@/components/QuickIcons";
 import BarList from "@/components/reports/BarList";
 import { qtyText } from "@/lib/qty";
 import { getUnitMode } from "@/lib/unit-mode";
@@ -54,23 +56,22 @@ export default async function WarehouseHome() {
     { href: "/warehouse/discrepancies", label: "Issues", icon: ScrollText, n: s.issuesOpen },
   ];
   const okN = Math.max(s.activeProducts - s.out - s.low, 0);
+  const COUNT = { symbol: "", decimals: 0 }; // the charts format numbers as money; these are plain counts
+  const shelfTop = Math.max(1, ...s.shelf.map((p) => p.available));
+  const ordersTotal = s.ordersPerDay.reduce((t, d) => t + d.value, 0);
+  const hoursText = (h: number) => (h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 48 ? `${h.toFixed(1)} h` : `${(h / 24).toFixed(1)} days`);
+  const reservedRows = s.shelf
+    .filter((p) => p.reserved > 0)
+    .sort((a, b) => b.reserved - a.reserved)
+    .slice(0, 6)
+    .map((p) => ({ label: p.name, value: p.reserved, text: qtyText(p.reserved, p.pack, p.symbol, unitMode).main }));
   const totalN = Math.max(s.activeProducts, 1);
 
   return (
     <>
       <HomeBanner user={user} />
 
-      <nav aria-label="Quick actions" className="mb-5 grid grid-cols-5 gap-2 sm:gap-3">
-        {quick.map((q) => (
-          <Link key={q.href} href={q.href} className={cn("relative flex flex-col items-center gap-1.5 rounded-2xl border px-1 py-3 text-[11px] font-semibold transition hover:-translate-y-0.5 sm:text-[13px]", q.primary ? "border-navy-600 bg-navy-600 text-[#ffffff] hover:bg-navy-700" : "border-line bg-white text-slate-700 hover:border-navy-300 hover:text-slate-900")}>
-            <span className={cn("flex h-10 w-10 items-center justify-center rounded-xl sm:h-11 sm:w-11", q.primary ? "bg-white/15 text-[#ffffff]" : "bg-navy-50 text-navy-700")}>
-              <q.icon size={21} />
-            </span>
-            {q.label}
-            {q.n ? <span className="absolute right-1.5 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand-red px-1 text-[10px] font-bold leading-none text-white sm:right-3 sm:top-3">{q.n > 99 ? "99+" : q.n}</span> : null}
-          </Link>
-        ))}
-      </nav>
+      <QuickIcons fill className="mb-5" label="Quick actions" items={quick.map((q) => ({ href: q.href, label: q.label, icon: q.icon, n: q.n, accent: q.primary }))} />
 
 
       <form action="/warehouse/orders" method="get" className="mb-5 flex gap-2">
@@ -127,57 +128,182 @@ export default async function WarehouseHome() {
         <KpiCard icon={TriangleAlert} tone={s.out + s.low > 0 ? "red" : "green"} label="Low or out" value={nf(s.out + s.low)} hint={`${s.out} out · ${s.low} running low`} href="/warehouse/stock?s=out" />
       </section>
 
-      <div className="mb-5 grid gap-4 lg:grid-cols-2">
-        <section className="card overflow-hidden" aria-label="Stock to watch">
+      {/* Stock: every product on the shelf with its level, and what is going on around it */}
+      <div className="mb-5 grid items-start gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <section className="card overflow-hidden" aria-label="Stock by product">
           <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
             <div>
-              <h2 className="text-base font-semibold text-slate-900">Stock to watch</h2>
-              <p className="text-xs text-slate-500">{s.watch.length === 0 ? "Everything is in stock." : `${s.out} out of stock, ${s.low} running low`}</p>
+              <h2 className="text-base font-semibold text-slate-900">Stock by product</h2>
+              <p className="text-xs text-slate-500">
+                <span className="font-semibold text-emerald-600">{okN} healthy</span> · <span className="font-semibold text-yellow-600">{s.low} low</span> · <span className="font-semibold text-rose-600">{s.out} out</span>, lowest first
+              </p>
             </div>
             <Link href="/warehouse/stock" className="text-sm font-medium text-navy-700 hover:underline">
               All stock
             </Link>
           </div>
-          <div className="px-4 pt-4 sm:px-5">
-            <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`${okN} healthy, ${s.low} running low, ${s.out} out of stock`}>
-              <div className="bg-emerald-500" style={{ width: `${(okN / totalN) * 100}%` }} />
-              <div className="bg-oil-400" style={{ width: `${(s.low / totalN) * 100}%` }} />
-              <div className="bg-rose-500" style={{ width: `${(s.out / totalN) * 100}%` }} />
-            </div>
-            <p className="mt-2 text-xs text-slate-500">
-              <span className="font-semibold text-emerald-600">{okN} healthy</span> · <span className="font-semibold text-yellow-600">{s.low} low</span> · <span className="font-semibold text-rose-600">{s.out} out</span>
-            </p>
-          </div>
-          {s.watch.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-slate-500">{s.activeProducts === 0 ? "No products have been added yet." : "Nothing is running low."}</p>
+          {s.shelf.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-slate-500">No products have been added yet.</p>
           ) : (
-            <ul className="mt-2 divide-y divide-slate-100">
-              {s.watch.map((a) => {
-                const pct = a.isOut ? 0 : Math.min(100, Math.max(4, (Number(a.qty) / Math.max(Number(a.min), 1)) * 100));
-                return (
-                  <li key={a.id} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-gradient-to-b from-white to-slate-100">
-                      {a.imageV ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={`/api/product-image/${a.id}?size=thumb&v=${a.imageV}`} alt="" loading="lazy" className="h-full w-full object-contain" />
-                      ) : (
-                        <Package size={18} className="text-slate-300" />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-slate-900">{a.name}</span>
-                      <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-slate-100">
-                        <span className={`block h-full rounded-full ${a.isOut ? "bg-rose-500" : "bg-oil-400"}`} style={{ width: `${pct}%` }} />
-                      </span>
-                    </span>
-                    <span className={a.isOut ? "badge-red" : "badge-yellow"}>{a.isOut ? "Out of stock" : `${qtyText(Number(a.qty), a.pack, a.symbol, unitMode).main} left`}</span>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <th className="px-4 py-2 sm:px-5">Product</th>
+                    <th className="px-2 py-2 text-right">Available</th>
+                    <th className="hidden px-2 py-2 text-right md:table-cell">Reserved</th>
+                    <th className="hidden px-2 py-2 text-right md:table-cell">Minimum</th>
+                    <th className="hidden w-44 px-4 py-2 sm:px-5 md:table-cell">Level</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {s.shelf.map((p) => {
+                    const pct = p.status === "out" ? 0 : p.min > 0 ? Math.min(100, Math.max(4, (p.available / (p.min * 3)) * 100)) : Math.min(100, Math.max(4, (p.available / shelfTop) * 100));
+                    return (
+                      <tr key={p.id}>
+                        <td className="w-full max-w-0 px-4 py-2 sm:px-5">
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-gradient-to-b from-white to-slate-100">
+                              {p.imageV ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={`/api/product-image/${p.id}?size=thumb&v=${p.imageV}`} alt="" loading="lazy" className="h-full w-full object-contain" />
+                              ) : (
+                                <Package size={16} className="text-slate-300" />
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium text-slate-900">{p.name}</span>
+                              <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-slate-100 md:hidden">
+                                <span className={cn("block h-full rounded-full", p.status === "out" ? "bg-rose-500" : p.status === "low" ? "bg-oil-400" : "bg-emerald-500")} style={{ width: `${pct}%` }} />
+                              </span>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-2 text-right font-semibold tabular-nums text-slate-900">{qtyText(p.available, p.pack, p.symbol, unitMode).main}</td>
+                        <td className="hidden whitespace-nowrap px-2 py-2 text-right tabular-nums text-slate-600 md:table-cell">{p.reserved > 0 ? qtyText(p.reserved, p.pack, p.symbol, unitMode).main : "—"}</td>
+                        <td className="hidden whitespace-nowrap px-2 py-2 text-right tabular-nums text-slate-500 md:table-cell">{p.min > 0 ? qtyText(p.min, p.pack, p.symbol, unitMode).main : "—"}</td>
+                        <td className="hidden px-4 py-2 sm:px-5 md:table-cell">
+                          <div className="flex items-center gap-2">
+                            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                              <span className={cn("block h-full rounded-full", p.status === "out" ? "bg-rose-500" : p.status === "low" ? "bg-oil-400" : "bg-emerald-500")} style={{ width: `${pct}%` }} />
+                            </span>
+                            {p.status !== "ok" && <span className={cn("shrink-0 text-[11px] font-semibold", p.status === "out" ? "text-rose-600" : "text-yellow-600")}>{p.status === "out" ? "Out" : "Low"}</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
+        <div className="grid gap-4">
+          <section className="card card-pad" aria-label="Orders right now">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-base font-semibold text-slate-900">Orders right now</h2>
+              <Link href="/warehouse/orders" className="text-sm font-medium text-navy-700 hover:underline">
+                Pickups
+              </Link>
+            </div>
+            <p className="mb-2 text-xs text-slate-500">All the orders the shop has sent to the warehouse</p>
+            <div className="h-60">
+              <DonutChart data={s.byStatus} money={COUNT} centre={nf(s.byStatus.reduce((t, x) => t + x.value, 0))} centreLabel="Orders" empty="No orders yet." />
+            </div>
+          </section>
+
+          <section className="card card-pad" aria-label="Reserved by product">
+            <h2 className="text-base font-semibold text-slate-900">Waiting to be collected</h2>
+            <p className="mb-4 text-xs text-slate-500">Reserved for customers, by product ({nf(s.reserved)} pieces in all)</p>
+            <BarList highlightFirst={false} empty="Nothing is reserved." rows={reservedRows} />
+          </section>
+        </div>
+      </div>
+
+      <div className="mb-5 grid items-start gap-4 lg:grid-cols-2">
+        <section className="card card-pad" aria-label="Orders per day">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-900">Orders per day</h2>
+            <p className="text-xs font-medium tabular-nums text-slate-600">{nf(ordersTotal)} in 14 days</p>
+          </div>
+          <p className="mb-3 text-xs text-slate-500">{s.avgHandoverHours === null ? "Orders sent to the warehouse, the last 14 days" : `Average time to hand over an order: ${hoursText(s.avgHandoverHours)}`}</p>
+          <div className="h-56">
+            <ColumnsChart data={s.ordersPerDay} money={COUNT} label="Orders" empty="No orders in the last 14 days." />
+          </div>
+        </section>
+        <section className="card card-pad">
+          <h2 className="text-base font-semibold text-slate-900">How long orders have been waiting</h2>
+          <p className="mb-4 text-xs text-slate-500">{s.open} order{s.open === 1 ? "" : "s"} still to collect</p>
+          <BarList highlightFirst={false} rows={s.age.map((a) => ({ label: a.label, value: a.value, text: `${a.value} order${a.value === 1 ? "" : "s"}` }))} empty="No order is waiting." />
+        </section>
+      </div>
+
+      <div className="mb-5 grid items-start gap-4 lg:grid-cols-2">
+        <section className="card card-pad">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-base font-semibold text-slate-900">Goods in and out</h2>
+            <p className="text-xs font-medium tabular-nums">
+              <span className="text-emerald-600">{nf(totalIn)} in</span> <span className="text-slate-400">/</span> <span className="text-navy-700">{nf(totalOut)} out</span>
+            </p>
+          </div>
+          <p className="mb-3 text-xs text-slate-500">Pieces received and handed over, the last 14 days</p>
+          <div className="flex h-36 items-end gap-1.5 border-b border-line" role="img" aria-label="Goods received and released per day">
+            {s.days.map((d) => (
+              <div key={d.day} className="flex h-full flex-1 items-end justify-center gap-0.5" title={`${d.day}: ${nf(d.received)} in, ${nf(d.released)} out`}>
+                <div className="w-1/2 max-w-[10px] rounded-t bg-emerald-500" style={{ height: `${(d.received / max) * 100}%`, minHeight: d.received > 0 ? 3 : 0 }} />
+                <div className="w-1/2 max-w-[10px] rounded-t bg-navy-500" style={{ height: `${(d.released / max) * 100}%`, minHeight: d.released > 0 ? 3 : 0 }} />
+              </div>
+            ))}
+          </div>
+          <div className="mt-1 flex gap-1.5 text-[10px] text-slate-500">
+            {s.days.map((d) => (
+              <span key={d.day} className="flex-1 text-center">
+                {d.day.slice(8)}
+              </span>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-4 text-xs text-slate-600">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Received
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-navy-500" /> Handed over
+            </span>
+          </div>
+        </section>
+
+        <section className="card overflow-hidden" aria-label="Moving by product">
+          <div className="border-b border-line px-4 py-3 sm:px-5">
+            <h2 className="text-base font-semibold text-slate-900">What moved, by product</h2>
+            <p className="text-xs text-slate-500">Received and handed over, the last 14 days</p>
+          </div>
+          {s.moves.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-slate-500">No goods moved in the last 14 days.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="px-4 py-2 sm:px-5">Product</th>
+                  <th className="px-2 py-2 text-right">In</th>
+                  <th className="px-4 py-2 text-right sm:px-5">Out</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {s.moves.map((m) => (
+                  <tr key={m.product.id}>
+                    <td className="w-full max-w-0 truncate px-4 py-2 font-medium text-slate-900 sm:px-5">{m.product.name}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-right font-semibold tabular-nums text-emerald-600">{m.received > 0 ? `+${qtyText(m.received, m.product.pack, m.product.symbol, unitMode).main}` : "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums text-navy-700 sm:px-5">{m.released > 0 ? `−${qtyText(m.released, m.product.pack, m.product.symbol, unitMode).main}` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         <section className="card overflow-hidden">
           <div className="flex items-center justify-between border-b border-line px-4 py-3 sm:px-5">
             <div>
@@ -212,49 +338,7 @@ export default async function WarehouseHome() {
             </ul>
           )}
         </section>
-      </div>
 
-      <div className="mb-5 grid gap-4 lg:grid-cols-2">
-        <section className="card card-pad">
-          <h2 className="text-base font-semibold text-slate-900">How long orders have been waiting</h2>
-          <p className="mb-4 text-xs text-slate-500">{s.open} order{s.open === 1 ? "" : "s"} still to collect</p>
-          <BarList highlightFirst={false} rows={s.age.map((a) => ({ label: a.label, value: a.value, text: `${a.value} order${a.value === 1 ? "" : "s"}` }))} empty="No order is waiting." />
-        </section>
-        <section className="card card-pad">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-900">Goods in and out</h2>
-            <p className="text-xs font-medium tabular-nums">
-              <span className="text-emerald-600">{nf(totalIn)} in</span> <span className="text-slate-400">/</span> <span className="text-navy-700">{nf(totalOut)} out</span>
-            </p>
-          </div>
-          <p className="mb-3 text-xs text-slate-500">Pieces received and handed over, the last 14 days</p>
-          <div className="flex h-36 items-end gap-1.5 border-b border-line" role="img" aria-label="Goods received and released per day">
-            {s.days.map((d) => (
-              <div key={d.day} className="flex h-full flex-1 items-end justify-center gap-0.5" title={`${d.day}: ${nf(d.received)} in, ${nf(d.released)} out`}>
-                <div className="w-1/2 max-w-[10px] rounded-t bg-emerald-500" style={{ height: `${(d.received / max) * 100}%`, minHeight: d.received > 0 ? 3 : 0 }} />
-                <div className="w-1/2 max-w-[10px] rounded-t bg-navy-500" style={{ height: `${(d.released / max) * 100}%`, minHeight: d.released > 0 ? 3 : 0 }} />
-              </div>
-            ))}
-          </div>
-          <div className="mt-1 flex gap-1.5 text-[10px] text-slate-500">
-            {s.days.map((d) => (
-              <span key={d.day} className="flex-1 text-center">
-                {d.day.slice(8)}
-              </span>
-            ))}
-          </div>
-          <div className="mt-2 flex gap-4 text-xs text-slate-600">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Received
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-navy-500" /> Handed over
-            </span>
-          </div>
-        </section>
-      </div>
-
-      <div className="grid gap-4">
         <section className="card overflow-hidden">
           <div className="border-b border-line px-4 py-3 sm:px-5">
             <h2 className="text-base font-semibold text-slate-900">Your activity</h2>
