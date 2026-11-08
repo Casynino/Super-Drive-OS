@@ -246,7 +246,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   /** the narrow rail: only icons, thin lines between the sets, red dots for what waits, night mode and the person */
   const rail = (
     <div className="flex min-h-0 flex-1 flex-col items-center">
-      <div className="pb-2 pr-3 pt-4">{brand(true)}</div>
+      <div className="pb-2 pt-4">{brand(true)}</div>
       <button
         type="button"
         onClick={() => {
