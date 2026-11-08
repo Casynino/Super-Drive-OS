@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, ClipboardList, ScanLine } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { ReleaseHost, ReleaseTrigger, type ListNote } from "@/components/warehouse/ReleaseHost";
 import { can, canAny } from "@/lib/auth/can";
 import { largestPack, qtyText } from "@/lib/qty";
 import { requireUser } from "@/lib/auth/guard";
@@ -48,7 +49,7 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
       orderBy: filter.key === "done" || filter.key === "cancelled" ? { createdAt: "desc" } : { createdAt: "asc" }, // waiting ones: the oldest first
       skip: (page - 1) * PAGE,
       take: PAGE,
-      include: { sale: { select: { saleNo: true, customer: { select: { name: true, reseller: { select: { id: true } } } }, salesperson: { select: { name: true } } } }, items: { select: { quantity: true, releasedQty: true, cancelledQty: true, product: { select: { name: true, baseUnit: { select: { symbol: true } }, units: { select: { factor: true, unit: { select: { symbol: true } } } } } } } } },
+      include: { sale: { select: { saleNo: true, customer: { select: { name: true, reseller: { select: { id: true } } } }, salesperson: { select: { name: true } } } }, items: { select: { id: true, productId: true, quantity: true, releasedQty: true, cancelledQty: true, product: { select: { name: true, sku: true, image: { select: { updatedAt: true } }, baseUnit: { select: { symbol: true } }, units: { select: { factor: true, unit: { select: { symbol: true } } } } } } } } },
     }),
     db.pickupNote.count({ where }),
     db.pickupNote.groupBy({ by: ["status"], _count: { _all: true } }),
@@ -86,6 +87,7 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
           <EmptyState icon={<ClipboardList size={22} />} title="Nothing here" description={filter.key === "open" ? "No sale is waiting to be collected." : "No notes match this filter."} />
         </div>
       ) : (
+        <ReleaseHost>
         <section className="card overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
             <p className="text-sm text-slate-600">
@@ -132,6 +134,21 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
                       })
                       .filter((l) => !open || l.qty > 0);
                     const customer = p.sale.customer?.name;
+                    const releaseNote: ListNote = {
+                      id: p.id,
+                      noteNo: p.noteNo,
+                      customer: customer ?? "Walk-in customer",
+                      winga: Boolean(p.sale.customer?.reseller),
+                      saleNo: p.sale.saleNo,
+                      paymentLabel: AUTH_LABEL[p.auth],
+                      lines: p.items
+                        .map((i) => {
+                          const waiting = i.quantity.minus(i.releasedQty).minus(i.cancelledQty);
+                          const pack = largestPack(i.product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
+                          return { id: i.id, productId: i.productId, name: i.product.name, sku: i.product.sku, waiting: Number(waiting), waitingText: qtyText(Number(waiting), pack, i.product.baseUnit.symbol).main, symbol: i.product.baseUnit.symbol, imageV: i.product.image ? i.product.image.updatedAt.getTime() : null, pack };
+                        })
+                        .filter((l) => l.waiting > 0),
+                    };
                     const hours = (Date.now() - p.createdAt.getTime()) / 3_600_000;
                     // the longer an order waits the louder its edge: yellow after 4 hours, red after a day
                     const edge = !open ? "border-l-transparent" : hours >= 24 ? "border-l-brand-red" : hours >= 4 ? "border-l-oil-400" : "border-l-transparent";
@@ -182,11 +199,7 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
                         <td className="hidden sm:table-cell">{status}</td>
                         <td className="whitespace-nowrap text-right max-sm:pl-1 max-sm:pr-3">
                           <span className="inline-flex items-center gap-2">
-                            {open && operate && (
-                              <Link href={`/warehouse/orders/${p.id}`} className="btn-primary btn-sm">
-                                Release
-                              </Link>
-                            )}
+                            {open && operate && releaseNote.lines.length > 0 && <ReleaseTrigger note={releaseNote} />}
                             <Link href={`/warehouse/orders/${p.id}`} className="btn-secondary btn-sm hidden sm:inline-flex" aria-label={`Open ${p.noteNo}`}>
                               Open
                             </Link>
@@ -223,6 +236,7 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
             </div>
           )}
         </section>
+        </ReleaseHost>
       )}
     </>
   );

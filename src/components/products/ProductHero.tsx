@@ -3,7 +3,7 @@ import { ImageOff } from "lucide-react";
 import { StatusBadge } from "@/components/ui";
 import type { RecordStatus } from "@/generated/prisma/client";
 import type { Pack } from "@/lib/qty";
-import HeroStockPanel, { type HeroAdjust, type HeroStock } from "./HeroStockPanel";
+import HeroStockPanel, { type HeroStock } from "./HeroStockPanel";
 
 export type { HeroStock };
 
@@ -24,7 +24,7 @@ export default function ProductHero({
   stock,
   pack = null,
   baseSymbol = "",
-  adjust,
+  stockHref,
 }: {
   id: string;
   name: string;
@@ -39,8 +39,8 @@ export default function ProductHero({
   /** cartons first: the biggest pack and the base unit's label */
   pack?: Pack | null;
   baseSymbol?: string;
-  /** add / remove stock by hand (people with inventory.adjust) */
-  adjust?: HeroAdjust;
+  /** where this product's stock is handled (add, remove, count, movements) */
+  stockHref?: string;
 }) {
   // badges in the header do not depend on how the numbers are written
   const out = stock ? stock.available === 0 : false;
@@ -79,7 +79,7 @@ export default function ProductHero({
         </div>
       </div>
 
-      {stock && <HeroStockPanel stock={stock} pack={pack} baseSymbol={baseSymbol} minStock={minStock} adjust={adjust} />}
+      {stock && <HeroStockPanel stock={stock} pack={pack} baseSymbol={baseSymbol} minStock={minStock} stockHref={stockHref} />}
     </section>
   );
 }

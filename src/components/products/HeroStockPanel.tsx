@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import QtySwitch from "@/components/QtySwitch";
-import StockChangeButtons from "@/components/inventory/StockChangeButtons";
+import Link from "next/link";
 import { qtyText, type Pack, type UnitMode } from "@/lib/qty";
 
 export type HeroStock = { available: number; reseller: number; sold: number; returned: number; damaged: number; missing: number };
@@ -11,9 +11,7 @@ export type HeroStock = { available: number; reseller: number; sold: number; ret
  * Where this product's stock is (shop, resellers, sold, returned, damaged) with one bar for the split.
  * Cartons by default; the CTN | PCS switch here changes only this product's numbers.
  */
-export type HeroAdjust = { productId: string; name: string; sku: string; imageV: number | null };
-
-export default function HeroStockPanel({ stock, pack, baseSymbol, minStock, adjust }: { stock: HeroStock; pack: Pack | null; baseSymbol: string; minStock: number; /** present for people who may add and remove stock by hand */ adjust?: HeroAdjust }) {
+export default function HeroStockPanel({ stock, pack, baseSymbol, minStock, stockHref }: { stock: HeroStock; pack: Pack | null; baseSymbol: string; minStock: number; /** the warehouse stock page of this product (add, remove, count, movements), for people who may open it */ stockHref?: string }) {
   const [mode, setMode] = useState<UnitMode>("ctn");
   const f = (n: number) => qtyText(n, pack, baseSymbol, mode).main;
   const total = stock.available + stock.reseller + stock.sold + stock.damaged;
@@ -35,9 +33,15 @@ export default function HeroStockPanel({ stock, pack, baseSymbol, minStock, adju
   ];
   return (
     <div className="border-t border-line px-5 pb-5 pt-4">
-      {(pack || adjust) && (
+      {(pack || stockHref) && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-          {adjust ? <StockChangeButtons {...adjust} pack={pack} baseSymbol={baseSymbol} total={stock.available} /> : <span />}
+          {stockHref ? (
+            <Link href={stockHref} className="text-sm font-medium text-navy-700 hover:underline">
+              Stock and movements
+            </Link>
+          ) : (
+            <span />
+          )}
           {pack && (
             <span className="flex items-center gap-2">
               Show this product in

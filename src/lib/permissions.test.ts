@@ -28,10 +28,11 @@ describe("permission registry", () => {
     // receiving goods is the warehouse attendant's job, never the shop attendant's
     for (const forbidden of ["shipments.receive", "inventory.receive", "warehouse.operate"]) expect(sales).not.toContain(forbidden);
     const warehouse = DEFAULT_ROLES.find((r) => r.key === "WAREHOUSE")!.permissions;
-    for (const forbidden of ["sales.pos", "products.price", "products.cost", "inventory.valuation", "payments.record", "inventory.adjust", "dashboard.financials", "reports.financial"]) {
+    for (const forbidden of ["sales.pos", "products.price", "products.cost", "inventory.valuation", "payments.record", "dashboard.financials", "reports.financial"]) {
       expect(warehouse).not.toContain(forbidden);
     }
-    for (const needed of ["shipments.receive", "warehouse.operate"]) expect(warehouse).toContain(needed);
+    // Nino 2026-11-08: the warehouse person adds products, changes their details, deletes them when empty, and adds / removes / counts stock by hand
+    for (const needed of ["shipments.receive", "warehouse.operate", "products.create", "products.edit", "products.deactivate", "inventory.adjust", "inventory.count"]) expect(warehouse).toContain(needed);
   });
 
   it("there are exactly three positions: owner, warehouse and shop attendant", () => {

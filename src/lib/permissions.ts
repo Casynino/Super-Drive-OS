@@ -153,6 +153,8 @@ export const DEFAULT_ROLES: DefaultRole[] = [
     permissions: [
       "products.view",
       "products.create", // adds products to the system like the Director (Nino 2026-11-08); prices and costs stay hidden: new products start with no price
+      "products.edit", // opens a product and changes its details and picture (Nino 2026-11-08); the price fields stay locked for him
+      "products.deactivate", // "Delete product" (never while it has stock; the history stays)
       "inventory.view",
       "inventory.movements",
       "shipments.receive",

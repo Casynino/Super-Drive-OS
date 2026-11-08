@@ -439,7 +439,7 @@ export async function reportProblemAction(_prev: ActionState, fd: FormData): Pro
 
 const decideProblemSchema = z.object({
   problemId: z.string().min(1),
-  action: z.enum(["FOUND", "WRITE_OFF", "DISCOUNT_SELL"]),
+  action: z.enum(["FOUND", "WRITE_OFF", "DISCOUNT_SELL", "DISMISS"]),
   note: z.string().trim().max(300),
   discountPrice: z.string().max(24),
 });
@@ -467,7 +467,7 @@ export async function decideProblemAction(_prev: ActionState, fd: FormData): Pro
       revalidatePath("/inventory");
       revalidatePath("/warehouse", "layout");
       revalidatePath("/products");
-      return { ok: true, message: p.action === "FOUND" ? "Back in stock." : p.action === "WRITE_OFF" ? "Written off." : "On sale at the discounted price, as a separate \"damaged packaging\" product." };
+      return { ok: true, message: p.action === "FOUND" ? "Back in stock." : p.action === "WRITE_OFF" ? "Written off." : p.action === "DISMISS" ? "Removed from the list. It stays in the history." : "On sale at the discounted price, as a separate \"damaged packaging\" product." };
     } catch (e) {
       if (e instanceof ShipmentError) return fail(e.message, e.fieldErrors);
       throw e;

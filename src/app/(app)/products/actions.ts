@@ -354,3 +354,34 @@ export async function setProductStatus(formData: FormData): Promise<void> {
   revalidatePath("/products");
   revalidatePath(`/products/${id}`);
 }
+
+
+/**
+ * "Delete product" (Nino 2026-11-08): the product leaves every list and the till, its history stays (records are never erased), and it can be brought back.
+ * Refused while anything of it is still in stock anywhere (shop, reserved, with a Winga), while it is on a delivery that is not finished, or while a problem about it is undecided.
+ */
+export async function deleteProductAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return guarded("products.deactivate", async (user) => {
+    const id = formString(fd, "id");
+    const product = await db.product.findUnique({ where: { id }, select: { id: true, sku: true, name: true, status: true, baseUnit: { select: { symbol: true } } } });
+    if (!product) return fail("This product no longer exists.");
+    if (product.status !== "ACTIVE") return { ok: true, message: "Already deleted." };
+
+    const held = await db.stockBalance.aggregate({ where: { productId: id }, _sum: { quantity: true } });
+    const total = held._sum.quantity ?? new Prisma.Decimal(0);
+    if (total.gt(0)) return fail(`It still has ${total.toString()} ${product.baseUnit.symbol} in stock. Take the stock out or sell it first, then delete the product.`);
+    const onDelivery = await db.shipment.findFirst({ where: { status: { in: ["EXPECTED", "PARTIAL"] }, items: { some: { productId: id } } }, select: { shipmentNo: true } });
+    if (onDelivery) return fail(`It is on the delivery ${onDelivery.shipmentNo}, which is not finished. Finish or cancel that delivery first.`);
+    const open = await db.stockProblem.count({ where: { productId: id, action: null } });
+    if (open > 0) return fail("A damaged or lost problem about it is still waiting for a decision. Decide it first.");
+
+    await db.$transaction(async (tx) => {
+      await tx.product.update({ where: { id }, data: { status: "INACTIVE" } });
+      await writeAudit(tx, { user, action: "product.deactivate", entityType: "Product", entityId: id, reference: product.sku, reason: "Deleted from the lists", before: { status: "ACTIVE" }, after: { status: "INACTIVE" } });
+    });
+    revalidatePath("/products", "layout");
+    revalidatePath("/inventory", "layout");
+    revalidatePath("/warehouse", "layout");
+    return { ok: true, message: `${product.name} was deleted.` };
+  });
+}

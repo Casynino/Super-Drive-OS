@@ -37,7 +37,7 @@ export type ProblemRow = {
 type Run = (prev: ActionState, fd: FormData) => Promise<ActionState>;
 const initial: ActionState = {};
 const KIND_LABEL = { DAMAGED: "Damaged", MISSING: "Lost" } as const;
-const OUTCOME: Record<string, string> = { FOUND: "Found and returned to stock", WRITE_OFF: "Written off", DISCOUNT_SELL: "Put on sale at a discount" };
+const OUTCOME: Record<string, string> = { FOUND: "Found and returned to stock", WRITE_OFF: "Written off", DISCOUNT_SELL: "Put on sale at a discount", DISMISS: "Removed from the list" };
 const nf = new Intl.NumberFormat("en-US");
 
 function ago(iso: string) {
@@ -209,86 +209,173 @@ function ReportForm({ products, action, onDone }: { products: ReportProduct[]; a
   );
 }
 
-// ───────────── One open problem and its decisions ─────────────
+// ───────────── One open problem and its decisions (each one asks in a pop-up) ─────────────
 
-function Decision({ r, action, currencySymbol }: { r: ProblemRow; action: Run; currencySymbol: string }) {
+type Choice = "FOUND" | "WRITE_OFF" | "DISCOUNT_SELL" | "DISMISS";
+
+const COPY: Record<Choice, { title: (r: ProblemRow) => string; help: (r: ProblemRow) => string; button: string; reason: "required" | "optional"; danger?: boolean }> = {
+  FOUND: {
+    title: (r) => (r.kind === "MISSING" ? "Found it" : "Not damaged"),
+    help: (r) => (r.kind === "MISSING" ? "The pieces turned up. They go back on the shelf now." : "They are fine after all, or it was a mistake. They go back on the shelf now."),
+    button: "Return to stock",
+    reason: "optional",
+  },
+  DISCOUNT_SELL: {
+    title: () => "Sell at a discount",
+    help: () => "They can still be sold, cheaper, as a separate product “(damaged packaging)”. The normal product keeps its normal price, so the two can never be mixed up at the till.",
+    button: "Put on sale",
+    reason: "optional",
+  },
+  WRITE_OFF: {
+    title: () => "Write off",
+    help: () => "They cannot be sold. They are thrown away for good and stay in the history, never on the shelf.",
+    button: "Write off",
+    reason: "required",
+    danger: true,
+  },
+  DISMISS: {
+    title: () => "Remove from the list",
+    help: () => "Use this when the record is a mistake or nothing more needs to be decided. The stock does not change and the pieces stay off the shelf. It is not erased: it stays in the history with your reason.",
+    button: "Remove from list",
+    reason: "required",
+    danger: true,
+  },
+};
+
+/** The question for one decision: what it does, the price (discount) and the reason, then Confirm. Done shows a check mark. */
+function DecisionForm({ r, choice, action, currencySymbol, onClose }: { r: ProblemRow; choice: Choice; action: Run; currencySymbol: string; onClose: () => void }) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(
-    async (prev: ActionState, fd: FormData) => {
-      const out = await action(prev, fd);
-      if (out.ok) router.refresh();
-      return out;
-    },
-    initial,
-  );
-  const [choice, setChoice] = useState<"FOUND" | "WRITE_OFF" | "DISCOUNT_SELL" | null>(null);
+  const [state, formAction, pending] = useActionState(action, initial);
   const fe = state.fieldErrors ?? {};
-  const options = [
-    { k: "FOUND" as const, label: r.kind === "MISSING" ? "Found it" : "Not damaged", icon: PackageCheck, tone: "good" },
-    ...(r.kind === "DAMAGED" ? [{ k: "DISCOUNT_SELL" as const, label: "Sell at a discount", icon: Tag, tone: "good" }] : []),
-    { k: "WRITE_OFF" as const, label: "Write off", icon: Trash2, tone: "danger" },
-  ];
-  if (state.ok) return <p className="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-700"><CircleCheck size={16} /> {state.message}</p>;
-  return (
-    <div className="mt-3">
-      <div className="flex flex-wrap gap-2">
-        {options.map((o) => (
-          <button key={o.k} type="button" aria-pressed={choice === o.k} onClick={() => setChoice(choice === o.k ? null : o.k)} className={cn("inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold transition", choice === o.k ? (o.tone === "danger" ? "border-brand-red bg-brand-red-soft text-brand-red-dark" : "border-navy-700 bg-navy-700 text-[#ffffff]") : "border-line bg-white text-slate-700 hover:border-navy-200")}>
-            <o.icon size={15} /> {o.label}
-          </button>
-        ))}
+  const c = COPY[choice];
+  const qty = say(r.pack, r.quantity, r.baseSymbol);
+
+  if (state.ok) {
+    return (
+      <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+        <span className="grid h-14 w-14 place-items-center rounded-full bg-emerald-500 text-[#ffffff]">
+          <CircleCheck size={30} />
+        </span>
+        <p className="text-lg font-semibold text-slate-900">{state.message}</p>
+        <button
+          type="button"
+          className="btn-primary h-11 px-6"
+          onClick={() => {
+            router.refresh();
+            onClose();
+          }}
+        >
+          Done
+        </button>
       </div>
-      {choice && (
-        <form action={formAction} className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3" noValidate>
-          <input type="hidden" name="problemId" value={r.id} />
-          <input type="hidden" name="action" value={choice} />
-          <p className="text-sm text-slate-600">
-            {choice === "FOUND" && (r.kind === "MISSING" ? "The pieces turned up. They go back on the shelf now." : "They are fine after all, or it was a mistake. They go back on the shelf now.")}
-            {choice === "WRITE_OFF" && "They cannot be sold. They are thrown away for good and stay in the history, never on the shelf."}
-            {choice === "DISCOUNT_SELL" && "They can still be sold, cheaper, as a separate product “(damaged packaging)”. The normal product keeps its normal price."}
-          </p>
-          {choice === "DISCOUNT_SELL" && (
-            <div>
-              <label className="label" htmlFor={`dp-${r.id}`}>
-                New price per {r.pack ? r.pack.symbol : r.baseSymbol} ({currencySymbol})
-                {r.normalPrice ? <span className="font-normal text-slate-500"> · normal {nf.format(r.normalPrice)}</span> : null}
-              </label>
-              <input id={`dp-${r.id}`} name="discountPrice" inputMode="numeric" className={cn("input h-11 max-w-[14rem]", fe.discountPrice && "input-error")} placeholder="0" autoComplete="off" />
-              {fe.discountPrice && <p className="field-error">{fe.discountPrice}</p>}
-            </div>
-          )}
+    );
+  }
+  return (
+    <form action={formAction} noValidate className="flex min-h-0 flex-1 flex-col">
+      <input type="hidden" name="problemId" value={r.id} />
+      <input type="hidden" name="action" value={choice} />
+      <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+        <h2 className="text-base font-semibold text-slate-900">{c.title(r)}</h2>
+        <button type="button" onClick={onClose} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-full text-slate-500 hover:bg-slate-100">
+          <X size={16} />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+          <Thumb id={r.productId} v={r.imageV} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-semibold text-slate-900">{r.productName}</span>
+            <span className="block truncate text-xs text-slate-500">{[r.saleNo, r.reference].filter(Boolean).join(" · ")}</span>
+          </span>
+          <span className="shrink-0 text-right text-base font-bold tabular-nums text-slate-900">{qty}</span>
+        </div>
+        <p className="text-sm text-slate-600">{c.help(r)}</p>
+        {choice === "DISCOUNT_SELL" && (
           <div>
-            <label className="label" htmlFor={`nt-${r.id}`}>
-              Reason {choice === "WRITE_OFF" ? "" : "(optional)"}
+            <label className="label" htmlFor={`dp-${r.id}`}>
+              New price per {r.pack ? r.pack.symbol : r.baseSymbol} ({currencySymbol})
+              {r.normalPrice ? <span className="font-normal text-slate-500"> · normal {nf.format(r.normalPrice)}</span> : null}
             </label>
-            <input id={`nt-${r.id}`} name="note" className={cn("input h-11", fe.note && "input-error")} placeholder={choice === "WRITE_OFF" ? "e.g. Leaking, cannot be sold" : "e.g. Found in the back store"} autoComplete="off" maxLength={300} />
-            {fe.note && <p className="field-error">{fe.note}</p>}
+            <input id={`dp-${r.id}`} name="discountPrice" inputMode="numeric" className={cn("input h-11 max-w-[14rem]", fe.discountPrice && "input-error")} placeholder="0" autoComplete="off" autoFocus />
+            {fe.discountPrice && <p className="field-error">{fe.discountPrice}</p>}
           </div>
-          {state.error && <Alert>{state.error}</Alert>}
-          <div className="flex gap-2">
-            <button type="submit" disabled={pending} className={cn("h-11 flex-1 rounded-xl text-sm font-semibold text-[#ffffff] transition disabled:opacity-60", choice === "WRITE_OFF" ? "bg-brand-red hover:bg-brand-red-dark" : "bg-navy-700 hover:bg-navy-800")}>
-              {pending ? "Saving…" : choice === "FOUND" ? "Return to stock" : choice === "WRITE_OFF" ? "Write off" : "Put on sale"}
+        )}
+        <div>
+          <label className="label" htmlFor={`nt-${r.id}`}>
+            Reason {c.reason === "optional" ? "(optional)" : ""}
+          </label>
+          <input id={`nt-${r.id}`} name="note" className={cn("input h-11", fe.note && "input-error")} placeholder={choice === "WRITE_OFF" ? "e.g. Leaking, cannot be sold" : choice === "DISMISS" ? "e.g. Recorded by mistake" : "e.g. Found in the back store"} autoComplete="off" maxLength={300} autoFocus={choice !== "DISCOUNT_SELL"} />
+          {fe.note && <p className="field-error">{fe.note}</p>}
+        </div>
+        {state.error && !fe.note && !fe.discountPrice && <Alert>{state.error}</Alert>}
+      </div>
+      <div className="flex gap-2 border-t border-line px-5 py-3.5">
+        <button type="submit" disabled={pending} className={cn("h-11 flex-1 rounded-xl text-sm font-semibold text-[#ffffff] transition disabled:opacity-60", c.danger ? "bg-brand-red hover:bg-brand-red-dark" : "bg-navy-700 hover:bg-navy-800")}>
+          {pending ? "Saving…" : c.button}
+        </button>
+        <button type="button" className="btn-secondary h-11 px-5" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** One open problem as a short row: picture, name and what happened, how much, and the decisions as small buttons (each opens a pop-up). */
+function ProblemItem({ r, onChoose }: { r: ProblemRow; onChoose: (r: ProblemRow, c: Choice) => void }) {
+  const options = [
+    { k: "FOUND" as const, label: r.kind === "MISSING" ? "Found it" : "Not damaged", icon: PackageCheck },
+    ...(r.kind === "DAMAGED" ? [{ k: "DISCOUNT_SELL" as const, label: "Discount", icon: Tag }] : []),
+    { k: "WRITE_OFF" as const, label: "Write off", icon: Trash2 },
+  ];
+  const qty = say(r.pack, r.quantity, r.baseSymbol);
+  const whole = r.pack ? Number.isInteger(r.quantity / r.pack.factor) : false;
+  const btn = "inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-white px-2.5 text-[13px] font-semibold text-slate-700 transition hover:border-navy-200";
+  return (
+    <li className="px-4 py-3 sm:px-5">
+      <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 lg:grid-cols-[2.5rem_minmax(0,1fr)_7rem_auto]">
+        <Thumb id={r.productId} v={r.imageV} />
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="text-sm font-semibold text-slate-900">{r.productName}</span>
+            <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", r.kind === "DAMAGED" ? "bg-brand-red-soft text-brand-red-dark" : "bg-oil-soft text-yellow-800")}>{KIND_LABEL[r.kind]}</span>
+          </p>
+          <p className="truncate text-xs text-slate-500" title={r.note}>
+            {r.note} · {r.saleNo ? "returned" : "reported"} by {r.reportedBy.split(" ")[0]}, {ago(r.reportedAt)}
+            {r.saleNo ? ` · ${r.saleNo}` : ""}
+          </p>
+        </div>
+        <p className="text-right text-base font-bold leading-tight tabular-nums text-slate-900">
+          {qty}
+          {r.pack && whole && <span className="block text-[11px] font-normal text-slate-500">{nf.format(r.quantity)} {r.baseSymbol}</span>}
+        </p>
+        <div className="col-span-3 flex flex-wrap items-center gap-1.5 lg:col-span-1 lg:justify-end">
+          {options.map((o) => (
+            <button key={o.k} type="button" className={btn} onClick={() => onChoose(r, o.k)}>
+              <o.icon size={13} /> {o.label}
             </button>
-            <button type="button" className="btn-secondary h-11" onClick={() => setChoice(null)}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-    </div>
+          ))}
+          <button type="button" className={cn(btn, "w-8 justify-center px-0 text-slate-400 hover:border-brand-red hover:text-brand-red-dark")} onClick={() => onChoose(r, "DISMISS")} aria-label="Remove from the list" title="Remove from the list">
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+    </li>
   );
 }
 
 export default function ProblemReports({ open, decided, products, canReport, reportAction, decideAction, currencySymbol, title = "Reported at the warehouse", intro, emptyText = "Nothing reported by hand yet." }: { open: ProblemRow[]; decided: ProblemRow[]; products: ReportProduct[]; canReport: boolean; reportAction: Run; decideAction: Run; currencySymbol: string; /** the card's heading, its line when nothing is open, and the line when there is nothing at all */ title?: string; intro?: string; emptyText?: string }) {
   const [modal, setModal] = useState(false);
+  // the decision pop-up lives here, not in the row: the row leaves the list when it is decided, and the check mark must stay
+  const [active, setActive] = useState<{ r: ProblemRow; choice: Choice } | null>(null);
   if (!canReport && open.length === 0 && decided.length === 0) return null;
   return (
     <section className="card mb-4 overflow-hidden" aria-label={title}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
         <div>
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-          <p className="text-sm text-slate-500">
-            {open.length > 0 ? `${open.length} product${open.length === 1 ? "" : "s"} to decide. Damaged or lost pieces are already off the shelf.` : (intro ?? "Damaged or lost goods you find on the shelf. They leave the sellable stock at once.")}
+          <p className="text-xs text-slate-500 sm:text-sm">
+            {open.length > 0 ? `${open.length} to decide. The pieces are already off the shelf.` : (intro ?? "Damaged or lost goods you find on the shelf. They leave the sellable stock at once.")}
           </p>
         </div>
         {canReport && (
@@ -301,26 +388,7 @@ export default function ProblemReports({ open, decided, products, canReport, rep
       {open.length > 0 && (
         <ul className="divide-y divide-line">
           {open.map((r) => (
-            <li key={r.id} className="px-4 py-4 sm:px-5">
-              <div className="flex items-start gap-3">
-                <Thumb id={r.productId} v={r.imageV} size={14} />
-                <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-2">
-                    <span className="text-[15px] font-semibold text-slate-900">{r.productName}</span>
-                    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", r.kind === "DAMAGED" ? "bg-brand-red-soft text-brand-red-dark" : "bg-oil-soft text-yellow-800")}>{KIND_LABEL[r.kind]}</span>
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {[r.sku, r.saleNo, r.reference].filter(Boolean).join(" · ")} · {r.saleNo ? "returned by" : "reported by"} {r.reportedBy} · {ago(r.reportedAt)}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-700">{r.note}</p>
-                </div>
-                <p className="shrink-0 text-right text-lg font-bold tabular-nums text-slate-900">
-                  {say(r.pack, r.quantity, r.baseSymbol)}
-                  {r.pack && !Number.isInteger(r.quantity / r.pack.factor) ? null : r.pack ? <span className="block text-[11px] font-normal text-slate-500">{nf.format(r.quantity)} {r.baseSymbol}</span> : null}
-                </p>
-              </div>
-              <Decision r={r} action={decideAction} currencySymbol={currencySymbol} />
-            </li>
+            <ProblemItem key={r.id} r={r} onChoose={(row, choice) => setActive({ r: row, choice })} />
           ))}
         </ul>
       )}
@@ -355,6 +423,9 @@ export default function ProblemReports({ open, decided, products, canReport, rep
         </p>
       )}
 
+      <Modal open={active !== null} onClose={() => setActive(null)} label={active ? COPY[active.choice].title(active.r) : "Decide"}>
+        {active && <DecisionForm key={`${active.r.id}:${active.choice}`} r={active.r} choice={active.choice} action={decideAction} currencySymbol={currencySymbol} onClose={() => setActive(null)} />}
+      </Modal>
       <Modal open={modal} onClose={() => setModal(false)} label="Report a problem">
         <ReportForm products={products} action={reportAction} onDone={() => setModal(false)} />
       </Modal>

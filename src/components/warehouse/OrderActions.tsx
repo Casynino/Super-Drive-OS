@@ -22,12 +22,12 @@ export default function OrderActions({ noteId, status }: { noteId: string; statu
   return (
     <div className="flex flex-wrap items-center gap-2">
       {status === "NEW" && (
-        <button type="button" className="btn-secondary" disabled={pending} onClick={() => run(startPreparingAction)}>
+        <button type="button" className="btn-secondary btn-sm" disabled={pending} onClick={() => run(startPreparingAction)}>
           Start preparing
         </button>
       )}
       {(status === "NEW" || status === "PREPARING") && (
-        <button type="button" className="btn-primary" disabled={pending} onClick={() => run(markReadyAction)}>
+        <button type="button" className="btn-primary btn-sm" disabled={pending} onClick={() => run(markReadyAction)}>
           Mark ready for collection
         </button>
       )}

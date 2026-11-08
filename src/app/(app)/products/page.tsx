@@ -154,7 +154,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     <>
       <PageHeader
         title="Products"
-        description="Everything you sell. Open a product to see its pieces, prices and codes."
+        description="Everything you sell. Open a product to change it or see its stock."
         actions={
           <>
             {canStock && PIECE_LIST_ENABLED && (
@@ -172,55 +172,60 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       />
 
       {top && (
-        <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
-          <KpiCard icon={Boxes} tone="navy" label="Products" value={n(top.products)} hint="Active, on sale" />
-          <KpiCard icon={PackageCheck} tone="green" label="In the shop" value={top.inShop} hint={top.inShopPcs ?? "On the shelf"} />
-          <KpiCard icon={Handshake} tone="blue" label="With winga" value={top.withResellers} hint="Held on trust" />
-          <KpiCard icon={ShoppingCart} tone="slate" label="Sold" value={top.sold} hint="Sold so far" />
-          <KpiCard icon={AlertTriangle} tone={top.restock > 0 ? "yellow" : "slate"} label="Restock" value={n(top.restock)} hint={top.restock > 0 ? "Low or out of stock" : "Nothing is low"} />
-        </div>
+        <section className="card mb-3 grid grid-cols-2 divide-line sm:grid-cols-5 sm:divide-x" aria-label="Numbers">
+          {[
+            { label: "Products", value: n(top.products), hint: "active, on sale", tone: "" },
+            { label: "In the shop", value: top.inShop, hint: top.inShopPcs ?? "on the shelf", tone: "text-emerald-700" },
+            { label: "With winga", value: top.withResellers, hint: "held on trust", tone: "text-blue-700" },
+            { label: "Sold", value: top.sold, hint: "sold so far", tone: "" },
+            { label: "Restock", value: n(top.restock), hint: top.restock > 0 ? "low or out" : "nothing low", tone: top.restock > 0 ? "text-yellow-700" : "" },
+          ].map((k) => (
+            <div key={k.label} className="min-w-0 px-4 py-2.5">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{k.label}</p>
+              <p className={cn("truncate text-lg font-bold leading-tight text-slate-900", k.tone)}>{k.value}</p>
+              <p className="truncate text-[11px] text-slate-500">{k.hint}</p>
+            </div>
+          ))}
+        </section>
       )}
 
       {LABELS_ENABLED && missing > 0 && <LabelExistingStock missing={missing} action={labelExistingStockAction} />}
 
-      <form className="card card-pad mb-4 grid gap-3 sm:grid-cols-[1fr_200px_160px_auto]" method="get">
-        {sp.view && <input type="hidden" name="view" value={sp.view} />}
-        <div className="relative">
-          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input name="q" defaultValue={q} placeholder="Search name, code or barcode" className="input pl-9" aria-label="Search products" />
-        </div>
-        <select name="category" defaultValue={sp.category ?? ""} className="input" aria-label="Category">
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select name="status" defaultValue={sp.status ?? "active"} className="input" aria-label="Status">
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="all">All</option>
-        </select>
-        <div className="flex gap-2">
-          <button className="btn-primary" type="submit">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <form className="flex min-w-0 flex-1 flex-wrap items-center gap-2" method="get">
+          {sp.view && <input type="hidden" name="view" value={sp.view} />}
+          <div className="relative min-w-[12rem] flex-1">
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input name="q" defaultValue={q} placeholder="Search name, code or barcode" className="input h-9 pl-9 text-sm" aria-label="Search products" />
+          </div>
+          <select name="category" defaultValue={sp.category ?? ""} className="input h-9 w-auto text-sm" aria-label="Category">
+            <option value="">All categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <select name="status" defaultValue={sp.status ?? "active"} className="input h-9 w-auto text-sm" aria-label="Status">
+            <option value="active">Active</option>
+            <option value="inactive">Deleted</option>
+            <option value="all">All</option>
+          </select>
+          <button className="btn-primary btn-sm h-9" type="submit">
             Filter
           </button>
           {hasFilters && (
-            <Link href={link({ q: undefined, category: undefined, status: undefined, page: undefined })} className="btn-secondary">
+            <Link href={link({ q: undefined, category: undefined, status: undefined, page: undefined })} className="text-sm text-slate-500 hover:text-slate-800">
               Clear
             </Link>
           )}
-        </div>
-      </form>
-
-      <div className="mb-3 flex justify-end">
+        </form>
         <div className="inline-flex rounded-lg border border-line bg-white p-0.5 text-sm" role="group" aria-label="View">
           {[
             { key: "cards", label: "Cards" },
             { key: "table", label: "Table" },
           ].map((v) => (
-            <Link key={v.key} href={link({ view: v.key === "cards" ? undefined : v.key, page: undefined })} aria-current={view === v.key ? "page" : undefined} className={cn("rounded-md px-3 py-1.5 font-medium transition", view === v.key ? "bg-navy-700 text-white" : "text-slate-600 hover:text-slate-900")}>
+            <Link key={v.key} href={link({ view: v.key === "cards" ? undefined : v.key, page: undefined })} aria-current={view === v.key ? "page" : undefined} className={cn("rounded-md px-3 py-1 font-medium transition", view === v.key ? "bg-navy-700 text-white" : "text-slate-600 hover:text-slate-900")}>
               {v.label}
             </Link>
           ))}
@@ -243,9 +248,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           />
         </div>
       ) : view === "cards" ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {levels.map((l) => (
-            <ProductLevelCard key={l.id} p={l} href={`/products/${l.id}`} showStock={canStock} mode={mode} />
+            <ProductLevelCard key={l.id} p={l} href={`/products/${l.id}`} showStock={canStock} mode={mode} compact />
           ))}
         </div>
       ) : (

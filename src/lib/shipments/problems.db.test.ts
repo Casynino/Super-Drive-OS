@@ -36,7 +36,7 @@ const qty = async (w: { location: { id: string }; product: { id: string } }, pro
 };
 const report = (w: { location: { id: string }; product: { id: string } }, kind: "DAMAGED" | "MISSING", quantity: string, key = randomUUID(), note = "Found broken on the shelf") =>
   db.$transaction((tx) => reportProblem(tx, { productId: w.product.id, locationId: w.location.id, kind, quantity, note, submissionKey: key, user: { id: userId } }));
-const decide = (problemId: string, action: "FOUND" | "WRITE_OFF" | "DISCOUNT_SELL", over: { note?: string | null; discountPrice?: string } = {}) =>
+const decide = (problemId: string, action: "FOUND" | "WRITE_OFF" | "DISCOUNT_SELL" | "DISMISS", over: { note?: string | null; discountPrice?: string } = {}) =>
   db.$transaction((tx) => decideProblem(tx, { problemId, action, note: over.note ?? null, discountPrice: over.discountPrice, user: { id: userId }, currencyDecimals: 0 }));
 
 describe("problems reported by hand", () => {
@@ -125,4 +125,20 @@ describe("problems reported by hand", () => {
     const normal = await db.product.findUniqueOrThrow({ where: { id: w.product.id } });
     expect(Number(normal.sellingPrice)).toBe(25000);
   });
+
+  it("a problem can be removed from the list with a reason: stock and money do not change, nothing is erased", async () => {
+    const w = await warehouse(20);
+    const r = await report(w, "DAMAGED", "3");
+    expect(await qty(w)).toBe(17);
+    await expect(decide(r.problem.id, "DISMISS")).rejects.toBeInstanceOf(ShipmentError); // a reason is needed
+    const d = await decide(r.problem.id, "DISMISS", { note: "Recorded by mistake" });
+    expect(d.problem.action).toBe("DISMISS");
+    expect(await qty(w)).toBe(17); // the pieces stay off the shelf
+    expect(await db.stockProblem.count({ where: { id: r.problem.id } })).toBe(1); // still there, in the history
+    const { open, decided } = await loadProblems(db);
+    expect(open.some((p) => p.id === r.problem.id)).toBe(false);
+    expect(decided.some((p) => p.id === r.problem.id && p.action === "DISMISS")).toBe(true);
+    await expect(decide(r.problem.id, "FOUND")).rejects.toThrow(/already decided/);
+  });
 });
+

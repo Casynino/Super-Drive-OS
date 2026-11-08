@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Package } from "lucide-react";
 import QtySwitch from "@/components/QtySwitch";
@@ -41,7 +42,7 @@ export default function WarehouseStockCard(p: WarehouseStockCardProps) {
   const f = (n: number) => qtyText(n, p.pack, p.baseSymbol, mode).main;
   const pct = p.min && p.min > 0 ? Math.min(100, (p.available / (3 * p.min)) * 100) : null;
   return (
-    <div className="card flex h-full flex-col p-3">
+    <div className="card relative flex h-full flex-col p-3 transition hover:border-navy-200 hover:shadow-md">
       <div className="flex items-start gap-2.5">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
           {p.imageV ? (
@@ -52,14 +53,23 @@ export default function WarehouseStockCard(p: WarehouseStockCardProps) {
           )}
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug text-slate-900">{p.name}</h3>
+          <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug text-slate-900">
+            {/* the whole card opens the product's stock (the name link stretches over it); the switch and the buttons stay above it */}
+            <Link href={`/warehouse/stock/${p.id}`} className="after:absolute after:inset-0 after:content-[''] hover:text-navy-700">
+              {p.name}
+            </Link>
+          </h3>
           <p className="truncate text-[10px] text-slate-500">{p.brand ?? p.category}</p>
         </div>
       </div>
 
       <div className="mt-2.5 flex items-center justify-between gap-1">
         <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Available</p>
-        {p.pack && <QtySwitch mode={mode} onChange={setMode} />}
+        {p.pack && (
+          <span className="relative z-10">
+            <QtySwitch mode={mode} onChange={setMode} />
+          </span>
+        )}
       </div>
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-lg font-bold leading-tight tracking-tight text-slate-900">{f(p.available)}</p>
@@ -80,7 +90,7 @@ export default function WarehouseStockCard(p: WarehouseStockCardProps) {
       </div>
 
       {(p.canAdjust || p.canCount) && (
-        <div className="mt-auto pt-2.5">
+        <div className="relative z-10 mt-auto pt-2.5">
           <StockChangeButtons productId={p.id} name={p.name} sku={p.sku} imageV={p.imageV} pack={p.pack} baseSymbol={p.baseSymbol} total={p.total} reserved={p.reserved} canCount={p.canCount} compact allowChange={p.canAdjust} />
         </div>
       )}

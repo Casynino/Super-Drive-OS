@@ -32,7 +32,7 @@ export type ProductLevel = {
  * One product's level at a glance: the big number is what is in the shop now, the bar shows where every piece of it went
  * (in the shop, with resellers, damaged, sold). Pressing the card shows only that product's pieces.
  */
-export default function ProductLevelCard({ p, href, active, showStock = true, mode: startMode = "ctn" }: { p: ProductLevel; href: string; active?: boolean; /** false for people who may not see stock: only the product and its price */ showStock?: boolean; /** the CTN | PCS switch */ mode?: UnitMode }) {
+export default function ProductLevelCard({ p, href, active, showStock = true, mode: startMode = "ctn", compact = false }: { p: ProductLevel; href: string; active?: boolean; /** false for people who may not see stock: only the product and its price */ showStock?: boolean; /** the CTN | PCS switch */ mode?: UnitMode; /** a small card for long lists (the Products page) */ compact?: boolean }) {
   // cartons by default; the small switch changes only this product's numbers
   const [mode, setMode] = useState<UnitMode>(startMode);
   const out = p.available === 0;
@@ -45,6 +45,47 @@ export default function ProductLevelCard({ p, href, active, showStock = true, mo
     { n: p.damaged, cls: "bg-brand-red", label: "damaged" },
     { n: p.sold, cls: "bg-slate-300", label: "sold" },
   ];
+  if (compact) {
+    return (
+      <Link href={href} className={cn("card flex h-full flex-col p-3 transition hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md", p.inactive && "opacity-70")}>
+        <div className="flex items-start gap-2.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-white">
+            {p.imageV ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`/api/product-image/${p.id}?size=thumb&v=${p.imageV}`} alt="" loading="lazy" className="h-full w-full object-contain" />
+            ) : (
+              <ImageOff size={15} className="text-slate-300" />
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-slate-900">{p.name}</p>
+            <p className="truncate text-[10px] text-slate-500">{p.subtitle ?? p.sku}</p>
+          </div>
+        </div>
+        {showStock ? (
+          <>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-lg font-bold leading-tight tracking-tight text-slate-900">{fmt(p.available)}</p>
+              {p.inactive ? <span className="badge-gray shrink-0">Off</span> : out ? <span className="badge-red shrink-0">Out</span> : low ? <span className="badge-yellow shrink-0">Low</span> : p.pack ? <QtySwitch mode={mode} onChange={setMode} /> : null}
+            </div>
+            <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={segments.filter((s) => s.n > 0).map((s) => `${s.n} ${s.label}`).join(", ")}>
+              {segments.map((s) => (s.n > 0 ? <span key={s.label} className={s.cls} style={{ width: `${pct(s.n)}%` }} title={`${s.n} ${s.label}`} /> : null))}
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-500">
+              <p className="min-w-0 truncate">
+                {fmt(p.sold)} sold
+                {p.reseller > 0 && <> · {fmt(p.reseller)} winga</>}
+                {p.damaged > 0 && <> · <span className="text-brand-red-dark">{fmt(p.damaged)} damaged</span></>}
+              </p>
+              {p.price && <p className="shrink-0 font-semibold text-slate-700">{p.price}</p>}
+            </div>
+          </>
+        ) : (
+          p.price && <p className="mt-2 text-base font-bold text-slate-900">{p.price}</p>
+        )}
+      </Link>
+    );
+  }
   return (
     <Link
       href={href}

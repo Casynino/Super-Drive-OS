@@ -39,6 +39,9 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const canValue = can(user, "inventory.valuation");
   const canHistory = can(user, "inventory.movements");
   const canOpenProduct = can(user, "products.view");
+  // a card opens the product's STOCK page (totals, performance, every movement) for people who may; others open the product itself
+  const canOpenStock = canAny(user, ["warehouse.operate", "warehouse.view"]);
+  const openHref = (id: string) => (canOpenStock ? `/warehouse/stock/${id}` : canOpenProduct ? `/products/${id}` : null);
   const locationId = sp.location || undefined;
   const q = sp.q?.trim().toLowerCase() ?? "";
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
@@ -196,7 +199,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       levelPct: hasMin ? Math.min(100, (Number(qty.toString()) / (Number(p.minStock.toString()) * 3)) * 100) : null,
       status,
       value: canValue ? formatMoney(value, currency) : null,
-      href: canOpenProduct ? `/products/${p.id}` : null,
+      href: openHref(p.id),
     };
   };
 
@@ -270,7 +273,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                 <ul className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-2">
                   {attention.slice(0, 8).map((r) => (
                     <li key={r.p.id}>
-                      <Link href={canOpenProduct ? `/products/${r.p.id}` : href({ q: r.p.sku, status: undefined, page: undefined })} className="group flex items-center gap-3 rounded-lg py-1.5 hover:bg-slate-50">
+                      <Link href={openHref(r.p.id) ?? href({ q: r.p.sku, status: undefined, page: undefined })} className="group flex items-center gap-3 rounded-lg py-1.5 hover:bg-slate-50">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
                           {r.p.image ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -428,7 +431,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                     <tr key={p.id}>
                       <td>
                         {/* the whole product cell opens the product, one press */}
-                        <Wrap href={canOpenProduct ? `/products/${p.id}` : null}>
+                        <Wrap href={openHref(p.id)}>
                         <div className="flex items-center gap-3">
                           <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
                             {p.image ? (

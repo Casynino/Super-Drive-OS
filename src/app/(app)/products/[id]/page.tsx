@@ -5,18 +5,20 @@ import { Printer, Search } from "lucide-react";
 import { Alert, EmptyState } from "@/components/ui";
 import ProductHero, { ProductTabs, type HeroStock } from "@/components/products/ProductHero";
 import ItemsTable, { type ItemRow } from "@/components/products/ItemsTable";
-import { can } from "@/lib/auth/can";
+import { can, canAny } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { Prisma, type ItemStatus } from "@/generated/prisma/client";
 import { ITEM_STATUSES, ITEM_STATUS_LABEL } from "@/lib/inventory/item-labels";
 import { formatMoney } from "@/lib/money";
-import { largestPack, packNote } from "@/lib/qty";
+import { largestPack, packNote, qtyText } from "@/lib/qty";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { LABELS_ENABLED, PIECE_LIST_ENABLED } from "@/lib/features";
 import { getProductFormOptions } from "../options";
 import ProductForm, { type ProductFormData } from "../ProductForm";
-import { setProductStatus } from "../actions";
+import { deleteProductAction, setProductStatus } from "../actions";
+import DeleteProductButton from "@/components/products/DeleteProductButton";
+import ProductPerformance from "@/components/products/ProductPerformance";
 import { removeProductImage, uploadProductImage } from "../image-actions";
 import ProductImageCard from "@/components/products/ProductImageCard";
 import ProductIdentityCard from "@/components/products/ProductIdentityCard";
@@ -33,6 +35,7 @@ export default async function EditProductPage({ params, searchParams }: { params
 
   const product = await db.product.findUnique({ where: { id }, include: { units: { include: { unit: { select: { symbol: true } } } }, baseUnit: { select: { symbol: true } }, category: { select: { name: true } }, brand: { select: { name: true } } } });
   if (!product) notFound();
+  const stockHeld = Number((await db.stockBalance.aggregate({ where: { productId: id }, _sum: { quantity: true } }))._sum.quantity ?? 0);
   const image = await db.productImage.findUnique({ where: { productId: id }, select: { updatedAt: true } });
   const currency = (await getProductFormOptions({ categoryId: product.categoryId, brandId: product.brandId ?? undefined, unitIds: [product.baseUnitId, ...product.units.map((u) => u.unitId)] })).currency;
 
@@ -151,11 +154,14 @@ export default async function EditProductPage({ params, searchParams }: { params
         stock={stock}
         pack={largestPack(product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })))}
         baseSymbol={product.baseUnit.symbol}
-        adjust={can(user, "inventory.adjust") && product.status === "ACTIVE" ? { productId: product.id, name: product.name, sku: product.sku, imageV: image ? image.updatedAt.getTime() : null } : undefined}
+        stockHref={canAny(user, ["warehouse.operate", "warehouse.view"]) ? `/warehouse/stock/${product.id}` : undefined}
       />
+      {can(user, "inventory.movements") && (
+        <ProductPerformance productId={product.id} pack={largestPack(product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })))} baseSymbol={product.baseUnit.symbol} showValue={can(user, "inventory.valuation")} moreHref={canAny(user, ["warehouse.operate", "warehouse.view"]) ? `/warehouse/stock/${product.id}` : undefined} />
+      )}
       {sp.created && (
         <div className="mb-4">
-          <Alert kind="success">Product created. Add its stock with the Add stock button below, or through Deliveries or a purchase order.</Alert>
+          <Alert kind="success">Product created. Add its stock on the Warehouse stock page, or through Deliveries or a purchase order.</Alert>
         </div>
       )}
 
@@ -249,21 +255,39 @@ export default async function EditProductPage({ params, searchParams }: { params
           />
 
           {can(user, "products.deactivate") && (
-            <form action={setProductStatus} className="card card-pad mt-5 flex flex-wrap items-center justify-between gap-3">
-              <input type="hidden" name="id" value={product.id} />
-              <input type="hidden" name="status" value={product.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"} />
-              <div>
-                <p className="text-sm font-semibold text-slate-900">{product.status === "ACTIVE" ? "Deactivate product" : "Reactivate product"}</p>
-                <p className="text-sm text-slate-500">
-                  {product.status === "ACTIVE"
-                    ? "It will no longer appear in the POS. History and stock records are kept."
-                    : "It will be available for sale again."}
-                </p>
-              </div>
-              <button type="submit" className={product.status === "ACTIVE" ? "btn-danger" : "btn-secondary"}>
-                {product.status === "ACTIVE" ? "Deactivate" : "Reactivate"}
-              </button>
-            </form>
+            <section className="card card-pad mt-5 flex flex-wrap items-center justify-between gap-3">
+              {product.status === "ACTIVE" ? (
+                <>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Delete product</p>
+                    <p className="text-sm text-slate-500">
+                      {stockHeld > 0
+                        ? `It still has ${qtyText(stockHeld, largestPack(product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor }))), product.baseUnit.symbol).main} in stock, so it cannot be deleted. Take the stock out on the Warehouse stock page first.`
+                        : "It leaves the lists and the till. Its history stays and it can be brought back."}
+                    </p>
+                  </div>
+                  {stockHeld > 0 ? (
+                    <button type="button" className="btn-danger" disabled title="It still has stock">
+                      Delete product
+                    </button>
+                  ) : (
+                    <DeleteProductButton productId={product.id} name={product.name} action={deleteProductAction} />
+                  )}
+                </>
+              ) : (
+                <form action={setProductStatus} className="flex w-full flex-wrap items-center justify-between gap-3">
+                  <input type="hidden" name="id" value={product.id} />
+                  <input type="hidden" name="status" value="ACTIVE" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">This product was deleted</p>
+                    <p className="text-sm text-slate-500">Bring it back and it is available for sale again.</p>
+                  </div>
+                  <button type="submit" className="btn-secondary">
+                    Bring it back
+                  </button>
+                </form>
+              )}
+            </section>
           )}
         </>
       )}

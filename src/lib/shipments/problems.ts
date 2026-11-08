@@ -6,6 +6,7 @@
 //            FOUND          the pieces turned up (or it was a mistake)  -> a stock increase puts them back
 //            WRITE_OFF      they cannot be sold                          -> damaged pieces are marked DISPOSED; nothing else moves (the stock is already out)
 //            DISCOUNT_SELL  damaged but sellable                         -> moved into the "(damaged packaging)" product at a lower price (damaged only)
+//            DISMISS        the record is removed from the list          -> a reason is kept; stock and money do not change (the pieces stay off the shelf)
 //
 // Call inside db.$transaction. Lock order: problem row -> (adjustment counter -> products -> balances).
 import { Prisma, type IssueAction, type IssueKind } from "@/generated/prisma/client";
@@ -26,8 +27,10 @@ export const PROBLEM_ACTION_LABEL: Partial<Record<IssueAction, string>> = {
   FOUND: "Found and returned to stock",
   WRITE_OFF: "Written off",
   DISCOUNT_SELL: "Put on sale at a discount",
+  DISMISS: "Removed from the list",
 };
-const FITS: Record<ReportKind, IssueAction[]> = { DAMAGED: ["FOUND", "WRITE_OFF", "DISCOUNT_SELL"], MISSING: ["FOUND", "WRITE_OFF"] };
+// DISMISS (Nino 2026-11-08: "I want to delete it"): the record leaves the list with a reason; nothing is deleted, stock and money do not change
+const FITS: Record<ReportKind, IssueAction[]> = { DAMAGED: ["FOUND", "WRITE_OFF", "DISCOUNT_SELL", "DISMISS"], MISSING: ["FOUND", "WRITE_OFF", "DISMISS"] };
 export const actionsFor = (kind: ReportKind): IssueAction[] => FITS[kind];
 
 const q = (n: Prisma.Decimal | number) => String(Number(Number(n).toFixed(3)));
@@ -94,7 +97,7 @@ export async function decideProblem(tx: Tx, input: DecideProblemInput) {
   const kind = p.kind as ReportKind;
   if (!FITS[kind].includes(input.action)) throw new ShipmentError("That action does not fit this problem.");
   const note = input.note?.trim() || null;
-  if (input.action === "WRITE_OFF" && (note?.length ?? 0) < 3) throw new ShipmentError("Write a short reason.", { note: "Give a short reason." });
+  if ((input.action === "WRITE_OFF" || input.action === "DISMISS") && (note?.length ?? 0) < 3) throw new ShipmentError("Write a short reason.", { note: "Give a short reason." });
 
   // where the problem came from: a stock adjustment (reported by hand) or a sale reversal (the customer brought it back damaged); the item history is found through it
   const sourceType = p.adjustmentId ? "StockAdjustment" : "SaleReversal";

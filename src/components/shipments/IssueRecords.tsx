@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { ChevronDown, ImageOff, PackageCheck, PackageX, Tag, Trash2, X } from "lucide-react";
+import Modal from "@/components/Modal";
 import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/FormBits";
 import type { ActionState } from "@/lib/action";
@@ -101,7 +102,7 @@ function DecisionForm({ r, choice, action, onDone, mode, currencySymbol }: { r: 
               : `${exact(r, base, mode)} are removed from this list. Stock and money do not change.`;
 
   return (
-    <form action={formAction} className={cn("mt-3 space-y-3 rounded-xl border p-4", c.tone === "danger" ? "border-brand-red/40 bg-brand-red-soft/30" : "border-line bg-slate-50/60")}>
+    <form action={formAction} className="space-y-3">
       <input type="hidden" name="shipmentId" value={r.shipmentId} />
       <input type="hidden" name="shipmentItemId" value={r.shipmentItemId} />
       <input type="hidden" name="kind" value={r.kind} />
@@ -239,13 +240,13 @@ function RecordRow({ r, canAct, closed, action, mode, currencySymbol }: { r: Iss
             options.map((o) => {
               const Icon = CHOICES[o].icon;
               return (
-                <button key={o} type="button" className={cn(BTN[CHOICES[o].tone], "btn-sm", choice === o && "ring-2 ring-navy-500/40")} onClick={() => setChoice(choice === o ? null : o)}>
+                <button key={o} type="button" className={cn(BTN[CHOICES[o].tone], "btn-sm", choice === o && "ring-2 ring-navy-500/40")} onClick={() => setChoice(o)}>
                   <Icon size={14} /> {ROW_LABEL[o] ?? CHOICES[o].label}
                 </button>
               );
             })}
           {canDecide && (
-            <button type="button" title="Remove from list" aria-label="Remove from list" className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-brand-red-soft hover:text-brand-red-dark", choice === "DISMISS" && "bg-brand-red-soft text-brand-red-dark")} onClick={() => setChoice(choice === "DISMISS" ? null : "DISMISS")}>
+            <button type="button" title="Remove from list" aria-label="Remove from list" className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-brand-red-soft hover:text-brand-red-dark", choice === "DISMISS" && "bg-brand-red-soft text-brand-red-dark")} onClick={() => setChoice("DISMISS")}>
               <X size={16} />
             </button>
           )}
@@ -255,11 +256,16 @@ function RecordRow({ r, canAct, closed, action, mode, currencySymbol }: { r: Iss
         </div>
       </div>
 
-      {choice && (
-        <div className="px-4 pb-4 sm:px-5">
-          <DecisionForm key={choice} r={r} choice={choice} action={action} onDone={() => setChoice(null)} mode={mode} currencySymbol={currencySymbol} />
+      {/* every decision asks in a pop-up (Nino 2026-11-08), with what will happen before anything is saved */}
+      <Modal open={choice !== null} onClose={() => setChoice(null)} label={choice ? CHOICES[choice].title : "Decide"}>
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <h2 className="text-base font-semibold text-slate-900">{choice ? CHOICES[choice].label : ""}</h2>
+          <button type="button" onClick={() => setChoice(null)} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-full text-slate-500 hover:bg-slate-100">
+            <X size={16} />
+          </button>
         </div>
-      )}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{choice && <DecisionForm key={choice} r={r} choice={choice} action={action} onDone={() => setChoice(null)} mode={mode} currencySymbol={currencySymbol} />}</div>
+      </Modal>
 
       {showHistory && (
         <div className="border-t border-line/70 bg-slate-50/60 px-4 py-3 text-sm sm:px-5">

@@ -6,6 +6,9 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { fail, formString, guarded, isUniqueViolation, type ActionState } from "@/lib/action";
+import type { ListNote } from "@/components/warehouse/ReleaseHost";
+import { largestPack, qtyText } from "@/lib/qty";
+import { AUTH_LABEL } from "@/lib/warehouse/labels";
 import { PickupError, loadPickup, logScanRejected, markReady, parseScan, pickupBlock, releasePickup, startPreparing } from "@/lib/warehouse/pickup";
 
 const D = Prisma.Decimal;
@@ -106,7 +109,8 @@ export async function releaseAction(_prev: ActionState, fd: FormData): Promise<A
   });
 }
 
-export type ScanResult = { ok: true; noteId: string; noteNo: string; blocked: string | null } | { ok: false; code: string; message: string };
+/** `note` is everything the release pop-up needs (null when the note cannot be released, `blocked` says why). */
+export type ScanResult = { ok: true; noteId: string; noteNo: string; blocked: string | null; note: ListNote | null } | { ok: false; code: string; message: string };
 
 /** The scanner (camera or typed) found something: look it up on the server. Refused scans are recorded. */
 export async function scanAction(code: string): Promise<ScanResult> {
@@ -119,7 +123,15 @@ export async function scanAction(code: string): Promise<ScanResult> {
     }
     const block = pickupBlock(note);
     if (block) await logScanRejected(db, { userId: user.id, locationId: note.locationId, noteId: note.id, code: block.code, detail: block.message });
-    return { ok: true, message: JSON.stringify({ ok: true, noteId: note.id, noteNo: note.noteNo, blocked: block?.message ?? null }) } as ActionState;
+    const lines = note.items
+      .map((i) => {
+        const waiting = i.quantity.minus(i.releasedQty).minus(i.cancelledQty);
+        const pack = largestPack(i.product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
+        return { id: i.id, productId: i.productId, name: i.product.name, sku: i.product.sku, waiting: Number(waiting), waitingText: qtyText(Number(waiting), pack, i.product.baseUnit.symbol).main, symbol: i.product.baseUnit.symbol, imageV: i.product.image ? i.product.image.updatedAt.getTime() : null, pack };
+      })
+      .filter((l) => l.waiting > 0);
+    const listNote: ListNote | null = block || lines.length === 0 ? null : { id: note.id, noteNo: note.noteNo, customer: note.sale.customer?.name ?? "Walk-in customer", winga: Boolean(note.sale.customer?.reseller), saleNo: note.sale.saleNo, paymentLabel: AUTH_LABEL[note.auth], lines };
+    return { ok: true, message: JSON.stringify({ ok: true, noteId: note.id, noteNo: note.noteNo, blocked: block?.message ?? null, note: listNote }) } as ActionState;
   });
   if (!result.ok || !result.message) return { ok: false, code: "ERROR", message: result.error ?? "You are not allowed to scan pickup notes." };
   return JSON.parse(result.message) as ScanResult;
