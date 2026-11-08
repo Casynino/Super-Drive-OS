@@ -95,12 +95,13 @@ export const NAV: NavGroup[] = [
     label: "Warehouse",
     icon: Warehouse,
     items: [
+      // Nino 2026-11-08: Stock first, then Issues, then the rest
       { label: "Overview", href: "/warehouse/overview", icon: Warehouse, permissions: ["warehouse.view"], ready: true },
+      { label: "Stock", href: "/warehouse/stock", icon: Boxes, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
+      { label: "Issues", href: "/warehouse/discrepancies", icon: ScrollText, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
       { label: "Receiving", href: "/shipments", icon: Truck, permissions: ["shipments.receive"], ready: true, badge: "incoming", hideIfAny: ["shipments.manage"], also: ["/inventory/receiving"] },
       { label: "Pickups", href: "/warehouse/orders", icon: ClipboardCheck, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
-      { label: "Stock", href: "/warehouse/stock", icon: Boxes, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
       { label: "Collected", href: "/warehouse/history", icon: PackageCheck, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
-      { label: "Issues", href: "/warehouse/discrepancies", icon: ScrollText, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
     ],
   },
   {

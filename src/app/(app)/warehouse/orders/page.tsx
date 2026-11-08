@@ -17,7 +17,7 @@ const ago = (d: Date) => {
 
 export const metadata = { title: "Collections" };
 
-const PAGE = 40;
+const PAGE = 30;
 const FILTERS = [
   { key: "open", label: "Waiting", statuses: OPEN_STATUSES },
   { key: "new", label: "New", statuses: ["NEW"] },
@@ -81,74 +81,130 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
           </Link>
         ))}
       </div>
-      <form method="get" className="card card-pad mb-4 flex gap-3">
-        {filter.key !== "open" && <input type="hidden" name="f" value={filter.key} />}
-        <input name="q" defaultValue={q} placeholder="Search a note number, customer, sale or product" className="input flex-1" aria-label="Search collections" />
-        <button className="btn-primary" type="submit">
-          Search
-        </button>
-      </form>
-
-      {notes.length === 0 ? (
+      {notes.length === 0 && !q ? (
         <div className="card">
           <EmptyState icon={<ClipboardList size={22} />} title="Nothing here" description={filter.key === "open" ? "No sale is waiting to be collected." : "No notes match this filter."} />
         </div>
       ) : (
-        <div>
-          <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-            {notes.map((p) => {
-              const open = (OPEN_STATUSES as readonly PickupStatus[]).includes(p.status);
-              const lines = p.items
-                .map((i) => {
-                  const pack = largestPack(i.product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
-                  const qty = open ? Number(i.quantity.minus(i.releasedQty).minus(i.cancelledQty)) : Number(i.quantity);
-                  return { id: `${p.id}-${i.product.name}`, name: i.product.name, qty, text: qtyText(qty, pack, i.product.baseUnit.symbol).main };
-                })
-                .filter((l) => !open || l.qty > 0);
-              const customer = p.sale.customer?.name;
-              return (
-                <li key={p.id} className="card flex flex-col overflow-hidden">
-                  <Link href={`/warehouse/orders/${p.id}`} className="block flex-1 px-4 py-3.5 transition hover:bg-slate-50/60">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="font-mono text-[13px] font-semibold text-slate-900">{p.noteNo}</span>
-                      <span className={cn("text-xs", STATUS_TEXT[p.status])}>{STATUS_LABEL[p.status]}</span>
-                    </div>
-                    <p className="mt-2 flex flex-wrap items-center gap-2 text-base font-semibold text-slate-900">
-                      {customer ?? <span className="font-medium text-slate-400">Walk-in customer</span>}
-                      {p.sale.customer?.reseller && <span className="rounded-full bg-oil-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span>}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      Sold by {p.sale.salesperson.name} · {ago(p.createdAt)}
-                    </p>
-                    <ul className="mt-3 space-y-1.5 border-t border-line pt-3 text-sm">
-                      {lines.slice(0, 4).map((l) => (
-                        <li key={l.id} className="flex items-baseline justify-between gap-3">
-                          <span className="min-w-0 truncate text-slate-700">{l.name}</span>
-                          <span className="shrink-0 font-semibold tabular-nums text-slate-900">{l.text}</span>
-                        </li>
-                      ))}
-                      {lines.length > 4 && <li className="text-xs text-slate-500">+ {lines.length - 4} more product{lines.length - 4 === 1 ? "" : "s"}</li>}
-                      {lines.length === 0 && <li className="text-xs text-slate-500">Nothing left to hand over.</li>}
-                    </ul>
-                  </Link>
-                  <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5">
-                    <span className={cn("text-xs font-medium", p.auth === "PAID" ? "text-emerald-600" : "text-amber-600")}>{AUTH_LABEL[p.auth].split(",")[0]}</span>
-                    {open && operate ? (
-                      <Link href={`/warehouse/orders/${p.id}`} className="btn-primary btn-sm">
-                        Release <ChevronRight size={14} />
-                      </Link>
-                    ) : (
-                      <Link href={`/warehouse/orders/${p.id}`} className="text-sm font-medium text-navy-700 hover:underline">
-                        Open
-                      </Link>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+        <section className="card overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
+            <p className="text-sm text-slate-600">
+              <span className="font-semibold text-slate-900">{total}</span> {filter.key === "open" ? "waiting" : filter.label.toLowerCase()}
+              {filter.key === "done" || filter.key === "cancelled" ? " · newest first" : " · waiting longest first"}
+            </p>
+            <form method="get" className="flex items-center gap-2">
+              {filter.key !== "open" && <input type="hidden" name="f" value={filter.key} />}
+              <input name="q" defaultValue={q} placeholder="Search note, customer or product" autoComplete="off" className="input h-9 w-full min-w-0 text-sm sm:w-72" aria-label="Search collections" />
+              <button className="btn-secondary btn-sm h-9" type="submit">
+                Search
+              </button>
+              {q && (
+                <Link href={href({ q: undefined, page: undefined })} className="text-sm text-slate-500 hover:text-slate-800">
+                  Clear
+                </Link>
+              )}
+            </form>
+          </div>
+
+          {notes.length === 0 ? (
+            <p className="px-4 py-10 text-center text-sm text-slate-500">Nothing matches &ldquo;{q}&rdquo;.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th className="hidden md:table-cell">Customer</th>
+                    <th className="hidden md:table-cell">Goods</th>
+                    <th className="hidden lg:table-cell">Payment</th>
+                    <th className="hidden sm:table-cell">Status</th>
+                    <th className="text-right">&nbsp;</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notes.map((p) => {
+                    const open = (OPEN_STATUSES as readonly PickupStatus[]).includes(p.status);
+                    const lines = p.items
+                      .map((i) => {
+                        const pack = largestPack(i.product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
+                        const qty = open ? Number(i.quantity.minus(i.releasedQty).minus(i.cancelledQty)) : Number(i.quantity);
+                        return { name: i.product.name, qty, text: qtyText(qty, pack, i.product.baseUnit.symbol).main };
+                      })
+                      .filter((l) => !open || l.qty > 0);
+                    const customer = p.sale.customer?.name;
+                    const hours = (Date.now() - p.createdAt.getTime()) / 3_600_000;
+                    // the longer an order waits the louder its edge: yellow after 4 hours, red after a day
+                    const edge = !open ? "border-l-transparent" : hours >= 24 ? "border-l-brand-red" : hours >= 4 ? "border-l-oil-400" : "border-l-transparent";
+                    const winga = p.sale.customer?.reseller ? <span className="rounded-full bg-oil-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span> : null;
+                    const status = <span className={cn("inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold", STATUS_TEXT[p.status])}>{STATUS_LABEL[p.status]}</span>;
+                    return (
+                      <tr key={p.id}>
+                        <td className={cn("border-l-[3px] max-sm:w-full max-sm:max-w-0", edge)}>
+                          <Link href={`/warehouse/orders/${p.id}`} className="whitespace-nowrap font-mono text-[13px] font-semibold text-navy-700 hover:underline">
+                            {p.noteNo}
+                          </Link>
+                          <span className="block text-xs text-slate-500">{ago(p.createdAt)}</span>
+                          {/* a phone has one column for the order: who, what, and where it stands */}
+                          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-medium text-slate-900 md:hidden">
+                            {customer ?? <span className="font-normal text-slate-400">Walk-in customer</span>}
+                            {winga}
+                          </span>
+                          <span className="block truncate text-xs text-slate-500 md:hidden">
+                            {lines.length === 0 ? "Nothing left to hand over" : `${lines[0].name} · ${lines[0].text}${lines.length > 1 ? ` + ${lines.length - 1} more` : ""}`}
+                          </span>
+                          <span className="mt-1 block sm:hidden">{status}</span>
+                        </td>
+                        <td className="hidden md:table-cell">
+                          <span className="flex flex-wrap items-center gap-2 font-medium text-slate-900">
+                            {customer ?? <span className="font-normal text-slate-400">Walk-in customer</span>}
+                            {winga}
+                          </span>
+                          <span className="block text-xs text-slate-500">Sold by {p.sale.salesperson.name}</span>
+                        </td>
+                        <td className="hidden md:table-cell">
+                          {lines.length === 0 ? (
+                            <span className="text-xs text-slate-500">Nothing left to hand over</span>
+                          ) : (
+                            <ul className="space-y-0.5 text-sm">
+                              {lines.slice(0, 2).map((l) => (
+                                <li key={l.name} className="flex items-baseline justify-between gap-4">
+                                  <span className="max-w-[16rem] truncate text-slate-700">{l.name}</span>
+                                  <span className="shrink-0 font-semibold tabular-nums text-slate-900">{l.text}</span>
+                                </li>
+                              ))}
+                              {lines.length > 2 && <li className="text-xs text-slate-500">+ {lines.length - 2} more product{lines.length - 2 === 1 ? "" : "s"}</li>}
+                            </ul>
+                          )}
+                        </td>
+                        <td className="hidden lg:table-cell">
+                          <span className={cn("text-xs font-medium", p.auth === "PAID" ? "text-emerald-600" : "text-amber-600")}>{AUTH_LABEL[p.auth].split(",")[0]}</span>
+                        </td>
+                        <td className="hidden sm:table-cell">{status}</td>
+                        <td className="whitespace-nowrap text-right max-sm:pl-1 max-sm:pr-3">
+                          <span className="inline-flex items-center gap-2">
+                            {open && operate && (
+                              <Link href={`/warehouse/orders/${p.id}`} className="btn-primary btn-sm">
+                                Release
+                              </Link>
+                            )}
+                            <Link href={`/warehouse/orders/${p.id}`} className="btn-secondary btn-sm hidden sm:inline-flex" aria-label={`Open ${p.noteNo}`}>
+                              Open
+                            </Link>
+                            <Link href={`/warehouse/orders/${p.id}`} className="btn-secondary btn-sm px-2 sm:hidden" aria-label={`Open ${p.noteNo}`}>
+                              <ChevronRight size={16} />
+                            </Link>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {total > PAGE && (
-            <div className="flex items-center justify-between border-t border-line px-4 py-3 text-sm text-slate-600">
+            <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm text-slate-600">
               <span>
                 Page {page} of {pages} · {total} notes
               </span>
@@ -166,7 +222,7 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
               </div>
             </div>
           )}
-        </div>
+        </section>
       )}
     </>
   );
