@@ -5,6 +5,7 @@ import { getTillToday } from "@/lib/cash/summary";
 import { Boxes, HandCoins, Package, Receipt, ReceiptText, Undo2, Wallet } from "lucide-react";
 import AttentionPanel, { type AttentionItem, type AttentionTab } from "@/components/dashboard/AttentionPanel";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { ColumnsChart, DonutChart, TopProductsChart } from "@/components/dashboard/Charts";
 import { SaleStatusBadge } from "../sales/StatusBadge";
 import { Prisma } from "@/generated/prisma/client";
@@ -128,13 +129,13 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
       <AttentionPanel items={needs} tabs={SHOP_TABS} empty="Nothing needs you right now." />
 
       {sells && (
-        <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
+        <KpiStrip>
           <KpiCard icon={Receipt} tone="navy" label="Sales today" value={m(soldToday)} hint={`${active.length} sale${active.length === 1 ? "" : "s"}${active.length > 0 ? ` · average ${m(soldToday.div(active.length).toDecimalPlaces(0))}` : ""}`} href="/sales" />
           <KpiCard icon={Wallet} tone="green" label="Money received" value={m(collected)} hint={`Cash ${m(received("CASH"))} · Mobile ${m(received("MOBILE_MONEY"))} · Bank ${m(received("BANK"))}`} />
           <KpiCard icon={HandCoins} tone="red" label="On credit today" value={m(stillOwed)} hint={`${onCredit.length} sale${onCredit.length === 1 ? "" : "s"} not paid yet`} />
           {spentToday ? <KpiCard icon={ReceiptText} tone="yellow" label="Expenses today" value={m(spentToday._sum.amount ?? 0)} hint="Paid out of the shop" href="/expenses" /> : <KpiCard icon={Undo2} tone="yellow" label="Requests waiting" value={String(pendingMine)} hint="Returns waiting for the manager" />}
           {shelf ? <KpiCard icon={Boxes} tone="slate" label="Stock on the shelf" value={`${Number(shelf._sum.quantity ?? 0).toFixed(0)} items`} hint={alerts ? `${alerts.inStock} of ${alerts.active} products in stock` : undefined} href="/inventory" /> : <KpiCard icon={Undo2} tone="slate" label="Requests waiting" value={String(pendingMine)} />}
-        </div>
+        </KpiStrip>
       )}
 
       {sells && (

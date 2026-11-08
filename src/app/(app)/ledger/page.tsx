@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, ScrollText, Search, TrendingUp } from "lucide-react";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { Prisma, type CashTxType } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
@@ -163,11 +164,11 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
     <>
       <PageHeader title="Ledger" description="Money in and out, one line each." />
 
-      <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
+      <KpiStrip className="mb-5">
         <KpiCard icon={ArrowDownLeft} tone="green" label="Money in" value={money(moneyIn)} hint="Payments received at sales and on debts" href={link({ dir: dir === "in" ? undefined : "in", page: undefined })} active={dir === "in"} />
         <KpiCard icon={ArrowUpRight} tone="red" label="Money out" value={money(moneyOut)} badge={moneyIn.gt(0) ? `${moneyOut.div(moneyIn).mul(100).toFixed(0)}% of money in` : undefined} hint="Expenses, suppliers, refunds and owner withdrawals" href={link({ dir: dir === "out" ? undefined : "out", page: undefined })} active={dir === "out"} />
         {profit && <KpiCard icon={TrendingUp} tone={profit.net.lt(0) ? "red" : "green"} label="Profit" value={money(profit.net)} badge={`${profit.marginPct.toFixed(1)}% of sales`} hint={`Sales profit ${money(profit.gross)} − expenses ${money(profit.gross.minus(profit.net))}`} />}
-      </div>
+      </KpiStrip>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <nav className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="In or out">

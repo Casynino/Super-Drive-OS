@@ -2,21 +2,16 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const TONES = {
-  navy: { tile: "bg-navy-50 text-navy-700", bar: "bg-navy-600" },
-  blue: { tile: "bg-blue-50 text-blue-700", bar: "bg-blue-500" },
-  red: { tile: "bg-brand-red-soft text-brand-red-dark", bar: "bg-brand-red" },
-  yellow: { tile: "bg-oil-soft text-yellow-700", bar: "bg-oil-400" },
-  green: { tile: "bg-emerald-50 text-emerald-700", bar: "bg-emerald-500" },
-  slate: { tile: "bg-slate-100 text-slate-600", bar: "bg-slate-400" },
-} as const;
+/** Only the tones that mean something get a dot; navy and slate are neutral. */
+const DOT = { navy: "", slate: "", blue: "bg-blue-500", red: "bg-brand-red", yellow: "bg-oil-400", green: "bg-emerald-500" } as const;
 
 /**
- * A compact number card: coloured top edge, icon tile on the left, label, one big number and a line of context.
- * `badge` is a small pill on the right (for example a margin), `active` outlines the card when it is the current filter.
+ * One cell of a slim figures strip (Nino 2026-11-09: "I do not like those big cards, make them nice and small, like the Stock overview"): a small
+ * label, ONE figure and a line of context. Always used inside a `KpiStrip`, which draws the card and the thin lines between the cells.
+ * `badge` is a small word on the right of the label (for example a margin), `active` marks the cell that is the current filter; `icon` is
+ * accepted so older call sites still compile, but the slim cell has no icon tile.
  */
 export default function KpiCard({
-  icon: Icon,
   tone = "navy",
   label,
   value,
@@ -25,8 +20,8 @@ export default function KpiCard({
   href,
   active,
 }: {
-  icon: LucideIcon;
-  tone?: keyof typeof TONES;
+  icon?: LucideIcon;
+  tone?: keyof typeof DOT;
   label: string;
   value: React.ReactNode;
   hint?: React.ReactNode;
@@ -34,23 +29,15 @@ export default function KpiCard({
   href?: string;
   active?: boolean;
 }) {
-  const t = TONES[tone];
   const body = (
-    <div className={cn("@container card relative h-full overflow-hidden px-4 py-4 transition", href && "hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md", active && "border-navy-500 ring-1 ring-navy-500/40")}>
-      <span className={cn("absolute inset-x-0 top-0 h-[3px]", t.bar)} />
-      <div className="flex flex-col items-start gap-2 @[13rem]:flex-row @[13rem]:gap-3.5">
-        <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", t.tile)}>
-          <Icon size={21} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <p className="truncate text-[13px] font-medium text-slate-500">{label}</p>
-            {badge && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{badge}</span>}
-          </div>
-          <p className="mt-0.5 whitespace-nowrap text-[clamp(1.2rem,9cqw,1.75rem)] font-bold leading-tight tracking-tight text-slate-900">{value}</p>
-          {hint && <p className="mt-1 text-xs leading-snug text-slate-500">{hint}</p>}
-        </div>
-      </div>
+    <div className={cn("h-full border-b border-r border-line bg-white px-4 py-2.5 transition", href && "hover:bg-slate-50", active && "bg-slate-50 shadow-[inset_0_-2px_0_var(--color-navy-500)]")}>
+      <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+        {DOT[tone] && <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT[tone])} />}
+        <span className="min-w-0 truncate">{label}</span>
+        {badge && <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-1.5 text-[10px] font-semibold normal-case tracking-normal text-slate-600">{badge}</span>}
+      </p>
+      <p className="mt-0.5 whitespace-nowrap text-base font-semibold leading-tight tabular-nums text-slate-900 sm:text-lg">{value}</p>
+      {hint && <p className="mt-0.5 truncate text-[11px] text-slate-500">{hint}</p>}
     </div>
   );
   return href ? (

@@ -3,6 +3,7 @@ import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, ImageOff, Scale, Sear
 import StockTabs from "@/components/inventory/StockTabs";
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { Prisma, type StockMovementType } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
@@ -109,12 +110,12 @@ export default async function MovementsPage({ searchParams }: { searchParams: Pr
       <PageHeader title="Stock movements" description="Every change to stock, newest first: what moved, how much, and who did it. Nothing here can be edited." />
       <StockTabs active="movements" user={user} />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <KpiStrip className="mb-5">
         <KpiCard icon={ArrowLeftRight} tone="navy" label="Movements" value={fmtQty(total)} hint={hasFilters ? "Matching your filters" : "All recorded changes"} />
         <KpiCard icon={ArrowDownToLine} tone="green" label="Stock in" value={`${one(stockIn)} CTN`} hint="Received, returned and added" />
         <KpiCard icon={ArrowUpFromLine} tone="red" label="Stock out" value={`${one(stockOut)} CTN`} hint="Sold, damaged and taken out" />
         <KpiCard icon={Scale} tone={net < 0 ? "yellow" : "slate"} label="Net change" value={`${net > 0 ? "+" : ""}${one(net)} CTN`} hint="In minus out" />
-      </div>
+      </KpiStrip>
 
       <nav className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Movement type">
         {pills.map((p) => {

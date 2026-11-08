@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AlertTriangle, Handshake, PackageCheck, PackageX, QrCode, ScanBarcode, Search, ShoppingCart, Trash2, type LucideIcon } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import ProductLevelCard, { type ProductLevel } from "@/components/items/ProductLevelCard";
 import ItemsTable, { type ItemRow } from "@/components/products/ItemsTable";
 import { Prisma, type ItemStatus } from "@/generated/prisma/client";
@@ -130,11 +131,11 @@ export default async function ItemsPage({ searchParams }: { searchParams: Promis
 
       {LABELS_ENABLED && untracked > 0 && <LabelExistingStock missing={untracked} action={labelExistingStockAction} />}
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
+      <KpiStrip className="mb-5">
         {cards.map((c) => (
           <KpiCard key={c.key || "all"} icon={c.icon} tone={c.tone} label={c.label} value={c.value.toLocaleString("en-US")} hint={c.hint} href={href({ status: c.key || undefined, page: undefined })} active={(sp.status ?? "") === c.key} />
         ))}
-      </div>
+      </KpiStrip>
 
       {levels.length > 0 && (
         <section className="mb-5" aria-label="Level by product">

@@ -4,6 +4,7 @@ import { defaultLocationId, listAccounts } from "@/lib/cash/ledger";
 import { Clock, HandCoins, Handshake, Package, Plus, Search, UserCheck } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import WingaCard, { wingaStatus } from "@/components/resellers/WingaCard";
 import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
@@ -86,12 +87,12 @@ export default async function ResellersPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <KpiStrip className="mb-5">
         <KpiCard icon={UserCheck} tone="navy" label="Winga" value={active.length} hint={`${rows.length} registered`} />
         <KpiCard icon={Package} tone="blue" label="Stock with winga" value={money(sum((x) => x.a.remainingValue.toNumber()))} hint="At the agreed prices" />
         <KpiCard icon={HandCoins} tone="yellow" label="Owed by winga" value={money(sum((x) => x.a.outstanding.toNumber()))} hint={onTimeAll === null ? "For what they reported sold" : `${onTimeAll}% of invoices paid on time`} />
         <KpiCard icon={Clock} tone={sum((x) => x.a.overdue.toNumber()) > 0 ? "red" : "green"} label="Late" value={money(sum((x) => x.a.overdue.toNumber()))} hint={lateWinga.length > 0 ? `${lateWinga.length} winga past the payment date` : "Nobody is late"} href={lateWinga.length > 0 ? href("late") : undefined} active={f === "late"} />
-      </div>
+      </KpiStrip>
 
       {rows.length === 0 ? (
         <div className="card">

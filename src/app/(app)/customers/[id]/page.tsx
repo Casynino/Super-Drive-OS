@@ -6,7 +6,8 @@ import { Alert } from "@/components/ui";
 import EntityForm from "@/components/EntityForm";
 import RemindButton from "@/components/credit/RemindButton";
 import { SalesTrendChart } from "@/components/dashboard/Charts";
-import StatTile from "@/components/dashboard/StatTile";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { CUSTOMER_BADGE, pctTone } from "@/components/customers/CustomerCard";
 import { Meter, PerfTile } from "@/components/customers/Bits";
 import { Prisma } from "@/generated/prisma/client";
@@ -160,12 +161,12 @@ export default async function CustomerPage({ params, searchParams }: { params: P
       )}
 
       {(seeSales || showCredit) && (
-        <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {seeSales && <StatTile icon={ShoppingBag} tone="navy" label="Bought so far" value={m(all.bought)} hint={`${all.orders} order${all.orders === 1 ? "" : "s"} · average ${m(all.average)}`} />}
-          {showCredit && <StatTile icon={Wallet} tone="green" label="Money paid in" value={m(all.paid)} hint="At the sale and on debts" />}
-          {showCredit && <StatTile icon={HandCoins} tone={owes?.gt(0) ? "red" : "slate"} label="They owe us" value={m(owes ?? 0)} hint={c.creditLimit.gt(0) ? `Credit limit ${m(c.creditLimit)}` : "No credit allowed"} />}
-          {showCredit && <StatTile icon={Wallet} tone={advance?.gt(0) ? "green" : "slate"} label={advance?.gt(0) ? "Paid in advance" : "Credit left"} value={advance?.gt(0) ? m(advance) : c.creditLimit.gt(0) ? m(Prisma.Decimal.max(c.creditLimit.minus(owes ?? 0), 0)) : "—"} hint={advance?.gt(0) ? "Can be used on the next invoices" : c.creditLimit.gt(0) ? "Still available to buy on credit" : "Pays at the sale"} />}
-        </div>
+        <KpiStrip className="mb-5">
+          {seeSales && <KpiCard icon={ShoppingBag} tone="navy" label="Bought so far" value={m(all.bought)} hint={`${all.orders} order${all.orders === 1 ? "" : "s"} · average ${m(all.average)}`} />}
+          {showCredit && <KpiCard icon={Wallet} tone="green" label="Money paid in" value={m(all.paid)} hint="At the sale and on debts" />}
+          {showCredit && <KpiCard icon={HandCoins} tone={owes?.gt(0) ? "red" : "slate"} label="They owe us" value={m(owes ?? 0)} hint={c.creditLimit.gt(0) ? `Credit limit ${m(c.creditLimit)}` : "No credit allowed"} />}
+          {showCredit && <KpiCard icon={Wallet} tone={advance?.gt(0) ? "green" : "slate"} label={advance?.gt(0) ? "Paid in advance" : "Credit left"} value={advance?.gt(0) ? m(advance) : c.creditLimit.gt(0) ? m(Prisma.Decimal.max(c.creditLimit.minus(owes ?? 0), 0)) : "—"} hint={advance?.gt(0) ? "Can be used on the next invoices" : c.creditLimit.gt(0) ? "Still available to buy on credit" : "Pays at the sale"} />}
+        </KpiStrip>
       )}
 
       {(seeSales || showCredit) && (

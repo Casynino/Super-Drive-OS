@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowDownLeft, ArrowLeft, ArrowUpRight, Banknote, Chevro
 import { AccountOpButton, EditAccountForm } from "@/components/cash/AccountAdmin";
 import { ManualCashForm } from "@/components/cash/CashForms";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { Alert, EmptyState } from "@/components/ui";
 import { Prisma, type CashTxType, type PaymentMethod } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
@@ -131,12 +132,12 @@ export default async function CashAccountPage({ params, searchParams }: { params
         </div>
       )}
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <KpiStrip className="mb-5">
         <KpiCard icon={Wallet} tone={a.balance.lt(0) ? "red" : "navy"} label="Balance now" value={money(a.balance)} hint="The total of every entry below" />
         <KpiCard icon={ArrowDownLeft} tone="green" label="In today" value={money(a.inToday)} />
         <KpiCard icon={ArrowUpRight} tone="red" label="Out today" value={money(a.outToday)} />
         <KpiCard icon={ListOrdered} tone="slate" label="Entries" value={a.movements} hint={a.lastAt ? `Last one ${formatDateTime(a.lastAt)}` : "Nothing yet"} />
-      </div>
+      </KpiStrip>
 
       {canAdjust && (
         <div className="mb-5 grid gap-3 lg:grid-cols-2">

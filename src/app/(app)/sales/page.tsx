@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, Receipt, Search, TrendingUp, Wallet } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { Prisma } from "@/generated/prisma/client";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -203,7 +204,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         }
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <KpiStrip className="mb-5">
         <KpiCard
           icon={Receipt}
           tone="navy"
@@ -224,7 +225,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           active={sp.from === monthStart && sp.to === today}
         />
         <KpiCard icon={Wallet} tone={n(k?.u_n) > 0 ? "yellow" : "slate"} label="Not paid yet" value={money(dec(k?.u_owed))} hint={`${n(k?.u_n)} invoice${n(k?.u_n) === 1 ? "" : "s"} with a balance`} href={n(k?.u_n) > 0 ? link({ status: "unpaid", from: undefined, to: undefined, page: undefined }) : undefined} />
-      </div>
+      </KpiStrip>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <nav className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Payment filters">

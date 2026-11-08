@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Banknote, CalendarCheck, Download, ExternalLink, Landmark, Printer, Receipt, Scale } from "lucide-react";
 import { ClosedDaysChart, DifferenceChart } from "@/components/dashboard/Charts";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { Difference } from "@/components/cash/Display";
 import { EmptyState } from "@/components/ui";
 import { Prisma } from "@/generated/prisma/client";
@@ -75,12 +76,12 @@ export default async function ClosingsSection({ user, show, shop, basePath, kpis
       {canReview && history.length > 0 && (
         <>
           {kpis && (
-            <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(12.5rem,1fr))]">
+            <KpiStrip className="mb-5">
               <KpiCard icon={CalendarCheck} tone="navy" label="Closings" value={String(history.length)} hint={history.length === 30 ? "The latest 30" : "Shown below"} />
               <KpiCard icon={Receipt} tone="green" label="Sold in these days" value={money(soldTotal)} hint={`About ${money(soldTotal.div(history.length).toDecimalPlaces(0))} a day`} />
               <KpiCard icon={Scale} tone={shortDays.length > 0 ? "red" : "green"} label="Cash short" value={money(shortTotal)} hint={shortDays.length > 0 ? `On ${shortDays.length} day${shortDays.length === 1 ? "" : "s"} · net ${netTotal.lt(0) ? "−" : "+"} ${money(netTotal.abs())}` : "No cash was missing"} />
               <KpiCard icon={Landmark} tone="blue" label="Deposited" value={money(bankedTotal)} hint={`Spent ${money(spentTotal)} in these days`} />
-            </div>
+            </KpiStrip>
           )}
           <div className="mb-6 grid gap-4 xl:grid-cols-2">
             <section className="card px-4 py-4 sm:px-5" aria-label="Sales per closed day">

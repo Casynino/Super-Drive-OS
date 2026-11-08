@@ -5,7 +5,8 @@ import { AlertTriangle, ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Calendar, H
 import { Alert } from "@/components/ui";
 import WingaActions from "@/components/pos/WingaActions";
 import { defaultLocationId, listAccounts } from "@/lib/cash/ledger";
-import StatTile from "@/components/dashboard/StatTile";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { SalesTrendChart } from "@/components/dashboard/Charts";
 import RemindButton from "@/components/credit/RemindButton";
 import { BADGE, pctTone, wingaStatus } from "@/components/resellers/WingaCard";
@@ -148,12 +149,12 @@ export default async function ResellerPage({ params, searchParams }: { params: P
         </div>
       )}
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatTile icon={ArrowUpFromLine} tone="navy" label="Stock received" value={m(a.issuedValue)} hint={`${a.issuedQty.toString()} items at the agreed prices`} />
-        <StatTile icon={ArrowDownToLine} tone="green" label="Reported sold" value={m(a.soldValue)} hint={`${a.soldQty.toString()} items · ${a.reports} report${a.reports === 1 ? "" : "s"}`} />
-        <StatTile icon={Undo2} tone="yellow" label="Stock they still hold" value={m(a.remainingValue)} hint={`${a.remainingQty.toString()} items unsold · ${a.returnedQty.toString()} returned`} />
-        <StatTile icon={HandCoins} tone={a.outstanding.gt(0) ? "red" : "slate"} label="They owe us" value={m(a.outstanding)} hint={`${st.openInvoices} open order${st.openInvoices === 1 ? "" : "s"} · paid so far ${m(a.collected)}`} />
-      </div>
+      <KpiStrip className="mb-5">
+        <KpiCard icon={ArrowUpFromLine} tone="navy" label="Stock received" value={m(a.issuedValue)} hint={`${a.issuedQty.toString()} items at the agreed prices`} />
+        <KpiCard icon={ArrowDownToLine} tone="green" label="Reported sold" value={m(a.soldValue)} hint={`${a.soldQty.toString()} items · ${a.reports} report${a.reports === 1 ? "" : "s"}`} />
+        <KpiCard icon={Undo2} tone="yellow" label="Stock they still hold" value={m(a.remainingValue)} hint={`${a.remainingQty.toString()} items unsold · ${a.returnedQty.toString()} returned`} />
+        <KpiCard icon={HandCoins} tone={a.outstanding.gt(0) ? "red" : "slate"} label="They owe us" value={m(a.outstanding)} hint={`${st.openInvoices} open order${st.openInvoices === 1 ? "" : "s"} · paid so far ${m(a.collected)}`} />
+      </KpiStrip>
 
       <div className="mb-5 grid gap-5 xl:grid-cols-[1fr_340px]">
         <section className="card overflow-hidden">

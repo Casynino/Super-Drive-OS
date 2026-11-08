@@ -6,6 +6,7 @@ import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import { ExpenseDecisionForm, RecordExpenseButton } from "@/components/cash/ExpenseForms";
 import { ExpenseStatusBadge } from "@/components/cash/Display";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { Prisma, type ExpenseStatus } from "@/generated/prisma/client";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -163,12 +164,12 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
+      <KpiStrip className="mb-5">
         <KpiCard icon={ReceiptText} tone="red" label="Spent on expenses" value={money(spentTotal)} hint={`${spentCount} paid expense${spentCount === 1 ? "" : "s"}${activePeriod ? ` · ${activePeriod.label.toLowerCase()}` : ""}`} />
         {biggest && <KpiCard icon={Tag} tone="navy" label="Biggest category" value={money(biggest.value)} hint={`${biggest.name} · ${spentTotal.gt(0) ? Math.round(biggest.value.div(spentTotal).mul(100).toNumber()) : 0}% of the spending`} href={link({ category: biggest.id, page: undefined })} />}
         {summary && <KpiCard icon={Wallet} tone="slate" label="Taken out by the owner" value={money(summary.withdrawals)} hint="Withdrawals, shown in the ledger" href={`/ledger?type=WITHDRAWAL${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`} />}
         {pendingCount > 0 && <KpiCard icon={Clock} tone="yellow" label="Waiting for owner's OK" value={money(pendingSum)} hint={`${pendingCount} expense${pendingCount === 1 ? "" : "s"} · not paid out yet`} href={link({ status: "PENDING", page: undefined })} active={status === "PENDING"} />}
-      </div>
+      </KpiStrip>
 
       {spread.length > 0 && (
         <section className="card mb-5 px-4 py-4 sm:px-5" aria-label="Where the money went">

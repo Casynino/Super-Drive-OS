@@ -11,6 +11,7 @@ import { loadIssueRecords } from "@/lib/shipments/issues";
 import { toIssueViews } from "@/lib/shipments/issue-view";
 import { getUnitMode } from "@/lib/unit-mode";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { Prisma } from "@/generated/prisma/client";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -207,12 +208,12 @@ export default async function ShipmentPage({ params, searchParams }: { params: P
       {shipment.status === "CANCELLED" && <div className="mb-5"><Alert kind="info">Cancelled: {shipment.resolutionNote}</Alert></div>}
 
       {money && (
-        <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <KpiStrip className="mb-5">
           <KpiCard icon={Banknote} tone="navy" label="You pay" value={formatMoney(money.cost, currency)} hint={`${shipment.items.filter((i) => !i.unexpected).length} products`} />
           <KpiCard icon={Coins} tone="blue" label="Sells for" value={money.sales.gt(0) ? formatMoney(money.sales, currency) : "—"} hint={money.unpriced ? `${money.unpriced} product${money.unpriced > 1 ? "s" : ""} with no selling price` : "At the selling prices"} />
           <KpiCard icon={TrendingUp} tone={profit && profit.lt(0) ? "red" : "green"} label="Expected profit" value={profit && money.sales.gt(0) ? formatMoney(profit, currency) : "—"} badge={margin !== null ? `${margin}% margin` : undefined} hint="If everything sells" />
           <KpiCard icon={Truck} tone="slate" label="Deliver to" value={shipment.location.name} hint={shipment.expectedDate ? `Expected ${formatDate(shipment.expectedDate)}` : "No date given"} />
-        </div>
+        </KpiStrip>
       )}
 
       {shipment.notes && <div className="mb-5"><Alert kind="info">Note: {shipment.notes}</Alert></div>}

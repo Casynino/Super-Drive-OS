@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowLeftRight, Boxes, CircleCheck, ClipboardCheck, LayoutGrid, List, PackageCheck, Search } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import StockCard from "@/components/inventory/StockCard";
 import { Prisma } from "@/generated/prisma/client";
 import { can, canAny } from "@/lib/auth/can";
@@ -216,23 +218,14 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       <PageHeader title="Stock overview" description="What you have, where it is, and what needs reordering." actions={actions} />
 
       {/* Headline numbers: ONE slim strip (Nino 2026-11-09: the big cards took too much room) */}
-      <section className="card mb-3 overflow-hidden">
-        <div className={cn("grid gap-px bg-line", canValue ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6" : "grid-cols-3")}>
-          {canValue && <Stat label="Stock value" value={formatMoney(totalValue, currency)} hint={noCost ? `${noCost} with no buying price yet` : "What the stock cost you"} />}
-          {canValue && <Stat label="Selling value" value={formatMoney(salesValue, currency)} hint={noPrice ? `${noPrice} with no selling price` : "At today's prices"} />}
-          {canValue && (
-            <Stat
-              label="Expected profit"
-              value={profitBase.gt(0) ? formatMoney(expectedProfit, currency) : "—"}
-              valueClass={expectedProfit.lt(0) ? "text-brand-red-dark" : undefined}
-              hint={profitBase.gt(0) ? (margin !== null ? `${margin}% margin` : "Selling value minus cost") : "Add buying and selling prices"}
-            />
-          )}
-          <Stat label="Products" value={total} hint={`${inStock} in stock`} href={canOpenProduct ? "/products" : undefined} />
-          <Stat label="Low stock" dot="bg-oil-400" value={lowRows.length} hint="At or below minimum" href={href({ status: "low", page: undefined })} active={sp.status === "low" && !histTab} />
-          <Stat label="Out of stock" dot="bg-brand-red" value={outRows.length} hint={outRows.length ? "Needs reordering" : "Nothing missing"} href={href({ status: "out", page: undefined })} active={sp.status === "out" && !histTab} />
-        </div>
-      </section>
+      <KpiStrip className="mb-3">
+        {canValue && <KpiCard label="Stock value" value={formatMoney(totalValue, currency)} hint={noCost ? `${noCost} with no buying price yet` : "What the stock cost you"} />}
+        {canValue && <KpiCard label="Selling value" value={formatMoney(salesValue, currency)} hint={noPrice ? `${noPrice} with no selling price` : "At today's prices"} />}
+        {canValue && <KpiCard label="Expected profit" tone={expectedProfit.lt(0) ? "red" : "navy"} value={profitBase.gt(0) ? formatMoney(expectedProfit, currency) : "—"} hint={profitBase.gt(0) ? (margin !== null ? `${margin}% margin` : "Selling value minus cost") : "Add buying and selling prices"} />}
+        <KpiCard label="Products" value={total} hint={`${inStock} in stock`} href={canOpenProduct ? "/products" : undefined} />
+        <KpiCard label="Low stock" tone="yellow" value={lowRows.length} hint="At or below minimum" href={href({ status: "low", page: undefined })} active={sp.status === "low" && !histTab} />
+        <KpiCard label="Out of stock" tone="red" value={outRows.length} hint={outRows.length ? "Needs reordering" : "Nothing missing"} href={href({ status: "out", page: undefined })} active={sp.status === "out" && !histTab} />
+      </KpiStrip>
 
       {/* Health + what to reorder: one slim card */}
       {total > 0 && (
@@ -362,14 +355,14 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
 
       {!histTab && (
       <>
-      <form method="get" className="card card-pad mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
+      <form method="get" className="mb-4 flex flex-wrap items-center gap-2">
         {sp.status && <input type="hidden" name="status" value={sp.status} />}
         {sp.view && <input type="hidden" name="view" value={sp.view} />}
-        <div className="relative">
-          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input name="q" defaultValue={sp.q ?? ""} placeholder="Search name, SKU or barcode" className="input pl-9" aria-label="Search stock" />
+        <div className="relative min-w-[11rem] flex-1 sm:max-w-xs">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input name="q" defaultValue={sp.q ?? ""} placeholder="Search a product" className="input h-9 pl-9 text-sm" aria-label="Search stock" />
         </div>
-        <select name="location" defaultValue={sp.location ?? ""} className="input" aria-label="Location">
+        <select name="location" defaultValue={sp.location ?? ""} className="input h-9 w-auto text-sm" aria-label="Location">
           <option value="">All locations</option>
           {locations.map((l) => (
             <option key={l.id} value={l.id}>
@@ -377,7 +370,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </option>
           ))}
         </select>
-        <select name="category" defaultValue={sp.category ?? ""} className="input" aria-label="Category">
+        <select name="category" defaultValue={sp.category ?? ""} className="input h-9 w-auto text-sm" aria-label="Category">
           <option value="">All categories</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
@@ -385,7 +378,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </option>
           ))}
         </select>
-        <select name="sort" defaultValue={sort} className="input" aria-label="Sort by">
+        <select name="sort" defaultValue={sort} className="input h-9 w-auto text-sm" aria-label="Sort by">
           {(Object.keys(SORTS) as SortKey[])
             .filter((k) => k !== "value" || canValue)
             .map((k) => (
@@ -395,11 +388,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             ))}
         </select>
         <div className="flex gap-2">
-          <button className="btn-primary" type="submit">
+          <button className="btn-primary h-9 px-4 text-sm" type="submit">
             Apply
           </button>
           {hasFilters && (
-            <Link href="/inventory" className="btn-secondary">
+            <Link href="/inventory" className="btn-secondary h-9 px-4 text-sm">
               Clear
             </Link>
           )}
@@ -423,7 +416,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           />
         </div>
       ) : view === "cards" ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {pageRows.map((r) => (
             <StockCard key={r.p.id} {...cardProps(r)} />
           ))}
@@ -622,26 +615,5 @@ function Wrap({ href, children }: { href: string | null; children: React.ReactNo
     </Link>
   ) : (
     <>{children}</>
-  );
-}
-
-/** One cell of the slim headline strip: a small label, the figure and one line of context. A link when it filters or opens something. */
-function Stat({ label, value, hint, href, active, dot, valueClass }: { label: string; value: React.ReactNode; hint?: string; href?: string; active?: boolean; dot?: string; valueClass?: string }) {
-  const body = (
-    <div className={cn("h-full bg-white px-4 py-2.5 transition", href && "hover:bg-slate-50", active && "bg-slate-50")}>
-      <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-        {dot && <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />}
-        {label}
-      </p>
-      <p className={cn("mt-0.5 whitespace-nowrap text-base font-semibold leading-tight tabular-nums text-slate-900 sm:text-lg", valueClass)}>{value}</p>
-      {hint && <p className="mt-0.5 truncate text-[11px] text-slate-500">{hint}</p>}
-    </div>
-  );
-  return href ? (
-    <Link href={href} className="block">
-      {body}
-    </Link>
-  ) : (
-    body
   );
 }

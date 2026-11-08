@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, HandCoins, Search, Users, Wallet } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { Prisma } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
@@ -241,12 +242,12 @@ export default async function CreditPage({ searchParams }: { searchParams: Promi
         }
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <KpiStrip className="mb-5">
         <KpiCard icon={Wallet} tone="navy" label="Total owed" value={money(openOwed)} hint={`${counts.all} open invoice${counts.all === 1 ? "" : "s"} · ${n(s?.customers)} customer${n(s?.customers) === 1 ? "" : "s"}`} href={link({ view: undefined, age: undefined, page: undefined })} active={view === "all" && !age} />
         <KpiCard icon={Clock} tone="red" label="Late" value={money(dec(s?.late_owed))} hint={`${counts.overdue} invoice${counts.overdue === 1 ? "" : "s"} past the due date`} href={link({ view: "overdue", age: undefined, page: undefined })} active={view === "overdue" && !age} />
         <KpiCard icon={CalendarClock} tone="yellow" label="Due this week" value={money(dec(s?.soon_owed))} hint={`${counts.soon} invoice${counts.soon === 1 ? "" : "s"} in the next 7 days`} href={link({ view: "soon", age: undefined, page: undefined })} active={view === "soon"} />
         <KpiCard icon={CalendarDays} tone="blue" label="Due later" value={money(dec(s?.later_owed))} hint={`${counts.later} invoice${counts.later === 1 ? "" : "s"} after that`} href={link({ view: "later", age: undefined, page: undefined })} active={view === "later"} />
-      </div>
+      </KpiStrip>
 
       {openOwed.gt(0) && (
         <section className="card mb-5 px-4 py-4 sm:px-5" aria-label="How old the debt is">

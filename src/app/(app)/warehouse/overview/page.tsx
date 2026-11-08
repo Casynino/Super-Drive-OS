@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Prisma } from "@/generated/prisma/client";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import BarList from "@/components/reports/BarList";
 import { PageHeader } from "@/components/ui";
 import { Boxes, Lock, PackageCheck, PackageOpen, TriangleAlert } from "lucide-react";
@@ -52,13 +53,13 @@ export default async function WarehouseOverviewPage() {
       <PageHeader title="Warehouse overview" description="Stock, receiving, sales and collections at the Store Warehouse, and who did what." actions={<Link href="/warehouse/stock" className="btn-secondary">Warehouse stock</Link>} />
 
       <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Stock</h2>
-      <section className="mb-6 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(13.5rem,1fr))]">
+      <KpiStrip className="mb-6">
         <KpiCard icon={Boxes} tone="navy" label="Products in the warehouse" value={nf(s.products)} hint="with stock on the shelf" href="/warehouse/stock" />
         <KpiCard icon={PackageCheck} tone="slate" label="In the warehouse" value={nf(s.physical)} hint="pieces, physically here" />
         <KpiCard icon={PackageOpen} tone="green" label="Available" value={nf(s.available)} hint="can still be sold" />
         <KpiCard icon={Lock} tone="yellow" label="Reserved" value={nf(s.reserved)} hint="sold, waiting to be collected" href="/warehouse/stock?s=reserved" />
         <KpiCard icon={TriangleAlert} tone={s.out + s.low > 0 ? "red" : "slate"} label="Low or out of stock" value={nf(s.out + s.low)} hint={`${s.out} out · ${s.low} low`} href="/warehouse/stock?s=low" />
-      </section>
+      </KpiStrip>
 
       <div className="mb-6 grid gap-4 lg:grid-cols-2">
         <section className="card card-pad">

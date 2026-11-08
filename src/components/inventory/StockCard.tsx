@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Package } from "lucide-react";
+import { ChevronRight, Package } from "lucide-react";
 import QtySwitch from "@/components/QtySwitch";
-import { packNote, qtyText, type Pack, type UnitMode } from "@/lib/qty";
+import { qtyText, type Pack, type UnitMode } from "@/lib/qty";
 import { cn } from "@/lib/utils";
 
 export type StockCardProps = {
@@ -32,72 +32,75 @@ export type StockCardProps = {
 };
 
 const BAR = { ok: "bg-emerald-500", low: "bg-oil-400", out: "bg-brand-red" } as const;
+const BADGE = { ok: "badge-green", low: "badge-yellow", out: "badge-red" } as const;
+const WORD = { ok: "In stock", low: "Low", out: "Out" } as const;
 
 /**
- * One product on the stock overview: picture, what is on the shelf, and a level bar against its minimum.
- * Cartons are the default; the small CTN | PCS switch changes only THIS product's numbers.
+ * One product on the stock overview as a SMALL card, the same size and look as the warehouse stock cards (Nino 2026-11-09: "small cards like those,
+ * nice and well"): a 44 px picture, name, brand, what is on the shelf ("5 CTN + 2 PCS", with its own tiny CTN | PCS switch), the status, a thin level
+ * bar with the minimum, and the stock value when the person may see it. The whole card opens the product's stock page. About 6 across on a wide
+ * screen, 2 on a phone.
  */
 export default function StockCard(p: StockCardProps) {
   const [mode, setMode] = useState<UnitMode>("ctn");
   const f = (n: number) => qtyText(n, p.pack, p.baseSymbol, mode).main;
   const min = p.minBase !== null ? f(p.minBase) : null;
-  const body = (
-    <div className={cn("card flex h-full flex-col overflow-hidden transition", p.href && "hover:-translate-y-0.5 hover:border-navy-200 hover:shadow-md")}>
-      <div className="flex gap-4 p-4">
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-50">
+  const note = [min ? `Min ${min}` : "No minimum", (p.reservedBase ?? 0) > 0 ? `${f(p.reservedBase!)} waiting` : null, (p.awayBase ?? 0) > 0 ? `${f(p.awayBase!)} with winga` : null].filter(Boolean).join(" · ");
+  return (
+    <div className={cn("card group relative flex h-full flex-col p-3 transition", p.href && "cursor-pointer hover:border-navy-300 hover:shadow-md")}>
+      <div className="flex items-start gap-2.5">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
           {p.imageV ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={`/api/product-image/${p.id}?size=thumb&v=${p.imageV}`} alt="" loading="lazy" className="h-full w-full object-contain" />
           ) : (
-            <Package size={30} className="text-slate-300" />
+            <Package size={18} className="text-slate-300" />
           )}
-        </div>
+        </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">{p.brand ? `${p.brand} · ${p.category}` : p.category}</p>
-          <h3 className="mt-0.5 line-clamp-2 text-[15px] font-semibold leading-snug text-slate-900">{p.name}</h3>
-          <p className="mt-1 truncate font-mono text-xs text-slate-400">{p.sku}</p>
+          <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug text-slate-900">
+            {p.href ? (
+              // the whole card opens the product (the name link stretches over it); the CTN | PCS switch stays above it
+              <Link href={p.href} className="after:absolute after:inset-0 after:content-[''] group-hover:text-navy-700" aria-label={`Open ${p.name}`}>
+                {p.name}
+              </Link>
+            ) : (
+              p.name
+            )}
+          </h3>
+          <p className="truncate text-[10px] text-slate-500">{p.brand ?? p.category}</p>
         </div>
-      </div>
-
-      <div className="mt-auto border-t border-line px-4 py-3">
-        <div className="flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{p.label ?? "On the shelf"}</p>
-            <p className="mt-0.5 truncate text-2xl font-bold leading-none tracking-tight text-slate-900">{f(p.qtyBase)}</p>
-            {p.pack && <p className="mt-1 text-xs text-slate-500">{packNote(p.pack, p.baseSymbol)}</p>}
-          </div>
-          <div className="flex flex-col items-end gap-1.5">
-            {p.pack && <QtySwitch mode={mode} onChange={setMode} />}
-            {p.status === "out" ? <span className="badge-red">Out of stock</span> : p.status === "low" ? <span className="badge-yellow">Low</span> : <span className="badge-green">In stock</span>}
-          </div>
-        </div>
-
-        {p.levelPct !== null ? (
-          <div className="mt-3">
-            <div className="relative h-2 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Stock level against a minimum of ${min}`}>
-              <div className={cn("h-full rounded-full transition-all", BAR[p.status])} style={{ width: `${Math.max(p.status === "out" ? 0 : 4, p.levelPct)}%` }} />
-              <span className="absolute inset-y-0 left-1/3 w-px bg-slate-400/70" />
-            </div>
-            <p className="mt-1 text-[11px] text-slate-500">Minimum {min}</p>
-          </div>
-        ) : (
-          <p className="mt-3 text-[11px] text-slate-400">No minimum set, so no low-stock alert</p>
-        )}
-
-        {((p.awayBase ?? 0) > 0 || (p.reservedBase ?? 0) > 0 || p.value) && (
-          <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
-            <span>{(p.reservedBase ?? 0) > 0 ? `${f(p.reservedBase!)} reserved, waiting to be collected` : (p.awayBase ?? 0) > 0 ? `${f(p.awayBase!)} with winga` : ""}</span>
-            {p.value && <span className="font-medium text-slate-700">{p.value}</span>}
-          </div>
+        {p.href && (
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-navy-700 group-hover:text-[#ffffff]" aria-hidden>
+            <ChevronRight size={14} />
+          </span>
         )}
       </div>
+
+      <div className="mt-2.5 flex items-center justify-between gap-1">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{p.label ?? "On the shelf"}</p>
+        {p.pack && (
+          <span className="relative z-10">
+            <QtySwitch mode={mode} onChange={setMode} />
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-lg font-bold leading-tight tracking-tight text-slate-900">{f(p.qtyBase)}</p>
+        <span className={cn("shrink-0", BADGE[p.status])}>{WORD[p.status]}</span>
+      </div>
+
+      <div className="mt-1.5">
+        {p.levelPct !== null && (
+          <div className="relative h-1 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`Stock level against a minimum of ${min}`}>
+            <div className={cn("h-full rounded-full", BAR[p.status])} style={{ width: `${Math.max(p.status === "out" ? 0 : 6, p.levelPct)}%` }} />
+            <span className="absolute inset-y-0 left-1/3 w-px bg-slate-400/70" />
+          </div>
+        )}
+        <p className="mt-1 truncate text-[10px] text-slate-500">{note}</p>
+      </div>
+
+      {p.value && <p className="mt-auto pt-1.5 text-right text-[11px] font-semibold tabular-nums text-slate-700">{p.value}</p>}
     </div>
-  );
-  return p.href ? (
-    <Link href={p.href} className="block h-full">
-      {body}
-    </Link>
-  ) : (
-    body
   );
 }

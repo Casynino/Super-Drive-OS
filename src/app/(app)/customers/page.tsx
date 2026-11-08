@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, HandCoins, LayoutGrid, Plus, Rows3, Search, Users } from "lucide-react";
 import CustomerCard, { CUSTOMER_BADGE, pctTone } from "@/components/customers/CustomerCard";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { Prisma, type CustomerType } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
@@ -108,11 +109,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
+      <KpiStrip className="mb-5">
         <KpiCard icon={Users} tone="navy" label="Customers" value={String(activeCount)} hint="Active" />
         {showCredit && <KpiCard icon={HandCoins} tone={totalOwed.gt(0) ? "yellow" : "slate"} label="Owe us" value={m(totalOwed)} hint={`${owed.size} customer${owed.size === 1 ? "" : "s"} with an unpaid balance`} href={link({ show: "owe", page: undefined })} active={show === "owe"} />}
         {showCredit && <KpiCard icon={AlertTriangle} tone={lateCustomersAll > 0 ? "red" : "green"} label="Paying late" value={String(lateCustomersAll)} hint={lateCustomersAll > 0 ? "Past the due date: send a reminder" : "Nobody is late"} href={lateCustomersAll > 0 ? link({ show: "late", page: undefined }) : undefined} active={show === "late"} />}
-      </div>
+      </KpiStrip>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         {showCredit ? (

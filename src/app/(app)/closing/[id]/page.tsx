@@ -5,6 +5,7 @@ import { ArrowDownRight, ArrowUpRight, Banknote, Boxes, CheckCircle2, Download, 
 import CorrectClosingForm from "@/components/cash/CorrectClosingForm";
 import { ClosingStatusBadge, ClosingSummaryView } from "@/components/cash/Display";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import Spread from "@/components/reports/Spread";
 import { Alert, PageHeader } from "@/components/ui";
 import { Prisma } from "@/generated/prisma/client";
@@ -105,7 +106,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
         </div>
       )}
 
-      <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))]">
+      <KpiStrip className="mb-5">
         <KpiCard icon={Receipt} tone="navy" label="Sold" value={money(today.sales.total)} hint={`${today.sales.count} sale${today.sales.count === 1 ? "" : "s"}${today.sales.creditGiven.gt(0) ? ` · ${money(today.sales.creditGiven)} on credit` : ""}`} />
         <KpiCard icon={Banknote} tone="green" label="Money received" value={money(today.money.income)} hint={`${today.money.payments} payment${today.money.payments === 1 ? "" : "s"} · at the sale and on debts`} />
         <KpiCard icon={ReceiptText} tone="red" label="Spent on expenses" value={money(spentDay)} hint={`${today.expensesByCategory.length} categor${today.expensesByCategory.length === 1 ? "y" : "ies"}`} />
@@ -123,7 +124,7 @@ export default async function ClosingDetailPage({ params, searchParams }: { para
             />
           );
         })()}
-      </div>
+      </KpiStrip>
 
       {can(user, "cash.adjust") && !c.countedCash.plus(correctedBy).minus(c.expectedCash).isZero() && (() => {
         const off = c.countedCash.plus(correctedBy).minus(c.expectedCash);

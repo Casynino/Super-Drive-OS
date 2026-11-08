@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ClipboardCheck, PackageCheck, PackageOpen, Plus, Search as SearchIcon, ShieldAlert, Truck } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import ReceiptsTable from "@/components/inventory/ReceiptsTable";
 import IssueRecords from "@/components/shipments/IssueRecords";
 import ProblemReports from "@/components/shipments/ProblemReports";
@@ -192,7 +193,8 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <div className={staff ? "hidden" : "mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"}>
+      {!staff && (
+      <KpiStrip className="mb-5">
         <KpiCard
           icon={Truck}
           tone="blue"
@@ -205,7 +207,8 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
         <KpiCard icon={PackageCheck} tone="yellow" label={staff ? "To count" : "To check"} value={counts.check} hint={counts.check ? "Arrived, waiting to be counted" : "All counted"} href="/shipments?tab=check" active={tab === "check"} />
         <KpiCard icon={ShieldAlert} tone={counts.investigation ? "red" : "slate"} label="Investigation" value={counts.investigation} hint={counts.investigation ? "Damaged, missing or extra goods" : "No problems"} href="/shipments?tab=investigation" active={tab === "investigation"} />
         <KpiCard icon={PackageOpen} tone="green" label="In stock" value={doneRecently} hint="Fully received, last 30 days" href={deliveriesAllowed ? "/shipments?tab=deliveries" : "/shipments?tab=history"} active={tab === "deliveries" || (!deliveriesAllowed && tab === "history")} />
-      </div>
+      </KpiStrip>
+      )}
 
       <nav className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Order stages">
         {tabs.map((t) => {

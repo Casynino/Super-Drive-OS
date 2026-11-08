@@ -8,6 +8,7 @@ import { Difference } from "@/components/cash/Display";
 import { ColumnsChart, DonutChart, TopProductsChart } from "@/components/dashboard/Charts";
 import BarList from "@/components/reports/BarList";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { Alert, PageHeader } from "@/components/ui";
 import { Prisma } from "@/generated/prisma/client";
 import { can } from "@/lib/auth/can";
@@ -116,13 +117,13 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
       )}
 
       {canReview && (
-        <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(12.5rem,1fr))]">
+        <KpiStrip className="mb-5">
           <KpiCard icon={Scale} tone={monthNet.length > 0 ? "red" : "green"} label="Cash short this month" value={money(monthShortSum)} hint={monthNet.length > 0 ? `On ${monthNet.length} day${monthNet.length === 1 ? "" : "s"}` : "No cash missing"} href={monthNet.length > 0 ? "/closing?show=short" : undefined} />
           {monthProfit && <KpiCard icon={TrendingUp} tone={monthProfit.net.lt(0) ? "red" : "green"} label={monthProfit.net.lt(0) ? "Loss this month" : "Profit this month"} value={money(monthProfit.net.abs())} badge={`${monthProfit.marginPct.toFixed(1)}% of sales`} hint="Sales profit minus expenses" />}
           <KpiCard icon={Banknote} tone="yellow" label="Cash in the till" value={money(cash?.balance ?? 0)} hint="Now" />
           <KpiCard icon={Landmark} tone="navy" label="Banked this month" value={money(monthBanked?._sum.amount ?? 0)} hint="Cash taken to the bank" />
           <KpiCard icon={CalendarCheck} tone={last && !last.difference.isZero() ? "red" : "green"} label="Last closing" value={last ? formatDate(last.businessDate) : "—"} hint={last ? (last.difference.isZero() ? "No difference" : last.difference.lt(0) ? `Short ${money(last.difference.abs())}` : `Extra ${money(last.difference)}`) : "No day closed yet"} />
-        </div>
+        </KpiStrip>
       )}
 
       {canSubmit && preview && (
@@ -141,12 +142,12 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
                   See the report
                 </Link>
               </div>
-              <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
+              <KpiStrip>
                 <KpiCard icon={Banknote} tone="yellow" label="Cash in the till" value={money(preview.expectedCash)} hint={`Carried forward · left at closing ${money(closedInfo.left)}`} />
                 <KpiCard icon={Receipt} tone="navy" label="Sold since closing" value={money(closedInfo.soldSince)} hint={`${closedInfo.salesSince} sale${closedInfo.salesSince === 1 ? "" : "s"}`} />
                 <KpiCard icon={Smartphone} tone="green" label="Mobile money since closing" value={money(collectedBy("MOBILE_MONEY"))} hint="Nothing to count" />
                 <KpiCard icon={Landmark} tone="blue" label="Bank since closing" value={money(collectedBy("BANK"))} hint="Nothing to count" />
-              </div>
+              </KpiStrip>
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
                 <section className="card px-4 py-4 sm:px-5" aria-label="How the closing went">
                   <h2 className="text-sm font-semibold text-slate-900">How the closing went</h2>
@@ -171,13 +172,13 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
             </>
           ) : (
             <>
-              <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
+              <KpiStrip>
                 <KpiCard icon={Receipt} tone="navy" label={`Sold today · ${formatDate(`${today}T00:00:00Z`)}`} value={money(preview.summary.sales.total)} hint={`${preview.summary.sales.count} sale${preview.summary.sales.count === 1 ? "" : "s"}${Number(preview.summary.sales.creditGiven) > 0 ? ` · ${money(preview.summary.sales.creditGiven)} on credit` : ""}`} />
                 <KpiCard icon={Banknote} tone="yellow" label="Cash expected in the till" value={money(preview.expectedCash)} hint={`Start ${money(preview.summary.cash.opening)} + in − out`} />
                 {collected.map((a) => (
                   <KpiCard key={a.accountId} icon={a.method === "BANK" ? Landmark : Smartphone} tone={a.method === "BANK" ? "blue" : "green"} label={`${a.name} · collected`} value={money(a.amount)} hint="Since the last closing · nothing to count" />
                 ))}
-              </div>
+              </KpiStrip>
             </>
           )}
 

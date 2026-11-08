@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Banknote, Receipt, ReceiptText, Scale, TrendingUp } from "lucide-react";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import Spread from "@/components/reports/Spread";
 import { PageHeader } from "@/components/ui";
 import { Prisma } from "@/generated/prisma/client";
@@ -62,14 +63,14 @@ export default async function PeriodReportPage({ searchParams }: { searchParams:
         ))}
       </nav>
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+      <KpiStrip className="mb-5">
         <KpiCard icon={Receipt} tone="navy" label="Sold" value={money(s.sales.total)} hint={`${s.sales.count} sale${s.sales.count === 1 ? "" : "s"}${change ? ` · ${change}` : ""}`} />
         <KpiCard icon={Banknote} tone="green" label="Income" value={money(s.money.income)} hint={`${s.money.payments} payment${s.money.payments === 1 ? "" : "s"} received`} />
         <KpiCard icon={ReceiptText} tone="red" label="Spent" value={money(s.money.spent)} hint={`Expenses ${money(s.money.expenses)} · suppliers ${money(s.money.suppliers)} · owner ${money(s.money.withdrawals)}`} />
         <KpiCard icon={TrendingUp} tone={s.money.left.lt(0) ? "red" : "green"} label="What is left" value={money(s.money.left)} hint="Income − everything spent" />
         {seeProfit && <KpiCard icon={TrendingUp} tone={s.profit.net.lt(0) ? "red" : "green"} label="Profit" value={money(s.profit.net)} badge={`${s.profit.marginPct.toFixed(1)}% of sales`} hint={`Sales profit ${money(s.profit.gross)} − expenses ${money(s.money.expenses)}`} />}
         <KpiCard icon={Scale} tone={s.closings.short.gt(0) ? "red" : "green"} label="Cash count" value={s.closings.short.gt(0) ? `Short ${money(s.closings.short)}` : "No cash missing"} hint={`${s.closings.count} of ${s.closings.daysInPeriod} days closed${s.closings.extra.gt(0) ? ` · extra ${money(s.closings.extra)}` : ""}`} href="/closing" />
-      </div>
+      </KpiStrip>
 
       <section className="card mb-5 px-4 py-4 sm:px-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">

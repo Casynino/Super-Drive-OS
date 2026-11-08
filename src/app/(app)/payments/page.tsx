@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ChevronLeft, ChevronRight, HandCoins, ReceiptText, Search, TrendingUp, Wallet } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
+import KpiStrip from "@/components/dashboard/KpiStrip";
 import { Prisma, type PaymentMethod, type PaymentSource } from "@/generated/prisma/client";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -145,13 +146,13 @@ export default async function IncomePage({ searchParams }: { searchParams: Promi
     <>
       <PageHeader title="Income" description="Every payment received and the account it went into." />
 
-      <div className="mb-5 grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))]">
+      <KpiStrip className="mb-5">
         <KpiCard icon={Wallet} tone="navy" label="Income received" value={money(summary.income)} hint={`${summary.payments} payment${summary.payments === 1 ? "" : "s"} · ${periodLabel}${summary.refunds.gt(0) ? ` · ${money(summary.refunds)} paid back is taken off` : ""}`} />
         {seeMoney && <KpiCard icon={ReceiptText} tone="red" label="Spent" value={money(summary.spent)} badge={summary.income.gt(0) ? `${summary.spent.div(summary.income).mul(100).toFixed(0)}% of income` : undefined} hint={`Expenses ${money(summary.expenses)} · suppliers ${money(summary.suppliers)} · owner ${money(summary.withdrawals)}`} href={`/ledger?dir=out${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`} />}
         {seeMoney && <KpiCard icon={TrendingUp} tone={summary.left.lt(0) ? "red" : "green"} label="What is left" value={money(summary.left)} hint={summary.corrections.isZero() ? "Income − everything spent" : `Income − spent, with ${money(summary.corrections)} of counting corrections`} href={`/ledger${from ? `?from=${from}${to ? `&to=${to}` : ""}` : ""}`} />}
         {profit && <KpiCard icon={TrendingUp} tone={profit.net.lt(0) ? "red" : "green"} label="Profit" value={money(profit.net)} badge={`${profit.marginPct.toFixed(1)}% of sales`} hint={`Sales profit ${money(profit.gross)} − expenses ${money(summary.expenses)}`} />}
         {seeDebts && <KpiCard icon={HandCoins} tone="yellow" label="Still to collect" value={money(dec(toCollect[0]?.owed))} hint={`${n(toCollect[0]?.n)} invoice${n(toCollect[0]?.n) === 1 ? "" : "s"} billed, not paid yet`} href="/credit" />}
-      </div>
+      </KpiStrip>
 
       {landed.length > 0 && (
         <section className="card mb-5 px-4 py-4 sm:px-5" aria-label="Where the income landed">
