@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ClipboardCheck, Plus } from "lucide-react";
+import StockTabs from "@/components/inventory/StockTabs";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -35,6 +36,7 @@ export default async function AdjustmentsPage() {
           )
         }
       />
+      <StockTabs active="adjustments" user={user} />
       <div className="card overflow-hidden">
         {rows.length === 0 ? (
           <EmptyState icon={<ClipboardCheck size={22} />} title="No adjustments yet" description="Damage reports, corrections and stock counts will be listed here." />

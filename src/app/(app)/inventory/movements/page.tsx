@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, ImageOff, Scale, Search } from "lucide-react";
+import StockTabs from "@/components/inventory/StockTabs";
 import { EmptyState, PageHeader } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { Prisma, type StockMovementType } from "@/generated/prisma/client";
@@ -106,6 +107,7 @@ export default async function MovementsPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title="Stock movements" description="Every change to stock, newest first: what moved, how much, and who did it. Nothing here can be edited." />
+      <StockTabs active="movements" user={user} />
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <KpiCard icon={ArrowLeftRight} tone="navy" label="Movements" value={fmtQty(total)} hint={hasFilters ? "Matching your filters" : "All recorded changes"} />

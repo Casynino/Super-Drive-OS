@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, Boxes, Handshake, Package, PackageCheck, Plus, QrCode, Search, ShoppingCart } from "lucide-react";
+import StockTabs from "@/components/inventory/StockTabs";
 import { EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 import KpiCard from "@/components/dashboard/KpiCard";
 import ProductLevelCard, { type ProductLevel } from "@/components/items/ProductLevelCard";
@@ -170,6 +171,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           </>
         }
       />
+      <StockTabs active="products" user={user} />
 
       {top && (
         <section className="card mb-3 grid grid-cols-2 divide-line sm:grid-cols-5 sm:divide-x" aria-label="Numbers">

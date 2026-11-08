@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeftRight, Plus } from "lucide-react";
+import StockTabs from "@/components/inventory/StockTabs";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
@@ -32,6 +33,7 @@ export default async function TransfersPage() {
           )
         }
       />
+      <StockTabs active="transfers" user={user} />
       <div className="card overflow-hidden">
         {transfers.length === 0 ? (
           <EmptyState icon={<ArrowLeftRight size={22} />} title="No transfers yet" description="Transfers appear here once you move stock from one location to another." />

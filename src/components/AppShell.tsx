@@ -98,7 +98,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
 
   const visible = new Set(visibleHrefs);
   const hidden = new Set(hiddenItems ?? []);
-  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.ready && visible.has(i.href) && !hidden.has(`${i.href}|${i.label}`)) })).filter((g) => g.items.length > 0);
+  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.ready && visible.has(i.href) && !hidden.has(`${g.label}|${i.href}|${i.label}`)) })).filter((g) => g.items.length > 0);
   const topGroups = groups.filter((g) => !g.label);
   const folding = groups.filter((g) => g.label);
 
