@@ -82,17 +82,17 @@ function ShowRows({ total, children }: { total: number; children: ReactNode }) {
         <div ref={box} className={cn("relative overflow-auto overscroll-contain [scrollbar-width:thin]", max === null && HIDE_AFTER_3)} style={max === null ? undefined : { maxHeight: max }} onScroll={() => setBelow(parts().hidden.length)}>
           {children}
         </div>
-        <div aria-hidden className={cn("pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-black/25 to-transparent transition-opacity dark:from-black/50", !below && "opacity-0")} />
+        <div aria-hidden className={cn("pointer-events-none absolute inset-x-0 bottom-0 h-3 bg-gradient-to-t from-black/25 to-transparent transition-opacity dark:from-black/50", !below && "opacity-0")} />
       </div>
-      <button type="button" onClick={step} className="flex w-full items-center justify-center gap-1.5 border-t border-line bg-slate-50/70 py-2 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800">
+      <button type="button" onClick={step} className="flex w-full items-center justify-center gap-1 border-t border-line py-1.5 text-[11px] text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800">
         {below ? (
           <>
-            <ChevronDown className="size-3.5" />
+            <ChevronDown className="size-3" />
             Scroll for {below} more
           </>
         ) : (
           <>
-            <ChevronUp className="size-3.5" />
+            <ChevronUp className="size-3" />
             Back to the top
           </>
         )}
@@ -115,30 +115,28 @@ export default function AttentionPanel({ items, tabs = DIRECTOR_TABS, empty = "N
 
   return (
     <section id="attention" aria-label="Needs your attention" className={cn("scroll-mt-20", className)}>
-      <h2 className="mb-3 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+      <h2 className="mb-2.5 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
         Needs your attention
         <span className="rounded-full bg-[#fdebc4] px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#3a2a00]">{items.length}</span>
       </h2>
-      <div className="card overflow-hidden rounded-2xl">
-        <div className="flex gap-1.5 overflow-x-auto border-b border-line px-4 py-2.5 [scrollbar-width:none]" role="tablist" aria-label="Filter">
-          {chips.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.key}
-              onClick={() => setTab(t.key)}
-              className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors", tab === t.key ? "border-sky-500 bg-sky-500 text-white" : "border-line text-slate-600 hover:bg-slate-100")}
-            >
-              {t.label}
-              <span className={cn("tabular-nums", tab === t.key ? "text-white/80" : "text-slate-500")}>{count(t.key)}</span>
-            </button>
-          ))}
-        </div>
-
+      <div className="mb-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Filter">
+        {chips.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => setTab(t.key)}
+            className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors", tab === t.key ? "bg-sky-500 text-white" : "bg-slate-100 text-slate-600 hover:text-slate-900")}
+          >
+            {t.label} <span className="opacity-60">{count(t.key)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="card overflow-hidden rounded-xl">
         {shown.length === 0 ? (
-          <div className="flex items-center gap-3 px-4 py-4 text-sm text-emerald-700 sm:px-5">
-            <CircleCheck size={18} />
+          <div className="flex items-center gap-2.5 px-3.5 py-3 text-[13px] text-emerald-700">
+            <CircleCheck size={16} />
             {items.length === 0 ? empty : "Nothing here."}
           </div>
         ) : (
@@ -148,23 +146,23 @@ export default function AttentionPanel({ items, tabs = DIRECTOR_TABS, empty = "N
                 const Icon = ICONS[i.icon] ?? AlertTriangle;
                 return (
                   <li key={i.id} data-row>
-                    <Link href={i.href} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50 sm:px-5">
-                      <span aria-hidden className={cn("h-8 w-[3px] shrink-0 rounded-full", BAR[i.tone])} />
-                      <Icon className={cn("size-[18px] shrink-0", ICON_TONE[i.tone])} />
-                      <span className="min-w-0 flex-1 leading-snug">
-                        <span className="block text-sm font-semibold text-slate-900">{i.title}</span>
-                        <span className="block truncate text-xs text-slate-500">
+                    <Link href={i.href} className="group flex items-center gap-2.5 px-3.5 py-2.5 transition-colors hover:bg-slate-50">
+                      <span aria-hidden className={cn("h-7 w-[3px] shrink-0 rounded-full", BAR[i.tone])} />
+                      <Icon className={cn("size-4 shrink-0", ICON_TONE[i.tone])} />
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900 sm:line-clamp-1">{i.title}</span>
+                        <span className="block truncate text-[11px] leading-tight text-slate-500">
                           {i.main && <span className="font-medium text-slate-700 sm:hidden">{i.main} · </span>}
                           {i.detail}
                         </span>
                       </span>
                       {(i.main || i.sub) && (
-                        <span className="hidden shrink-0 text-right text-xs leading-snug text-slate-500 sm:block">
-                          {i.main && <span className="block font-medium tabular-nums text-slate-600">{i.main}</span>}
-                          {i.sub && <span className="block tabular-nums">{i.sub}</span>}
+                        <span className="hidden shrink-0 text-right leading-tight sm:block">
+                          {i.main && <span className="block text-[13px] font-bold tabular-nums text-slate-900">{i.main}</span>}
+                          {i.sub && <span className="block text-[11px] tabular-nums text-slate-500">{i.sub}</span>}
                         </span>
                       )}
-                      <ChevronRight className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+                      <ChevronRight className="size-3.5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />
                     </Link>
                   </li>
                 );
