@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Package } from "lucide-react";
+import { ChevronRight, Package } from "lucide-react";
 import QtySwitch from "@/components/QtySwitch";
 import StockChangeButtons from "@/components/inventory/StockChangeButtons";
 import { qtyText, type Pack, type UnitMode } from "@/lib/qty";
@@ -42,7 +42,7 @@ export default function WarehouseStockCard(p: WarehouseStockCardProps) {
   const f = (n: number) => qtyText(n, p.pack, p.baseSymbol, mode).main;
   const pct = p.min && p.min > 0 ? Math.min(100, (p.available / (3 * p.min)) * 100) : null;
   return (
-    <div className="card relative flex h-full flex-col p-3 transition hover:border-navy-200 hover:shadow-md">
+    <div className="card group relative flex h-full cursor-pointer flex-col p-3 transition hover:border-navy-300 hover:shadow-md">
       <div className="flex items-start gap-2.5">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
           {p.imageV ? (
@@ -55,12 +55,16 @@ export default function WarehouseStockCard(p: WarehouseStockCardProps) {
         <div className="min-w-0 flex-1">
           <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug text-slate-900">
             {/* the whole card opens the product's stock (the name link stretches over it); the switch and the buttons stay above it */}
-            <Link href={`/warehouse/stock/${p.id}`} className="after:absolute after:inset-0 after:content-[''] hover:text-navy-700">
+            <Link href={`/warehouse/stock/${p.id}`} className="after:absolute after:inset-0 after:content-[''] group-hover:text-navy-700" aria-label={`Open ${p.name}: movements, totals and performance`}>
               {p.name}
             </Link>
           </h3>
           <p className="truncate text-[10px] text-slate-500">{p.brand ?? p.category}</p>
         </div>
+        {/* the card opens the product's stock (movements, totals, performance): this arrow says so */}
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-navy-700 group-hover:text-[#ffffff]" aria-hidden title="Open">
+          <ChevronRight size={14} />
+        </span>
       </div>
 
       <div className="mt-2.5 flex items-center justify-between gap-1">

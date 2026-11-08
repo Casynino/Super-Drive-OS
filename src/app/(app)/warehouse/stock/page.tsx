@@ -53,7 +53,7 @@ export default async function WarehouseStockPage({ searchParams }: { searchParam
 
   return (
     <>
-      <PageHeader title="Warehouse stock" description={`${all.length} products · ${totals.qty.toLocaleString("en-US")} pieces in the warehouse, ${totals.reserved.toLocaleString("en-US")} of them sold and waiting to be collected.`} />
+      <PageHeader title="Warehouse stock" description={`${all.length} products · ${totals.qty.toLocaleString("en-US")} pieces in the warehouse, ${totals.reserved.toLocaleString("en-US")} of them sold and waiting to be collected. Press a product to open it: its movements, totals and performance.`} />
       <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2.5">
         <div className="flex flex-wrap gap-2">
           {([["all", "All"], ["low", "Running low"], ["out", "Out of stock"], ["reserved", "Reserved"]] as const).map(([k, label]) => (
