@@ -98,9 +98,9 @@ export const NAV: NavGroup[] = [
       { label: "Stock", href: "/warehouse/stock", icon: Boxes, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
       { label: "Issues", href: "/warehouse/discrepancies", icon: ScrollText, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
       { label: "Pickups", href: "/warehouse/orders", icon: ClipboardCheck, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
-      { label: "Receiving", href: "/shipments", icon: Truck, permissions: ["shipments.receive"], ready: true, badge: "incoming", hideIfAny: ["shipments.manage"], also: ["/inventory/receiving"] },
-      // the warehouse person has everything under Warehouse: Products sits below Receiving (Nino 2026-11-08); everyone else finds it under Stock
+      // the warehouse person has everything under Warehouse: Products (everyone else finds it under Stock), then Receiving goes down (Nino 2026-11-08)
       { label: "Products", href: "/products", icon: Package, permissions: ["products.view"], ready: true, onlyIf: ["warehouse.operate"], also: ["/items", "/inventory/transfers", "/inventory/movements", "/inventory/adjustments"] },
+      { label: "Receiving", href: "/shipments", icon: Truck, permissions: ["shipments.receive"], ready: true, badge: "incoming", hideIfAny: ["shipments.manage"], also: ["/inventory/receiving"] },
       { label: "Collected", href: "/warehouse/history", icon: PackageCheck, permissions: ["warehouse.operate", "warehouse.view"], ready: true },
     ],
   },
