@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, CircleCheck, ClipboardList, Boxes, Lock, Package, PackageCheck, PackageOpen, ScanLine, ScrollText, Search, Timer, TriangleAlert, Truck } from "lucide-react";
+import { ClipboardList, Boxes, Package, ScanLine, ScrollText, Search, Truck } from "lucide-react";
+import AttentionPanel, { type AttentionItem, type AttentionTab } from "@/components/dashboard/AttentionPanel";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { ColumnsChart, DonutChart, InOutChart } from "@/components/dashboard/Charts";
 import HomeBanner from "@/components/HomeBanner";
@@ -17,6 +18,11 @@ import { cn, formatDateTime } from "@/lib/utils";
 
 export const metadata = { title: "Home" };
 
+const WAREHOUSE_TABS: AttentionTab[] = [
+  { key: "orders", label: "Orders" },
+  { key: "deliveries", label: "Deliveries" },
+  { key: "stock", label: "Stock" },
+];
 const nf = (v: number) => new Intl.NumberFormat("en-US").format(Math.round(v));
 const dayWord = (d: Date) => {
   const n = Math.floor((Date.now() - d.getTime()) / 86_400_000);
@@ -50,13 +56,13 @@ export default async function WarehouseHome() {
   const arrived = s.inbound.filter((i) => i.arrivedAt);
   const onTheWay = s.inbound.filter((i) => !i.arrivedAt);
 
-  const attention: { key: string; title: string; detail: string; figure?: string; href: string; tone: "red" | "amber" | "blue" }[] = [
-    ...(s.issuesOpen > 0 ? [{ key: "issues", title: `${s.issuesOpen} deliver${s.issuesOpen === 1 ? "y" : "ies"} with a discrepancy`, detail: "Goods missing, damaged or different from the order.", href: "/warehouse/discrepancies", tone: "red" as const }] : []),
-    ...(s.isNew > 0 ? [{ key: "new", title: `${s.isNew} new order${s.isNew === 1 ? "" : "s"} to prepare`, detail: "Sold, paid or on approved credit, and waiting for you.", figure: s.oldest ? `oldest ${dayWord(s.oldest.createdAt)}` : undefined, href: "/warehouse/orders?f=new", tone: "amber" as const }] : []),
-    ...(arrived.length > 0 ? [{ key: "arrived", title: `${arrived.length} deliver${arrived.length === 1 ? "y" : "ies"} to count`, detail: "Arrived at the warehouse. Count it and confirm what is good and what is not.", href: "/shipments", tone: "amber" as const }] : []),
-    ...(s.partial > 0 ? [{ key: "partial", title: `${s.partial} partly collected`, detail: "Part of the goods left. The rest is still reserved for the person.", href: "/warehouse/orders?f=partial", tone: "amber" as const }] : []),
-    ...(s.ready > 0 ? [{ key: "ready", title: `${s.ready} ready for collection`, detail: "Picked and set aside. Waiting for the person to come.", href: "/warehouse/orders?f=ready", tone: "blue" as const }] : []),
-    ...(s.out + s.low > 0 ? [{ key: "stock", title: `${s.out} out of stock, ${s.low} running low`, detail: "Tell the Director so more can be ordered.", href: "/warehouse/stock?s=out", tone: "amber" as const }] : []),
+  const attention: AttentionItem[] = [
+    ...(s.issuesOpen > 0 ? [{ id: "issues", group: "deliveries", tone: "red" as const, icon: "issue" as const, title: `${s.issuesOpen} deliver${s.issuesOpen === 1 ? "y" : "ies"} with a discrepancy`, detail: "Goods missing, damaged or different from the order.", href: "/warehouse/discrepancies" }] : []),
+    ...(s.isNew > 0 ? [{ id: "new", group: "orders", tone: "amber" as const, icon: "orders" as const, title: `${s.isNew} new order${s.isNew === 1 ? "" : "s"} to prepare`, detail: "Sold, paid or on approved credit, and waiting for you.", main: s.oldest ? `oldest ${dayWord(s.oldest.createdAt)}` : undefined, href: "/warehouse/orders?f=new" }] : []),
+    ...(arrived.length > 0 ? [{ id: "arrived", group: "deliveries", tone: "amber" as const, icon: "shipment" as const, title: `${arrived.length} deliver${arrived.length === 1 ? "y" : "ies"} to count`, detail: "Arrived at the warehouse. Count it and confirm what is good and what is not.", href: "/shipments" }] : []),
+    ...(s.partial > 0 ? [{ id: "partial", group: "orders", tone: "amber" as const, icon: "partial" as const, title: `${s.partial} partly collected`, detail: "Part of the goods left. The rest is still reserved for the person.", href: "/warehouse/orders?f=partial" }] : []),
+    ...(s.ready > 0 ? [{ id: "ready", group: "orders", tone: "blue" as const, icon: "ready" as const, title: `${s.ready} ready for collection`, detail: "Picked and set aside. Waiting for the person to come.", href: "/warehouse/orders?f=ready" }] : []),
+    ...(s.out + s.low > 0 ? [{ id: "stock", group: "stock", tone: "amber" as const, icon: "stock" as const, title: `${s.out} out of stock, ${s.low} running low`, detail: "Tell the Director so more can be ordered.", href: "/warehouse/stock?s=out" }] : []),
   ];
   const totalIn = s.days.reduce((t, d) => t + d.received, 0);
   const totalOut = s.days.reduce((t, d) => t + d.released, 0);
@@ -101,29 +107,9 @@ export default async function WarehouseHome() {
 
       <section className="mb-5" aria-label="Needs your attention">
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Needs your attention <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] normal-case tracking-normal text-slate-600">{attention.length}</span>
+          Needs your attention <span className="ml-1.5 rounded-full bg-oil-400 px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#0a1424]">{attention.length}</span>
         </h2>
-        {attention.length === 0 ? (
-          <div className="card flex items-center gap-3 px-5 py-5 text-sm text-emerald-700">
-            <CircleCheck size={20} /> Nothing needs you right now. The warehouse is up to date.
-          </div>
-        ) : (
-          <ul className="card divide-y divide-line overflow-hidden">
-            {attention.map((a) => (
-              <li key={a.key}>
-                <Link href={a.href} className="flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50 sm:px-5">
-                  <span className={cn("h-9 w-1 shrink-0 rounded-full", a.tone === "red" ? "bg-brand-red" : a.tone === "amber" ? "bg-oil-400" : "bg-sky-500")} aria-hidden />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-slate-900">{a.title}</span>
-                    <span className="block truncate text-xs text-slate-500">{a.detail}</span>
-                  </span>
-                  {a.figure && <span className="hidden shrink-0 text-xs text-slate-500 sm:block">{a.figure}</span>}
-                  <ChevronRight size={16} className="shrink-0 text-slate-400" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        <AttentionPanel items={attention} tabs={WAREHOUSE_TABS} empty="Nothing needs you right now. The warehouse is up to date." />
       </section>
 
       {/* the numbers, compact: two cards with four figures each */}

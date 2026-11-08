@@ -3,6 +3,7 @@ import { getUnitMode } from "@/lib/unit-mode";
 import Link from "next/link";
 import { getTillToday } from "@/lib/cash/summary";
 import { Boxes, HandCoins, Package, Receipt, ReceiptText, Undo2, Wallet } from "lucide-react";
+import AttentionPanel, { type AttentionItem, type AttentionTab } from "@/components/dashboard/AttentionPanel";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { ColumnsChart, DonutChart, TopProductsChart } from "@/components/dashboard/Charts";
 import { SaleStatusBadge } from "../sales/StatusBadge";
@@ -21,6 +22,11 @@ import { formatDate } from "@/lib/utils";
 const TZ = "Africa/Dar_es_Salaam";
 const timeOf = (d: Date) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(d);
 const hourOf = (d: Date) => Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: TZ }).format(d)) % 24;
+const SHOP_TABS: AttentionTab[] = [
+  { key: "sales", label: "Sales" },
+  { key: "money", label: "Money" },
+  { key: "stock", label: "Stock" },
+];
 const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? "am" : "pm"}`;
 
 // The shop attendant's overview of the day (opened from the menu; the attendant's home is the POS).
@@ -100,6 +106,14 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
   const okN = Math.max((alerts?.active ?? 0) - outN - lowN, 0);
   const attention = alerts ? [...alerts.out.map((a) => ({ ...a, out: true })), ...alerts.low.map((a) => ({ ...a, out: false }))].slice(0, 6) : [];
 
+  // what needs him now (same panel as the other home pages: three rows show, the rest scroll)
+  const needs: AttentionItem[] = [];
+  const nameList = (rows: { name: string }[]) => rows.slice(0, 3).map((r) => r.name).join(", ") + (rows.length > 3 ? ` and ${rows.length - 3} more` : "");
+  if (closingNote?.link) needs.push({ id: "closing", group: "money", tone: olderOpen.length > 0 ? "red" : "amber", icon: "closing", title: olderOpen.length > 0 ? "Cash waiting to be closed" : "Time to close the day", detail: closingNote.text, href: "/closing" });
+  if (pendingMine > 0) needs.push({ id: "returns", group: "sales", tone: "amber", icon: "returns", title: `${pendingMine} return${pendingMine === 1 ? "" : "s"} waiting for the manager`, detail: "Goods and money stay as they are until it is approved.", href: "/sales" });
+  if (alerts && outN > 0) needs.push({ id: "out", group: "stock", tone: "red", icon: "stock", title: `${outN} product${outN === 1 ? "" : "s"} out of stock`, detail: nameList(alerts.out), href: "/inventory?status=out" });
+  if (alerts && lowN > 0) needs.push({ id: "low", group: "stock", tone: "amber", icon: "stock", title: `${lowN} product${lowN === 1 ? "" : "s"} running low`, detail: nameList(alerts.low), href: "/inventory?status=low" });
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
@@ -107,15 +121,16 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Today</h1>
           <p className="mt-1 text-sm text-slate-500">{new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: TZ }).format(new Date())}</p>
         </div>
-        {closingNote &&
-          (closingNote.link ? (
-            <Link href="/closing" className="text-sm font-medium text-slate-700 hover:text-navy-700 hover:underline">
-              {closingNote.text} · Close &amp; deposit →
-            </Link>
-          ) : (
-            <p className="text-sm font-medium text-slate-700">{closingNote.text}</p>
-          ))}
+        {/* a closing that is waiting is the first row of "Needs your attention" below, so only "done today" is said here */}
+        {closingNote && !closingNote.link && <p className="text-sm font-medium text-slate-700">{closingNote.text}</p>}
       </div>
+
+      <section aria-label="Needs your attention">
+        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          Needs your attention <span className="ml-1.5 rounded-full bg-oil-400 px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#0a1424]">{needs.length}</span>
+        </h2>
+        <AttentionPanel items={needs} tabs={SHOP_TABS} empty="Nothing needs you right now." />
+      </section>
 
       {sells && (
         <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
