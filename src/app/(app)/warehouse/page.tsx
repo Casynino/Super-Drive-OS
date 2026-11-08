@@ -177,7 +177,7 @@ export default async function WarehouseHome() {
               const bar = p.status === "out" ? "bg-rose-500" : p.status === "low" ? "bg-oil-400" : "bg-emerald-500";
               return (
                 <li key={p.id}>
-                  <Link href={`/warehouse/stock?q=${encodeURIComponent(p.name)}`} className="card block h-full p-3 transition hover:border-navy-300">
+                  <Link href={`/warehouse/stock/${p.id}`} className="card block h-full p-3 transition hover:border-navy-300" aria-label={`Open ${p.name}`}>
                     <div className="flex items-center gap-2.5">
                       <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-gradient-to-b from-white to-slate-100">
                         {p.imageV ? (
@@ -305,7 +305,11 @@ export default async function WarehouseHome() {
               <tbody className="divide-y divide-slate-100">
                 {s.moves.slice(0, 6).map((m) => (
                   <tr key={m.product.id}>
-                    <td className="w-full max-w-0 truncate px-4 py-2 font-medium text-slate-900 sm:px-5">{m.product.name}</td>
+                    <td className="w-full max-w-0 truncate px-4 py-2 font-medium text-slate-900 sm:px-5">
+                      <Link href={`/warehouse/stock/${m.product.id}`} className="hover:text-navy-700 hover:underline">
+                        {m.product.name}
+                      </Link>
+                    </td>
                     <td className="whitespace-nowrap px-2 py-2 text-right font-semibold tabular-nums text-emerald-600">{m.received > 0 ? `+${qtyText(m.received, m.product.pack, m.product.symbol, unitMode).main}` : "—"}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums text-navy-700 sm:px-5">{m.released > 0 ? `−${qtyText(m.released, m.product.pack, m.product.symbol, unitMode).main}` : "—"}</td>
                   </tr>
