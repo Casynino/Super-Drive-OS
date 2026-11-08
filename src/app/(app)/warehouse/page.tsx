@@ -105,12 +105,7 @@ export default async function WarehouseHome() {
         </button>
       </form>
 
-      <section className="mb-5" aria-label="Needs your attention">
-        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Needs your attention <span className="ml-1.5 rounded-full bg-oil-400 px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#0a1424]">{attention.length}</span>
-        </h2>
-        <AttentionPanel items={attention} tabs={WAREHOUSE_TABS} empty="Nothing needs you right now. The warehouse is up to date." />
-      </section>
+      <AttentionPanel items={attention} tabs={WAREHOUSE_TABS} empty="Nothing needs you right now. The warehouse is up to date." className="mb-5" />
 
       {/* the numbers, compact: two cards with four figures each */}
       <div className="mb-5 grid gap-4 lg:grid-cols-2">

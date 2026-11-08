@@ -125,12 +125,7 @@ export default async function ShopOverview({ user }: { user: SessionUser }) {
         {closingNote && !closingNote.link && <p className="text-sm font-medium text-slate-700">{closingNote.text}</p>}
       </div>
 
-      <section aria-label="Needs your attention">
-        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Needs your attention <span className="ml-1.5 rounded-full bg-oil-400 px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#0a1424]">{needs.length}</span>
-        </h2>
-        <AttentionPanel items={needs} tabs={SHOP_TABS} empty="Nothing needs you right now." />
-      </section>
+      <AttentionPanel items={needs} tabs={SHOP_TABS} empty="Nothing needs you right now." />
 
       {sells && (
         <div className="grid gap-3 sm:gap-4 [grid-template-columns:repeat(auto-fit,minmax(11.5rem,1fr))]">
