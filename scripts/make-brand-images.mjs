@@ -2,6 +2,7 @@
 // icon.png      tab icon: the red O with the oil drop, big, on navy (the full logo is unreadable at 16 px)
 // apple-icon    home-screen icon on iPhone / iPad: the full logo
 // app-*.png     the app icons of the installed web app (manifest.ts)
+// splash/*.png  the launch screen an iPhone shows while the installed app opens (one per screen size; without it iOS flashes white)
 // og-share.png  the picture WhatsApp, Facebook, LinkedIn and others show when the link is shared (1200 x 630)
 import sharp from "sharp";
 import { join } from "node:path";
@@ -53,4 +54,24 @@ await sharp({ create: { width: W, height: H, channels: 4, background: NAVY } })
   .flatten({ background: NAVY })
   .png({ compressionLevel: 9, palette: false })
   .toFile(join(root, "public/brand/og-share.png"));
+
+// launch screens for iPhones (portrait): navy with the logo in the middle. The sizes are CSS points x pixel ratio, see appleWebApp.startupImage in layout.tsx.
+import { mkdirSync } from "node:fs";
+export const SPLASH = [
+  [440, 956, 3], [430, 932, 3], [428, 926, 3], [420, 912, 3], [414, 896, 3], [414, 896, 2], [414, 736, 3],
+  [402, 874, 3], [393, 852, 3], [390, 844, 3], [375, 812, 3], [375, 667, 2], [320, 568, 2],
+];
+mkdirSync(join(root, "public/brand/splash"), { recursive: true });
+for (const [w, h, r] of SPLASH) {
+  const pw = w * r;
+  const ph = h * r;
+  const lw = Math.round(pw * 0.5);
+  const img = await sharp(logo).resize({ width: lw }).toBuffer();
+  const lh = (await sharp(img).metadata()).height;
+  await sharp({ create: { width: pw, height: ph, channels: 4, background: NAVY } })
+    .composite([{ input: img, left: Math.round((pw - lw) / 2), top: Math.round((ph - lh) / 2) - Math.round(ph * 0.03) }])
+    .flatten({ background: NAVY })
+    .png({ compressionLevel: 9, palette: true })
+    .toFile(join(root, `public/brand/splash/${w}x${h}@${r}.png`));
+}
 console.log("done");

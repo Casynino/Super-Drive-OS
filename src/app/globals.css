@@ -230,6 +230,21 @@ body {
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
 body { overflow-x: clip; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); }
 
+/* Full screen like an app (Nino 2026-11-09). The installed app runs under the phone's status bar (clock, battery): this strip is the status bar's own
+   colour (navy in the light look, the page colour in the dark look) so the white clock is always readable. In a browser tab the top inset is 0, so the strip has no height. */
+.status-strip { position: fixed; inset: 0 0 auto 0; z-index: 100; height: env(safe-area-inset-top, 0px); background: #0a1a33; pointer-events: none; }
+html.dark .status-strip { background: #0a1220; }
+@media print { .status-strip { display: none; } }
+/* taps act at once (no double-tap zoom), buttons and menu links are not selected by a long press, like in a native app */
+html { touch-action: manipulation; }
+@media (pointer: coarse) {
+  button, [role="button"], [role="tab"], [role="menuitem"], nav a, summary { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+}
+/* iPhone Safari zooms the whole page when a field smaller than 16 px is tapped and then stays zoomed: fields are 16 px on phones so the app never jumps */
+@media (max-width: 767px) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]), select, textarea { font-size: 16px; }
+}
+
 /* ───────── Glass sidebar (Nino 2026-11-08, from the "Glassy SideBar V5" reference): a tall, very round, frosted panel with a soft light at
    the top and a warm glow at the bottom; the open page is a bright-ringed glass pill; rows light up softly on hover. Works in both themes. ───────── */
 .glass-panel {

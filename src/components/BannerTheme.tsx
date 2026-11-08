@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { applyTheme } from "@/lib/theme-client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,8 +15,7 @@ export default function BannerTheme({ className }: { className?: string }) {
   const toggle = () => {
     const next = !dark;
     setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    document.cookie = `sd-theme=${next ? "dark" : "light"}; path=/; max-age=31536000; samesite=lax`;
+    applyTheme(next);
   };
   const label = dark ? "Switch to the light look" : "Switch to night mode";
   return (

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { applyTheme } from "@/lib/theme-client";
+import { InstallSheet, useInstall } from "@/components/InstallApp";
 
 function initials(name: string) {
   return name
@@ -21,6 +23,8 @@ export default function UserMenu({ name, roleName, logoutAction }: { name: strin
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(true);
+  const [sheet, setSheet] = useState(false);
+  const inst = useInstall();
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => setOpen(false), [pathname]);
@@ -40,8 +44,7 @@ export default function UserMenu({ name, roleName, logoutAction }: { name: strin
   const toggleTheme = () => {
     const next = !dark;
     setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    document.cookie = `sd-theme=${next ? "dark" : "light"}; path=/; max-age=31536000; samesite=lax`;
+    applyTheme(next);
   };
   const row = "block w-full px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-100 hover:text-slate-900";
 
@@ -65,6 +68,11 @@ export default function UserMenu({ name, roleName, logoutAction }: { name: strin
             <Link href="/account#password" role="menuitem" className={row}>
               Change password
             </Link>
+            {inst.ready && inst.phone && !inst.installed && (
+              <button type="button" role="menuitem" onClick={() => { setOpen(false); setSheet(true); }} className={row}>
+                Get the app
+              </button>
+            )}
             <button type="button" role="menuitem" onClick={toggleTheme} className={row}>
               {dark ? "Light look" : "Dark look"}
             </button>
@@ -76,6 +84,7 @@ export default function UserMenu({ name, roleName, logoutAction }: { name: strin
           </form>
         </div>
       )}
+      <InstallSheet open={sheet} onClose={() => setSheet(false)} />
     </div>
   );
 }

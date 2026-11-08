@@ -6,12 +6,16 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "Super Drive Oil",
     short_name: "Super Drive",
     description: "Sales, inventory and distribution management for Super Drive Oil.",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",
+    display_override: ["standalone"],
+    categories: ["business", "productivity"],
+    lang: "en",
     orientation: "any",
     background_color: "#0a1a33",
     theme_color: "#0a1a33",

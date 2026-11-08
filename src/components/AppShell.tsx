@@ -7,6 +7,7 @@ import { trackPage } from "@/lib/auth/track-page";
 import { useEffect, useRef, useState } from "react";
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, House, Menu, Search, X } from "lucide-react";
 import SidebarFooter from "@/components/SidebarFooter";
+import { InstallPrompt } from "@/components/InstallApp";
 import UserMenu from "@/components/UserMenu";
 import { cn } from "@/lib/utils";
 import { NAV, type NavItem } from "./nav";
@@ -338,7 +339,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
       )}
 
       {/* Top bar on a phone only: menu button, date, bell, person. On a computer or tablet there is none (Nino 2026-11-08: "we do not need this"): the bell is in the sidebar. */}
-      <div className="pointer-events-none sticky top-0 z-20 px-4 pb-3 pt-3 print:hidden sm:px-6 lg:hidden xl:px-8" style={{ background: "linear-gradient(to bottom, var(--color-surface) 60%, transparent)" }}>
+      <div className="pointer-events-none sticky top-0 z-20 px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] print:hidden sm:px-6 lg:hidden xl:px-8" style={{ background: "linear-gradient(to bottom, var(--color-surface) 60%, transparent)" }}>
         <header className="pointer-events-auto flex h-14 items-center justify-between gap-3 rounded-2xl border border-line bg-white/90 px-3 shadow-sm backdrop-blur sm:px-4">
           <div className="flex min-w-0 items-center gap-3">
             <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
@@ -364,6 +365,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
       </div>
 
       <main className="mx-auto w-full max-w-[1920px] px-4 pb-6 pt-3 max-lg:pb-24 sm:px-6 lg:pt-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
+      <InstallPrompt />
 
       {/* Phone and tablet: the bottom bar. Only icons and short words, the open page has a thin yellow bar on top and a yellow icon. */}
       <nav aria-label="Quick" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden print:hidden">

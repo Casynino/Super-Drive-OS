@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowRight, Smartphone, X } from "lucide-react";
+import { InstallButton } from "@/components/InstallApp";
 import { cn } from "@/lib/utils";
 
 /**
@@ -30,6 +31,15 @@ export default function LoginGate({ children }: { children: React.ReactNode }) {
         Log in
         <ArrowRight size={16} />
       </button>
+      {/* a browser tab always keeps its address bar; the installed app is full screen (only phones that have not installed it see this) */}
+      <InstallButton
+        render={(openSheet) => (
+          <button type="button" onClick={openSheet} className="ls-up mt-3 inline-flex items-center gap-1.5 text-[13px] text-white/65 underline-offset-4 transition-colors hover:text-white hover:underline md:hidden" style={{ "--rd": "0.7s" } as React.CSSProperties}>
+            <Smartphone size={14} />
+            Get the full-screen app
+          </button>
+        )}
+      />
 
       <div
         className={cn(

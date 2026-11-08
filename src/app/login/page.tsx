@@ -9,6 +9,8 @@ import LoginScene from "./LoginScene";
 import "./login.css";
 
 export const metadata = { title: "Log in" };
+// the sign-in scene is always dark navy, so the phone's top bar is too (in either look)
+export const viewport = { themeColor: "#061a33" };
 
 const delay = (s: number) => ({ "--rd": `${s}s` }) as CSSProperties;
 

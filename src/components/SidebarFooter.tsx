@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bell, KeyRound, LogOut, Moon, Sun, UserRound } from "lucide-react";
+import { Bell, KeyRound, LogOut, Moon, Smartphone, Sun, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { applyTheme } from "@/lib/theme-client";
+import { InstallSheet, useInstall } from "@/components/InstallApp";
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
@@ -19,6 +21,8 @@ export default function SidebarFooter({ name, roleName, logoutAction, unread = 0
   const pathname = usePathname();
   const [dark, setDark] = useState(true);
   const [menu, setMenu] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const inst = useInstall();
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => setDark(document.documentElement.classList.contains("dark")), []);
@@ -38,8 +42,7 @@ export default function SidebarFooter({ name, roleName, logoutAction, unread = 0
   const toggleTheme = () => {
     const next = !dark;
     setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    document.cookie = `sd-theme=${next ? "dark" : "light"}; path=/; max-age=31536000; samesite=lax`;
+    applyTheme(next);
   };
   const item = "glass-row flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] text-slate-700 hover:text-slate-900";
 
@@ -72,6 +75,11 @@ export default function SidebarFooter({ name, roleName, logoutAction, unread = 0
             <Link href="/account#password" role="menuitem" className={item}>
               <KeyRound size={14} /> Change password
             </Link>
+            {inst.ready && inst.phone && !inst.installed && (
+              <button type="button" role="menuitem" className={item} onClick={() => { setMenu(false); setSheet(true); }}>
+                <Smartphone size={14} /> Get the app
+              </button>
+            )}
             <button type="button" role="menuitem" className={item} onClick={() => { toggleTheme(); setMenu(false); }}>
               {dark ? <Sun size={14} /> : <Moon size={14} />} {dark ? "Light look" : "Night mode"}
             </button>
@@ -83,6 +91,7 @@ export default function SidebarFooter({ name, roleName, logoutAction, unread = 0
           </div>
         )}
       </div>
+      <InstallSheet open={sheet} onClose={() => setSheet(false)} />
     </div>
   );
 }
