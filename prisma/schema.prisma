@@ -805,6 +805,8 @@ model ReversalItem {
   returnValue Decimal         @default(0) @db.Decimal(14, 2) // price charged for these units, set when completed
   costValue   Decimal         @default(0) @db.Decimal(14, 2) // cost restored to stock (0 when damaged), set when completed
 
+  problem StockProblem?
+
   @@index([reversalId])
   @@index([saleItemId])
 }
@@ -1638,8 +1640,10 @@ model StockProblem {
   kind              IssueKind // DAMAGED or MISSING (lost); EXTRA is never reported by hand
   quantity          Decimal          @db.Decimal(14, 3) // base units, taken off the sellable stock when reported
   note              String
-  adjustmentId      String           @unique
-  adjustment        StockAdjustment  @relation("ProblemReport", fields: [adjustmentId], references: [id])
+  adjustmentId      String?          @unique // the stock adjustment that took a hand-reported problem off the shelf (null for a customer return)
+  adjustment        StockAdjustment? @relation("ProblemReport", fields: [adjustmentId], references: [id])
+  reversalItemId    String?          @unique // the damaged line of a customer return this problem comes from (null for a hand report)
+  reversalItem      ReversalItem?    @relation(fields: [reversalItemId], references: [id])
   submissionKey     String           @unique
   reportedById      String
   reportedBy        User             @relation("ProblemReporter", fields: [reportedById], references: [id])

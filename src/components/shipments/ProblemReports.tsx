@@ -22,6 +22,9 @@ export type ProblemRow = {
   kind: "DAMAGED" | "MISSING";
   quantity: number;
   note: string;
+  /** the stock adjustment, or the return number, it comes from; and the sale of a returned one */
+  reference: string;
+  saleNo: string | null;
   reportedBy: string;
   reportedAt: string;
   action: "FOUND" | "WRITE_OFF" | "DISCOUNT_SELL" | "KEEP" | "NOT_DELIVERED" | "DISMISS" | null;
@@ -276,16 +279,16 @@ function Decision({ r, action, currencySymbol }: { r: ProblemRow; action: Run; c
   );
 }
 
-export default function ProblemReports({ open, decided, products, canReport, reportAction, decideAction, currencySymbol }: { open: ProblemRow[]; decided: ProblemRow[]; products: ReportProduct[]; canReport: boolean; reportAction: Run; decideAction: Run; currencySymbol: string }) {
+export default function ProblemReports({ open, decided, products, canReport, reportAction, decideAction, currencySymbol, title = "Reported at the warehouse", intro, emptyText = "Nothing reported by hand yet." }: { open: ProblemRow[]; decided: ProblemRow[]; products: ReportProduct[]; canReport: boolean; reportAction: Run; decideAction: Run; currencySymbol: string; /** the card's heading, its line when nothing is open, and the line when there is nothing at all */ title?: string; intro?: string; emptyText?: string }) {
   const [modal, setModal] = useState(false);
   if (!canReport && open.length === 0 && decided.length === 0) return null;
   return (
-    <section className="card mb-4 overflow-hidden" aria-label="Problems reported at the warehouse">
+    <section className="card mb-4 overflow-hidden" aria-label={title}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Reported at the warehouse</h2>
+          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           <p className="text-sm text-slate-500">
-            {open.length > 0 ? `${open.length} product${open.length === 1 ? "" : "s"} to decide. Damaged or lost pieces are already off the shelf.` : "Damaged or lost goods you find on the shelf. They leave the sellable stock at once."}
+            {open.length > 0 ? `${open.length} product${open.length === 1 ? "" : "s"} to decide. Damaged or lost pieces are already off the shelf.` : (intro ?? "Damaged or lost goods you find on the shelf. They leave the sellable stock at once.")}
           </p>
         </div>
         {canReport && (
@@ -307,7 +310,7 @@ export default function ProblemReports({ open, decided, products, canReport, rep
                     <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", r.kind === "DAMAGED" ? "bg-brand-red-soft text-brand-red-dark" : "bg-oil-soft text-yellow-800")}>{KIND_LABEL[r.kind]}</span>
                   </p>
                   <p className="text-xs text-slate-500">
-                    {r.sku} · reported by {r.reportedBy} · {ago(r.reportedAt)}
+                    {[r.sku, r.saleNo, r.reference].filter(Boolean).join(" · ")} · {r.saleNo ? "returned by" : "reported by"} {r.reportedBy} · {ago(r.reportedAt)}
                   </p>
                   <p className="mt-1 text-sm text-slate-700">{r.note}</p>
                 </div>
@@ -348,7 +351,7 @@ export default function ProblemReports({ open, decided, products, canReport, rep
 
       {open.length === 0 && decided.length === 0 && (
         <p className="flex items-center gap-2 px-4 py-5 text-sm text-slate-500 sm:px-5">
-          <TriangleAlert size={15} className="shrink-0" /> Nothing reported by hand yet.
+          <TriangleAlert size={15} className="shrink-0" /> {emptyText}
         </p>
       )}
 

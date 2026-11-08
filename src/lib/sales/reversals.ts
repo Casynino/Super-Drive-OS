@@ -198,6 +198,8 @@ export async function completeReversal(tx: Tx, input: { reversalId: string; appr
       // The same pieces come back and are marked damaged.
       const back = await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "CUSTOMER_RETURN", delta: physical, unitCost, reason: `${reversal.reason} (damaged)` }, { saleItemId: p.line.saleItemId });
       await moveStockTracked(tx, { ...ref, productId: p.line.productId, locationId: sale.locationId, type: "DAMAGED", delta: physical.neg(), unitCost, reason: `Returned damaged: ${reversal.reason}` }, { itemIds: back.itemIds });
+      // the pieces are off the shelf, but what happens to them (found fine, written off, sold cheaper) is decided on the warehouse Issues list
+      await tx.stockProblem.create({ data: { productId: p.line.productId, locationId: sale.locationId, kind: "DAMAGED", quantity: physical, note: reversal.reason, reversalItemId: p.line.id, submissionKey: `return:${p.line.id}`, reportedById: reversal.requestedById } });
     }
   }
   if (note) await settlePickupNote(tx, { noteId: note.id, userId: input.approver.id, reason: `${reversal.reversalNo}: ${reversal.reason}` });

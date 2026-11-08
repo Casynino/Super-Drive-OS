@@ -314,16 +314,17 @@ export async function disposeDamagedItems(tx: Tx, i: { shipmentId: string; produ
 }
 
 /**
- * Same as disposeDamagedItems, for a problem reported by hand: the pieces that went DAMAGED because of that stock adjustment are marked DISPOSED.
+ * Same as disposeDamagedItems, for a problem decided from the warehouse list (reported by hand, or goods a customer returned damaged): the pieces that went
+ * DAMAGED because of that stock adjustment / sale reversal (`sourceType` + `sourceId`, as written on their item movements) are marked DISPOSED.
  * (Lost pieces stay MISSING: nothing to throw away.) No stock changes.
  */
-export async function disposeReportedItems(tx: Tx, i: { adjustmentId: string; productId: string; qty: Dec } & Refs): Promise<number> {
+export async function disposeReportedItems(tx: Tx, i: { sourceType: string; sourceId: string; productId: string; qty: Dec } & Refs): Promise<number> {
   if (!(await isTracked(tx, i.productId))) return 0;
   const n = whole(i.qty);
   const rows = await tx.$queryRaw<Row[]>`
     SELECT it."id", it."status", it."locationId" FROM "InventoryItem" it
      WHERE it."productId" = ${i.productId} AND it."status" = 'DAMAGED'
-       AND EXISTS (SELECT 1 FROM "ItemMovement" m WHERE m."itemId" = it."id" AND m."toStatus" = 'DAMAGED' AND m."referenceType" = 'StockAdjustment' AND m."referenceId" = ${i.adjustmentId})
+       AND EXISTS (SELECT 1 FROM "ItemMovement" m WHERE m."itemId" = it."id" AND m."toStatus" = 'DAMAGED' AND m."referenceType" = ${i.sourceType} AND m."referenceId" = ${i.sourceId})
      ORDER BY it."itemNo" DESC LIMIT ${n} FOR UPDATE OF it`;
   if (rows.length) await transition(tx, rows, { kind: "DISPOSED", toStatus: "DISPOSED", auto: false, referenceType: i.referenceType, referenceId: i.referenceId, referenceNo: i.referenceNo, note: i.note, userId: i.userId });
   return rows.length;

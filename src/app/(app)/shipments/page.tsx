@@ -86,8 +86,8 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   // Problems reported by hand on products already in stock (the warehouse person AND the owner can report and decide them)
   const canReport = can(user, "inventory.report_damage") || manage;
   const canDecide = manage || receive;
-  const openProblemCount = await db.stockProblem.count({ where: { action: null } });
-  const problems = tab === "investigation" ? await loadProblems(db) : { open: [], decided: [] };
+  const openProblemCount = await db.stockProblem.count({ where: { action: null, adjustmentId: { not: null } } }); // goods a customer brought back damaged are decided on the warehouse Issues page
+  const problems = tab === "investigation" ? await loadProblems(db, { source: "hand" }) : { open: [], decided: [] };
   const reportProducts =
     tab === "investigation" && canReport
       ? await (async () => {

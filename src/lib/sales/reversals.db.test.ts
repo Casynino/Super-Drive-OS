@@ -10,6 +10,7 @@ import { postSale, type SaleInput } from "./post-sale";
 import { getStatement } from "./statement";
 import { customerCredit } from "./collections";
 import { completeReversal, createReversalRequest, rejectReversal, ReversalError } from "./reversals";
+import { decideProblem } from "@/lib/shipments/problems";
 
 const D = (v: string | number) => new Prisma.Decimal(v);
 let cashierId: string;
@@ -162,6 +163,41 @@ describe("damaged returns", () => {
     const item = await db.reversalItem.findFirstOrThrow({ where: { reversalId: r.reversal.id } });
     expect([item.returnValue.toString(), item.costValue.toString()]).toEqual(["50000", "0"]); // customer is credited, cost is not restored
     expect(r.refund.toString()).toBe("50000");
+    // the damaged pieces wait on the warehouse Issues list for a decision (found / write off / sell cheaper)
+    const problem = await db.stockProblem.findUniqueOrThrow({ where: { reversalItemId: item.id } });
+    expect([problem.kind, problem.quantity.toString(), problem.action, problem.adjustmentId]).toEqual(["DAMAGED", "2", null, null]);
+  });
+
+  it("a resellable return is not a problem", async () => {
+    const w = await world();
+    const sale = await sell(w, 4);
+    const r = await approve((await request(sale.id, "RETURN", [{ quantity: "1" }])).id);
+    const items = await db.reversalItem.findMany({ where: { reversalId: r.reversal.id } });
+    expect(await db.stockProblem.count({ where: { reversalItemId: { in: items.map((i) => i.id) } } })).toBe(0);
+  });
+
+  it("the damaged pieces can then be put back as found, or written off, from the Issues list", async () => {
+    const w = await world();
+    const problemOf = async (reversalId: string) => {
+      const item = await db.reversalItem.findFirstOrThrow({ where: { reversalId } });
+      return db.stockProblem.findUniqueOrThrow({ where: { reversalItemId: item.id } });
+    };
+    const decide = (problemId: string, action: "FOUND" | "WRITE_OFF", note: string | null) => db.$transaction((tx) => decideProblem(tx, { problemId, action, note, user: { id: managerId }, currencyDecimals: 0 }));
+
+    const r1 = await approve((await request((await sell(w, 4)).id, "RETURN", [{ quantity: "2", condition: "DAMAGED" }])).id);
+    const found = await problemOf(r1.reversal.id);
+    expect(await stock(w)).toBe("96");
+    await decide(found.id, "FOUND", null); // they were fine after all
+    expect(await stock(w)).toBe("98");
+    await expect(decide(found.id, "WRITE_OFF", "again")).rejects.toThrow(/already decided/);
+
+    const r2 = await approve((await request((await sell(w, 3)).id, "RETURN", [{ quantity: "3", condition: "DAMAGED" }])).id);
+    const gone = await problemOf(r2.reversal.id);
+    const before = await stock(w);
+    await expect(decide(gone.id, "WRITE_OFF", null)).rejects.toThrow(); // a reason is needed
+    await decide(gone.id, "WRITE_OFF", "Leaking, cannot be sold");
+    expect(await stock(w)).toBe(before); // the stock was already off the shelf
+    expect(await db.inventoryItem.count({ where: { productId: w.product.id, status: "DISPOSED" } })).toBe(3);
   });
 });
 

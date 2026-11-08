@@ -88,7 +88,7 @@ export type DecideProblemInput = {
 /** Decide a reported problem, once. Updates stock in the same transaction. */
 export async function decideProblem(tx: Tx, input: DecideProblemInput) {
   await tx.$queryRaw`SELECT "id" FROM "StockProblem" WHERE "id" = ${input.problemId} FOR UPDATE`;
-  const p = await tx.stockProblem.findUnique({ where: { id: input.problemId }, include: { adjustment: { select: { adjustmentNo: true } }, product: { select: { name: true, baseUnitId: true, purchasePrice: true, avgCost: true } } } });
+  const p = await tx.stockProblem.findUnique({ where: { id: input.problemId }, include: { adjustment: { select: { adjustmentNo: true } }, reversalItem: { select: { reversalId: true, reversal: { select: { reversalNo: true } } } }, product: { select: { name: true, baseUnitId: true, purchasePrice: true, avgCost: true } } } });
   if (!p) throw new ShipmentError("This problem no longer exists.");
   if (p.action) throw new ShipmentError("This problem was already decided.");
   const kind = p.kind as ReportKind;
@@ -96,7 +96,11 @@ export async function decideProblem(tx: Tx, input: DecideProblemInput) {
   const note = input.note?.trim() || null;
   if (input.action === "WRITE_OFF" && (note?.length ?? 0) < 3) throw new ShipmentError("Write a short reason.", { note: "Give a short reason." });
 
-  const refs = { referenceType: "StockProblem", referenceId: p.id, referenceNo: p.adjustment.adjustmentNo };
+  // where the problem came from: a stock adjustment (reported by hand) or a sale reversal (the customer brought it back damaged); the item history is found through it
+  const sourceType = p.adjustmentId ? "StockAdjustment" : "SaleReversal";
+  const sourceId = p.adjustmentId ?? p.reversalItem?.reversalId ?? "";
+  const sourceNo = p.adjustment?.adjustmentNo ?? p.reversalItem?.reversal.reversalNo ?? "";
+  const refs = { referenceType: "StockProblem", referenceId: p.id, referenceNo: sourceNo };
   let foundAdjustmentId: string | null = null;
   let variantProductId: string | null = null;
   let discountPerBase: Prisma.Decimal | null = null;
@@ -108,14 +112,14 @@ export async function decideProblem(tx: Tx, input: DecideProblemInput) {
     const { adjustment } = await postAdjustment(tx, {
       kind: "INCREASE",
       locationId: p.locationId,
-      reason: `Found after investigation (${p.adjustment.adjustmentNo})${note ? `: ${note}` : ""}`,
+      reason: `Found after investigation (${sourceNo})${note ? `: ${note}` : ""}`,
       submissionKey: `problem-found:${p.id}`,
       lines: resolved.lines,
       user: input.user,
     });
     foundAdjustmentId = adjustment.id;
   } else if (input.action === "WRITE_OFF") {
-    await disposeReportedItems(tx, { adjustmentId: p.adjustmentId, productId: p.productId, qty: p.quantity, ...refs, note: note ?? "Written off after investigation", userId: input.user.id });
+    await disposeReportedItems(tx, { sourceType, sourceId, productId: p.productId, qty: p.quantity, ...refs, note: note ?? "Written off after investigation", userId: input.user.id });
   } else if (input.action === "DISCOUNT_SELL") {
     const moved = await putOnDiscount(tx, {
       productId: p.productId,
@@ -126,9 +130,9 @@ export async function decideProblem(tx: Tx, input: DecideProblemInput) {
       currencyDecimals: input.currencyDecimals,
       user: input.user,
       ...refs,
-      reason: `Damaged packaging reported at the warehouse (${p.adjustment.adjustmentNo}), put on sale at a discount${note ? `: ${note}` : ""}`,
+      reason: `Damaged packaging from the warehouse list (${sourceNo}), put on sale at a discount${note ? `: ${note}` : ""}`,
       disposeOriginal: async (variantName) => {
-        await disposeReportedItems(tx, { adjustmentId: p.adjustmentId, productId: p.productId, qty: p.quantity, ...refs, note: `Moved to ${variantName} to be sold at a discount`, userId: input.user.id });
+        await disposeReportedItems(tx, { sourceType, sourceId, productId: p.productId, qty: p.quantity, ...refs, note: `Moved to ${variantName} to be sold at a discount`, userId: input.user.id });
       },
     });
     variantProductId = moved.variantProductId;
@@ -155,7 +159,10 @@ export type ProblemView = {
   kind: ReportKind;
   quantity: number;
   note: string;
-  adjustmentNo: string;
+  /** the document it comes from: the stock adjustment (reported by hand) or the sale and return numbers (a customer brought it back damaged) */
+  reference: string;
+  /** the sale a returned problem belongs to (null for a hand report) */
+  saleNo: string | null;
   reportedBy: string;
   reportedAt: Date;
   action: IssueAction | null;
@@ -167,17 +174,19 @@ export type ProblemView = {
 };
 
 /** Open problems first (oldest first), then the decided ones (newest first, `decidedLimit` of them). */
-export async function loadProblems(db: Reader, opts: { decidedLimit?: number } = {}): Promise<{ open: ProblemView[]; decided: ProblemView[] }> {
+export async function loadProblems(db: Reader, opts: { decidedLimit?: number; /** by hand (stock adjustment) or from a customer return */ source?: "hand" | "return" } = {}): Promise<{ open: ProblemView[]; decided: ProblemView[] }> {
+  const from = opts.source === "hand" ? { adjustmentId: { not: null } } : opts.source === "return" ? { reversalItemId: { not: null } } : {};
   const include = {
     product: { select: { name: true, sku: true, sellingPrice: true, baseUnit: { select: { symbol: true } }, image: { select: { updatedAt: true } }, units: { select: { factor: true, sellingPrice: true, unit: { select: { symbol: true } } } } } },
     adjustment: { select: { adjustmentNo: true } },
+    reversalItem: { select: { reversal: { select: { reversalNo: true, sale: { select: { saleNo: true } } } } } },
     reportedBy: { select: { name: true } },
     decidedBy: { select: { name: true } },
     variantProduct: { select: { name: true } },
   } as const;
   const [open, decided] = await Promise.all([
-    db.stockProblem.findMany({ where: { action: null }, orderBy: { reportedAt: "asc" }, include }),
-    db.stockProblem.findMany({ where: { action: { not: null } }, orderBy: { decidedAt: "desc" }, take: opts.decidedLimit ?? 15, include }),
+    db.stockProblem.findMany({ where: { action: null, ...from }, orderBy: { reportedAt: "asc" }, include }),
+    db.stockProblem.findMany({ where: { action: { not: null }, ...from }, orderBy: { decidedAt: "desc" }, take: opts.decidedLimit ?? 15, include }),
   ]);
   type Row = (typeof open)[number];
   const view = (r: Row): ProblemView => {
@@ -195,7 +204,8 @@ export async function loadProblems(db: Reader, opts: { decidedLimit?: number } =
       kind: r.kind as ReportKind,
       quantity: Number(r.quantity),
       note: r.note,
-      adjustmentNo: r.adjustment.adjustmentNo,
+      reference: r.adjustment?.adjustmentNo ?? r.reversalItem?.reversal.reversalNo ?? "",
+      saleNo: r.reversalItem?.reversal.sale.saleNo ?? null,
       reportedBy: r.reportedBy.name,
       reportedAt: r.reportedAt,
       action: r.action,

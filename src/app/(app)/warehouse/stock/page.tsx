@@ -2,8 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Search } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
-import WarehouseStockRow from "@/components/warehouse/WarehouseStockRow";
-import { STOCK_ROW_GRID } from "@/components/warehouse/stock-grid";
+import WarehouseStockCard from "@/components/warehouse/WarehouseStockCard";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
@@ -82,39 +81,28 @@ export default async function WarehouseStockPage({ searchParams }: { searchParam
           <EmptyState title="No products match" description="Try another filter or search." />
         </div>
       ) : (
-        <section className="card overflow-hidden">
-          <div className={cn("hidden items-center gap-x-3 border-b border-line bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid", STOCK_ROW_GRID)}>
-            <span />
-            <span>Product</span>
-            <span>Available</span>
-            <span>Level</span>
-            <span>Sold, waiting</span>
-            <span>Status</span>
-            <span className="text-right">Change</span>
-          </div>
-          <ul className="divide-y divide-line">
-            {rows.map((r) => (
-              <WarehouseStockRow
-                key={r.p.id}
-                id={r.p.id}
-                name={r.p.name}
-                sku={r.p.sku}
-                category={r.p.category.name}
-                brand={r.p.brand?.name ?? null}
-                imageV={r.p.image ? r.p.image.updatedAt.getTime() : null}
-                available={r.available}
-                reserved={r.reserved}
-                total={r.qty}
-                min={r.min > 0 ? r.min : null}
-                pack={largestPack(r.p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })))}
-                baseSymbol={r.p.baseUnit.symbol}
-                status={r.status}
-                canAdjust={can(user, "inventory.adjust")}
-                canCount={can(user, "inventory.count") || can(user, "inventory.adjust")}
-              />
-            ))}
-          </ul>
-        </section>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+          {rows.map((r) => (
+            <WarehouseStockCard
+              key={r.p.id}
+              id={r.p.id}
+              name={r.p.name}
+              sku={r.p.sku}
+              category={r.p.category.name}
+              brand={r.p.brand?.name ?? null}
+              imageV={r.p.image ? r.p.image.updatedAt.getTime() : null}
+              available={r.available}
+              reserved={r.reserved}
+              total={r.qty}
+              min={r.min > 0 ? r.min : null}
+              pack={largestPack(r.p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })))}
+              baseSymbol={r.p.baseUnit.symbol}
+              status={r.status}
+              canAdjust={can(user, "inventory.adjust")}
+              canCount={can(user, "inventory.count") || can(user, "inventory.adjust")}
+            />
+          ))}
+        </div>
       )}
     </>
   );
