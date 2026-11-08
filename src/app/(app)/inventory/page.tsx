@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { ArrowLeftRight, Banknote, Boxes, CircleCheck, ClipboardCheck, Coins, LayoutGrid, List, PackageCheck, PackageX, Search, TrendingUp, TriangleAlert } from "lucide-react";
+import { ArrowLeftRight, Boxes, CircleCheck, ClipboardCheck, LayoutGrid, List, PackageCheck, Search } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
-import KpiCard from "@/components/dashboard/KpiCard";
 import StockCard from "@/components/inventory/StockCard";
 import { Prisma } from "@/generated/prisma/client";
 import { can, canAny } from "@/lib/auth/can";
@@ -18,7 +17,7 @@ export const metadata = { title: "Stock overview" };
 
 const D = Prisma.Decimal;
 const PAGE_SIZE = 24;
-type Search = { q?: string; location?: string; category?: string; status?: string; sort?: string; view?: string; page?: string };
+type Search = { q?: string; location?: string; category?: string; status?: string; sort?: string; view?: string; page?: string; tab?: string };
 type Status = "ok" | "low" | "out";
 
 const SORTS = {
@@ -46,6 +45,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const q = sp.q?.trim().toLowerCase() ?? "";
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
   const view = sp.view === "table" ? "table" : "cards";
+  // the history pages next to the stock status pills (Received, Adjustments, Damaged), for people who may see stock documents
+  const histTab = canHistory && (sp.tab === "received" || sp.tab === "adjustments" || sp.tab === "damaged") ? sp.tab : null;
   const sort: SortKey = sp.sort && sp.sort in SORTS && (sp.sort !== "value" || canValue) ? (sp.sort as SortKey) : "attention";
 
   const [products, balances, locations, categories, custody] = await Promise.all([
@@ -134,15 +135,22 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     return `/inventory${s ? `?${s}` : ""}`;
   };
 
-  // Recent activity (only for people allowed to see stock documents)
+  // History pages (only for people allowed to see stock documents): the counts for the pills, and the rows of the page that is open
   const since = new Date(Date.now() - 30 * 24 * 3600 * 1000);
-  const [recentReceipts, recentAdjustments, damaged] = canHistory
-    ? await Promise.all([
-        db.stockReceipt.findMany({ orderBy: { createdAt: "desc" }, take: 5, include: { supplier: { select: { name: true } }, _count: { select: { items: true } } } }),
-        db.stockAdjustment.findMany({ orderBy: { createdAt: "desc" }, take: 5, include: { location: { select: { name: true } } } }),
-        db.stockMovement.findMany({ where: { type: "DAMAGED", createdAt: { gte: since } }, select: { quantity: true, unitCost: true } }),
-      ])
-    : [[], [], []];
+  const [receiptCount, adjustmentCount, damaged, receipts, adjustments] = await Promise.all([
+    canHistory ? db.stockReceipt.count() : Promise.resolve(0),
+    canHistory ? db.stockAdjustment.count() : Promise.resolve(0),
+    canHistory
+      ? db.stockMovement.findMany({
+          where: { type: "DAMAGED", createdAt: { gte: since } },
+          orderBy: { createdAt: "desc" },
+          take: 200,
+          select: { id: true, quantity: true, unitCost: true, createdAt: true, reason: true, user: { select: { name: true } }, product: { select: { id: true, name: true, baseUnit: { select: { symbol: true } }, units: { include: { unit: { select: { symbol: true } } } } } } },
+        })
+      : Promise.resolve([]),
+    histTab === "received" ? db.stockReceipt.findMany({ orderBy: { createdAt: "desc" }, take: 40, include: { supplier: { select: { name: true } }, receivedBy: { select: { name: true } }, _count: { select: { items: true } } } }) : Promise.resolve([]),
+    histTab === "adjustments" ? db.stockAdjustment.findMany({ orderBy: { createdAt: "desc" }, take: 40, include: { location: { select: { name: true } }, createdBy: { select: { name: true } } } }) : Promise.resolve([]),
+  ]);
   const damagedValue = damaged.reduce((s, m) => s.plus(m.quantity.abs().mul(m.unitCost ?? 0)), new D(0));
 
   const actions = (
@@ -207,112 +215,98 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="Stock overview" description="What you have, where it is, and what needs reordering." actions={actions} />
 
-      {/* Headline numbers */}
-      {canValue && (
-        <div className="mb-3 grid gap-3 sm:gap-4 md:grid-cols-3">
-          <KpiCard icon={Banknote} tone="navy" label="Stock value" value={formatMoney(totalValue, currency)} hint={noCost ? `${noCost} product${noCost > 1 ? "s" : ""} in stock with no buying price yet` : "What the stock cost you"} />
-          <KpiCard icon={Coins} tone="blue" label="Selling value" value={formatMoney(salesValue, currency)} hint={noPrice ? `${noPrice} product${noPrice > 1 ? "s" : ""} in stock with no selling price` : "If it all sells at today's prices"} />
-          <KpiCard
-            icon={TrendingUp}
-            tone={expectedProfit.lt(0) ? "red" : "green"}
-            label="Expected profit"
-            value={profitBase.gt(0) ? formatMoney(expectedProfit, currency) : "—"}
-            badge={margin !== null ? `${margin}% margin` : undefined}
-            hint={profitBase.gt(0) ? "Selling value minus cost" : "Add buying and selling prices to see it"}
-          />
+      {/* Headline numbers: ONE slim strip (Nino 2026-11-09: the big cards took too much room) */}
+      <section className="card mb-3 overflow-hidden">
+        <div className={cn("grid gap-px bg-line", canValue ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6" : "grid-cols-3")}>
+          {canValue && <Stat label="Stock value" value={formatMoney(totalValue, currency)} hint={noCost ? `${noCost} with no buying price yet` : "What the stock cost you"} />}
+          {canValue && <Stat label="Selling value" value={formatMoney(salesValue, currency)} hint={noPrice ? `${noPrice} with no selling price` : "At today's prices"} />}
+          {canValue && (
+            <Stat
+              label="Expected profit"
+              value={profitBase.gt(0) ? formatMoney(expectedProfit, currency) : "—"}
+              valueClass={expectedProfit.lt(0) ? "text-brand-red-dark" : undefined}
+              hint={profitBase.gt(0) ? (margin !== null ? `${margin}% margin` : "Selling value minus cost") : "Add buying and selling prices"}
+            />
+          )}
+          <Stat label="Products" value={total} hint={`${inStock} in stock`} href={canOpenProduct ? "/products" : undefined} />
+          <Stat label="Low stock" dot="bg-oil-400" value={lowRows.length} hint="At or below minimum" href={href({ status: "low", page: undefined })} active={sp.status === "low" && !histTab} />
+          <Stat label="Out of stock" dot="bg-brand-red" value={outRows.length} hint={outRows.length ? "Needs reordering" : "Nothing missing"} href={href({ status: "out", page: undefined })} active={sp.status === "out" && !histTab} />
         </div>
-      )}
-      <div className="mb-5 grid grid-cols-3 gap-3 sm:gap-4">
-        <KpiCard icon={Boxes} tone="navy" label="Products" value={total} hint={`${inStock} in stock`} href={canOpenProduct ? "/products" : undefined} />
-        <KpiCard icon={TriangleAlert} tone="yellow" label="Low stock" value={lowRows.length} hint="At or below minimum" href={href({ status: "low", page: undefined })} active={sp.status === "low"} />
-        <KpiCard icon={PackageX} tone="red" label="Out of stock" value={outRows.length} hint={outRows.length ? "Needs reordering" : "Nothing missing"} href={href({ status: "out", page: undefined })} active={sp.status === "out"} />
-      </div>
+      </section>
 
-      {/* Health + what to reorder */}
+      {/* Health + what to reorder: one slim card */}
       {total > 0 && (
-        <div className="mb-5 grid gap-4 lg:grid-cols-[1fr_1.35fr]">
-          <section className="card card-pad">
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-base font-semibold text-slate-900">Stock health</h2>
-              <span className="text-xs text-slate-500">{total} products</span>
-            </div>
-            <div className="mt-4 flex h-3 gap-0.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`${okRows.length} healthy, ${lowRows.length} low, ${outRows.length} out of stock`}>
-              {segments.map((s) => (s.n > 0 ? <span key={s.key} className={cn("h-full", s.bar)} style={{ width: `${pct(s.n)}%` }} /> : null))}
-            </div>
-            <ul className="mt-4 grid grid-cols-3 gap-3">
+        <section className="card mb-4 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1.5">
+            <h2 className="text-sm font-semibold text-slate-900">
+              Stock health <span className="font-normal text-slate-500">· {total} products</span>
+            </h2>
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
               {segments.map((s) => (
-                <li key={s.key}>
-                  <p className="flex items-center gap-1.5 text-xs text-slate-500">
-                    <span className={cn("h-2 w-2 rounded-full", s.dot)} />
-                    {s.label}
-                  </p>
-                  <p className="mt-0.5 text-xl font-bold leading-tight tracking-tight text-slate-900">
-                    {s.n} <span className="text-xs font-medium text-slate-400">{Math.round(pct(s.n))}%</span>
-                  </p>
+                <li key={s.key} className="inline-flex items-center gap-1.5">
+                  <span className={cn("h-2 w-2 rounded-full", s.dot)} />
+                  {s.label} <b className="font-semibold text-slate-900">{s.n}</b> <span>{Math.round(pct(s.n))}%</span>
                 </li>
               ))}
             </ul>
-            {noMinimum > 0 && (
-              <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                {noMinimum} product{noMinimum > 1 ? "s have" : " has"} no minimum set, so {noMinimum > 1 ? "they" : "it"} can never show as low. Set a minimum on the product page.
-              </p>
-            )}
-          </section>
-
-          <section className="card card-pad">
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-base font-semibold text-slate-900">Needs attention</h2>
-              {attention.length > 0 && <span className="text-xs text-slate-500">{attention.length} to reorder</span>}
-            </div>
-            {attention.length === 0 ? (
-              <p className="mt-4 flex items-center gap-2 text-sm text-emerald-700">
-                <CircleCheck size={18} /> Every product is above its minimum.
-              </p>
-            ) : (
-              <>
-                <ul className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-2">
-                  {attention.slice(0, 8).map((r) => (
-                    <li key={r.p.id}>
-                      <Link href={openHref(r.p.id) ?? href({ q: r.p.sku, status: undefined, page: undefined })} className="group flex items-center gap-3 rounded-lg py-1.5 hover:bg-slate-50">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
-                          {r.p.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={`/api/product-image/${r.p.id}?size=thumb&v=${r.p.image.updatedAt.getTime()}`} alt="" loading="lazy" className="h-full w-full object-contain" />
-                          ) : (
-                            <Boxes size={16} className="text-slate-300" />
-                          )}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{r.p.name}</span>
-                        {r.status === "out" ? (
-                          <span className="badge-red shrink-0">Out</span>
+          </div>
+          <div className="mt-2 flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`${okRows.length} healthy, ${lowRows.length} low, ${outRows.length} out of stock`}>
+            {segments.map((s) => (s.n > 0 ? <span key={s.key} className={cn("h-full", s.bar)} style={{ width: `${pct(s.n)}%` }} /> : null))}
+          </div>
+          {attention.length === 0 ? (
+            <p className="mt-2.5 flex items-center gap-1.5 text-xs text-emerald-700">
+              <CircleCheck size={14} /> Every product is above its minimum.
+            </p>
+          ) : (
+            <div className="mt-2.5 border-t border-line pt-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Needs attention · {attention.length} to reorder</p>
+              <ul className="mt-1 grid gap-x-6 sm:grid-cols-2">
+                {attention.slice(0, 8).map((r) => (
+                  <li key={r.p.id}>
+                    <Link href={openHref(r.p.id) ?? href({ q: r.p.sku, status: undefined, page: undefined })} className="flex items-center gap-2.5 rounded-md py-1 hover:bg-slate-50">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-50">
+                        {r.p.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={`/api/product-image/${r.p.id}?size=thumb&v=${r.p.image.updatedAt.getTime()}`} alt="" loading="lazy" className="h-full w-full object-contain" />
                         ) : (
-                          <span className="shrink-0 text-xs text-slate-500">
-                            {(() => {
-                              const pk = largestPack(r.p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
-                              return `${qtyText(Number(r.qty.toString()), pk, r.p.baseUnit.symbol, mode).main} / ${qtyText(Number(r.p.minStock.toString()), pk, r.p.baseUnit.symbol, mode).main}`;
-                            })()}
-                          </span>
+                          <Boxes size={14} className="text-slate-300" />
                         )}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-                {attention.length > 8 && (
-                  <Link href={href({ sort: "attention", status: undefined, page: undefined })} className="mt-2 inline-block text-sm text-navy-700 hover:underline">
-                    See all {attention.length}
-                  </Link>
-                )}
-              </>
-            )}
-          </section>
-        </div>
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-800">{r.p.name}</span>
+                      {r.status === "out" ? (
+                        <span className="badge-red shrink-0">Out</span>
+                      ) : (
+                        <span className="shrink-0 text-xs text-slate-500">
+                          {(() => {
+                            const pk = largestPack(r.p.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
+                            return `${qtyText(Number(r.qty.toString()), pk, r.p.baseUnit.symbol, mode).main} / ${qtyText(Number(r.p.minStock.toString()), pk, r.p.baseUnit.symbol, mode).main}`;
+                          })()}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {attention.length > 8 && (
+                <Link href={href({ sort: "attention", status: undefined, page: undefined })} className="mt-1 inline-block text-xs text-navy-700 hover:underline">
+                  See all {attention.length}
+                </Link>
+              )}
+            </div>
+          )}
+          {noMinimum > 0 && (
+            <p className="mt-2 text-[11px] text-slate-500">
+              {noMinimum} product{noMinimum > 1 ? "s have" : " has"} no minimum set, so {noMinimum > 1 ? "they" : "it"} can never show as low. Set a minimum on the product page.
+            </p>
+          )}
+        </section>
       )}
 
       {/* Tabs, view switch and filters */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <nav className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Stock status">
           {tabs.map((t) => {
-            const active = (sp.status ?? "") === t.key;
+            const active = !histTab && (sp.status ?? "") === t.key;
             return (
               <Link
                 key={t.key || "all"}
@@ -328,19 +322,46 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
               </Link>
             );
           })}
+          {canHistory && <span className="mx-1 h-5 w-px shrink-0 self-center bg-line" aria-hidden />}
+          {canHistory &&
+            [
+              { key: "received", label: "Received", n: receiptCount },
+              { key: "adjustments", label: "Adjustments", n: adjustmentCount },
+              { key: "damaged", label: "Damaged", n: damaged.length },
+            ].map((t) => {
+              const active = histTab === t.key;
+              return (
+                <Link
+                  key={t.key}
+                  href={`/inventory?tab=${t.key}`}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition",
+                    active ? "border-navy-700 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900",
+                  )}
+                >
+                  {t.label}
+                  <span className={cn("rounded-full px-1.5 text-xs font-semibold", active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600")}>{t.n}</span>
+                </Link>
+              );
+            })}
         </nav>
+        {!histTab && (
         <div className="inline-flex rounded-lg border border-line bg-white p-0.5" role="group" aria-label="View">
-          {[
-            { key: "cards", label: "Cards", Icon: LayoutGrid, to: href({ view: undefined, page: undefined }) },
-            { key: "table", label: "Table", Icon: List, to: href({ view: "table", page: undefined }) },
-          ].map(({ key, label, Icon, to }) => (
-            <Link key={key} href={to} aria-current={view === key ? "true" : undefined} className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition", view === key ? "bg-navy-50 text-navy-800" : "text-slate-500 hover:text-slate-800")}>
-              <Icon size={15} /> {label}
-            </Link>
-          ))}
-        </div>
+            {[
+              { key: "cards", label: "Cards", Icon: LayoutGrid, to: href({ view: undefined, page: undefined }) },
+              { key: "table", label: "Table", Icon: List, to: href({ view: "table", page: undefined }) },
+            ].map(({ key, label, Icon, to }) => (
+              <Link key={key} href={to} aria-current={view === key ? "true" : undefined} className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition", view === key ? "bg-navy-50 text-navy-800" : "text-slate-500 hover:text-slate-800")}>
+                <Icon size={15} /> {label}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
+      {!histTab && (
+      <>
       <form method="get" className="card card-pad mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
         {sp.status && <input type="hidden" name="status" value={sp.status} />}
         {sp.view && <input type="hidden" name="view" value={sp.view} />}
@@ -486,57 +507,108 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </div>
       )}
 
-      {canHistory && (
-        <div className="mt-6 grid gap-5 lg:grid-cols-3">
-          <section className="card overflow-hidden">
-            <h2 className="border-b border-line px-5 py-3 text-base font-semibold text-slate-900">Recently received</h2>
-            {recentReceipts.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-slate-500">Nothing received yet.</p>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {recentReceipts.map((r) => (
-                  <li key={r.id} className="px-5 py-3 text-sm">
-                    <Link href={`/inventory/receiving/${r.id}`} className="font-medium text-navy-700 hover:underline">
-                      {r.receiptNo}
-                    </Link>
-                    <p className="text-xs text-slate-500">
-                      {r.type === "OPENING_STOCK" ? "Opening stock" : (r.supplier?.name ?? "No supplier")} · {r._count.items} item{r._count.items === 1 ? "" : "s"} · {formatDateTime(r.createdAt)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-          <section className="card overflow-hidden">
-            <h2 className="border-b border-line px-5 py-3 text-base font-semibold text-slate-900">Recent adjustments</h2>
-            {recentAdjustments.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-slate-500">No adjustments yet.</p>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {recentAdjustments.map((a) => (
-                  <li key={a.id} className="px-5 py-3 text-sm">
-                    <Link href={`/inventory/adjustments/${a.id}`} className="font-medium text-navy-700 hover:underline">
-                      {a.adjustmentNo}
-                    </Link>{" "}
-                    <span className="text-slate-500">· {ADJUSTMENT_KIND_LABELS[a.kind]}</span>
-                    <p className="truncate text-xs text-slate-500">
-                      {a.location.name} · {a.reason}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-          <section className="card card-pad">
-            <h2 className="text-base font-semibold text-slate-900">Damaged / missing (30 days)</h2>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{damaged.length}</p>
-            <p className="text-sm text-slate-500">report{damaged.length === 1 ? "" : "s"}</p>
-            {canValue && <p className="mt-3 text-sm text-slate-600">Written off at cost: <span className="font-semibold">{formatMoney(damagedValue, currency)}</span></p>}
-            <Link href="/inventory/movements?type=DAMAGED" className="mt-3 inline-block text-sm text-navy-700 hover:underline">
-              View damaged stock
+      </>
+      )}
+
+      {histTab && (
+        <section className="card overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-line px-4 py-2.5">
+            <h2 className="text-sm font-semibold text-slate-900">
+              {histTab === "received" ? "Received" : histTab === "adjustments" ? "Adjustments" : "Damaged or missing, last 30 days"}
+              {histTab === "damaged" && (
+                <span className="ml-2 font-normal text-slate-500">
+                  {damaged.length} report{damaged.length === 1 ? "" : "s"}
+                  {canValue ? ` · written off at cost ${formatMoney(damagedValue, currency)}` : ""}
+                </span>
+              )}
+            </h2>
+            <Link href={histTab === "received" ? "/inventory/receiving" : histTab === "adjustments" ? "/inventory/adjustments" : "/inventory/movements?type=DAMAGED"} className="text-xs font-medium text-navy-700 hover:underline">
+              {histTab === "damaged" ? "Open the movements" : "Open all"} →
             </Link>
-          </section>
-        </div>
+          </div>
+          {histTab === "received" &&
+            (receipts.length === 0 ? (
+              <p className="px-4 py-5 text-sm text-slate-500">Nothing received yet.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {receipts.map((r) => (
+                  <li key={r.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/inventory/receiving/${r.id}`} className="text-[13px] font-semibold text-navy-700 hover:underline">
+                        {r.receiptNo}
+                      </Link>
+                      <p className="truncate text-[11px] text-slate-500">
+                        {r.type === "OPENING_STOCK" ? "Opening stock" : (r.supplier?.name ?? "No supplier")} · {r._count.items} item{r._count.items === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {canValue && <p className="text-[13px] font-semibold tabular-nums text-slate-900">{formatMoney(r.totalCost, currency)}</p>}
+                      <p className="text-[11px] text-slate-500">
+                        {formatDateTime(r.createdAt)} · {r.receivedBy.name}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ))}
+          {histTab === "adjustments" &&
+            (adjustments.length === 0 ? (
+              <p className="px-4 py-5 text-sm text-slate-500">No adjustments yet.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {adjustments.map((a) => (
+                  <li key={a.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px]">
+                        <Link href={`/inventory/adjustments/${a.id}`} className="font-semibold text-navy-700 hover:underline">
+                          {a.adjustmentNo}
+                        </Link>{" "}
+                        <span className="text-slate-500">· {ADJUSTMENT_KIND_LABELS[a.kind]}</span>
+                      </p>
+                      <p className="truncate text-[11px] text-slate-500">
+                        {a.location.name} · {a.reason}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-right text-[11px] text-slate-500">
+                      {formatDateTime(a.createdAt)} · {a.createdBy.name}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ))}
+          {histTab === "damaged" &&
+            (damaged.length === 0 ? (
+              <p className="px-4 py-5 text-sm text-slate-500">Nothing damaged or missing in the last 30 days.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {damaged.map((m) => {
+                  const pk = largestPack(m.product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
+                  const to = openHref(m.product.id);
+                  return (
+                    <li key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        {to ? (
+                          <Link href={to} className="text-[13px] font-semibold text-navy-700 hover:underline">
+                            {m.product.name}
+                          </Link>
+                        ) : (
+                          <p className="text-[13px] font-semibold text-slate-900">{m.product.name}</p>
+                        )}
+                        <p className="truncate text-[11px] text-slate-500">{m.reason ?? "No reason written"}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-[13px] font-semibold tabular-nums text-slate-900">{qtyText(Number(m.quantity.abs().toString()), pk, m.product.baseUnit.symbol, mode).main}</p>
+                        <p className="text-[11px] text-slate-500">
+                          {formatDateTime(m.createdAt)} · {m.user.name}
+                          {canValue && m.unitCost ? ` · ${formatMoney(m.quantity.abs().mul(m.unitCost), currency)}` : ""}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ))}
+        </section>
       )}
     </>
   );
@@ -550,5 +622,26 @@ function Wrap({ href, children }: { href: string | null; children: React.ReactNo
     </Link>
   ) : (
     <>{children}</>
+  );
+}
+
+/** One cell of the slim headline strip: a small label, the figure and one line of context. A link when it filters or opens something. */
+function Stat({ label, value, hint, href, active, dot, valueClass }: { label: string; value: React.ReactNode; hint?: string; href?: string; active?: boolean; dot?: string; valueClass?: string }) {
+  const body = (
+    <div className={cn("h-full bg-white px-4 py-2.5 transition", href && "hover:bg-slate-50", active && "bg-slate-50")}>
+      <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+        {dot && <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />}
+        {label}
+      </p>
+      <p className={cn("mt-0.5 whitespace-nowrap text-base font-semibold leading-tight tabular-nums text-slate-900 sm:text-lg", valueClass)}>{value}</p>
+      {hint && <p className="mt-0.5 truncate text-[11px] text-slate-500">{hint}</p>}
+    </div>
+  );
+  return href ? (
+    <Link href={href} className="block">
+      {body}
+    </Link>
+  ) : (
+    body
   );
 }

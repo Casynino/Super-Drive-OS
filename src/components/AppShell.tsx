@@ -22,6 +22,8 @@ type Props = {
   unread: number;
   /** numbers shown beside menu items that need someone to act */
   badges: { approvals: number; incoming: number };
+  /** the person unfolded the menu during this sign-in (cookie `sd-sidebar=open`); otherwise it is the narrow icon rail */
+  startOpen?: boolean;
   /** a different menu name for this person (for example the shop person's "Close & deposit" where the Director has "Closing") */
   labels?: Record<string, string>;
   children: React.ReactNode;
@@ -29,11 +31,11 @@ type Props = {
 
 const DIM = { color: "var(--glass-text-dim)" } as const;
 
-export default function AppShell({ businessName, user, visibleHrefs, hiddenItems, logoutAction, unread, badges, labels, children }: Props) {
+export default function AppShell({ businessName, user, visibleHrefs, hiddenItems, logoutAction, unread, badges, labels, startOpen = false, children }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false); // the menu on a phone
-  const [collapsed, setCollapsed] = useState(false); // the narrow icon rail on a computer or tablet
+  const [collapsed, setCollapsed] = useState(!startOpen); // the narrow icon rail on a computer or tablet: the default for everyone (Nino 2026-11-09)
   const [q, setQ] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -42,18 +44,12 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
     setQ("");
   }, [pathname]);
 
-  // the rail stays the way the person left it
-  useEffect(() => {
-    try {
-      if (localStorage.getItem("sdoSidebar") === "rail") setCollapsed(true);
-    } catch {
-      /* no storage: it simply starts open */
-    }
-  }, []);
+  // Everyone starts every sign-in with the icon rail; unfolding it is remembered (a cookie the server reads, so there is no flash)
+  // until the next sign-in, which starts with the rail again.
   const setRail = (next: boolean) => {
     setCollapsed(next);
     try {
-      localStorage.setItem("sdoSidebar", next ? "rail" : "open");
+      document.cookie = next ? "sd-sidebar=; path=/; max-age=0; samesite=lax" : "sd-sidebar=open; path=/; max-age=43200; samesite=lax";
     } catch {
       /* ignore */
     }

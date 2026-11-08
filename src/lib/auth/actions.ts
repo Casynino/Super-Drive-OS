@@ -58,6 +58,7 @@ export async function login(_prev: ActionState, formData: FormData): Promise<Act
 
   await db.user.update({ where: { id: user.id }, data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() } });
   await createSession(user.id);
+  (await cookies()).delete("sd-sidebar"); // every sign-in starts with the narrow menu rail
   await writeAudit(db, { user: { id: user.id, name: user.name }, action: "auth.login", entityType: "User", entityId: user.id });
   redirect("/dashboard");
 }
