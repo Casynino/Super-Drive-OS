@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, CalendarCheck, ChevronDown, ChevronRight, ChevronUp, CircleCheck, ClipboardList, Clock, HandCoins, Handshake, Package, PackageCheck, PackageOpen, ReceiptText, Truck, TriangleAlert, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +22,6 @@ export type AttentionItem = {
 const ICONS = { returns: Undo2, expense: ReceiptText, closing: CalendarCheck, debt: HandCoins, reseller: Handshake, stock: Package, shipment: Truck, clock: Clock, orders: ClipboardList, ready: PackageCheck, partial: PackageOpen, issue: TriangleAlert };
 const BAR = { red: "bg-brand-red", amber: "bg-oil-400", blue: "bg-sky-500" };
 const ICON_TONE = { red: "text-brand-red", amber: "text-oil-500", blue: "text-sky-500" };
-/** exactly this many rows show before the list scrolls inside its box (every row has the same fixed height, so it is true on a phone too) */
-const VISIBLE = 3;
 /** the Director's tabs; other departments pass their own */
 export const DIRECTOR_TABS: AttentionTab[] = [
   { key: "decisions", label: "Decisions" },
@@ -31,109 +29,149 @@ export const DIRECTOR_TABS: AttentionTab[] = [
   { key: "stock", label: "Stock" },
 ];
 
+/** Until the rows are measured (first paint) only the first three show, so nothing jumps. */
+const HIDE_AFTER_3 = "[&_[data-row]:nth-child(n+4)]:hidden";
+const VISIBLE = 3;
+
 /**
- * "Needs your attention", the same on every home page and on every screen size (Nino 2026-11-08): filter pills on top, then rows (coloured bar,
- * icon, what it is and why, how much is at stake, an arrow). Three rows show; the rest scroll inside the box and the footer says how many more.
- * Pills for groups with nothing in them are not drawn.
+ * Shows the first three rows (elements marked `data-row`); the rest are a scroll away. The height is measured from the real rows, so exactly three
+ * fit on every screen size even when a title wraps. The bar underneath says how many more there are and brings them up when pressed; at the end it
+ * says "Back to the top". A soft edge says the list goes on. (Same behaviour as the Vegas hotel system's `ShowRows`.)
+ */
+function ShowRows({ total, children }: { total: number; children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [max, setMax] = useState<number | null>(null);
+  const [below, setBelow] = useState(total - VISIBLE);
+  const extra = total - VISIBLE;
+
+  const parts = useCallback(() => {
+    const el = box.current!;
+    const rect = el.getBoundingClientRect();
+    const rows = [...el.querySelectorAll<HTMLElement>("[data-row]")];
+    const visibleBottom = rect.top + el.clientHeight;
+    return { el, rect, rows, hidden: rows.filter((r) => r.getBoundingClientRect().bottom > visibleBottom + 1) };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!box.current || extra <= 0) return;
+    const measure = () => {
+      const { el, rect, rows } = parts();
+      const last = rows[VISIBLE - 1];
+      if (!last) return;
+      setMax(Math.ceil(last.getBoundingClientRect().bottom - (rect.top - el.scrollTop)));
+      requestAnimationFrame(() => box.current && setBelow(parts().hidden.length));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(box.current);
+    return () => ro.disconnect();
+  }, [extra, parts]);
+
+  if (extra <= 0) return <div>{children}</div>;
+  const step = () => {
+    const { el, rect, hidden } = parts();
+    if (!hidden.length) {
+      el.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    el.scrollTo({ top: el.scrollTop + hidden[0].getBoundingClientRect().top - rect.top, behavior: "smooth" });
+  };
+  return (
+    <div>
+      <div className="relative">
+        <div ref={box} className={cn("relative overflow-auto overscroll-contain [scrollbar-width:thin]", max === null && HIDE_AFTER_3)} style={max === null ? undefined : { maxHeight: max }} onScroll={() => setBelow(parts().hidden.length)}>
+          {children}
+        </div>
+        <div aria-hidden className={cn("pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-black/25 to-transparent transition-opacity dark:from-black/50", !below && "opacity-0")} />
+      </div>
+      <button type="button" onClick={step} className="flex w-full items-center justify-center gap-1.5 border-t border-line bg-slate-50/70 py-2 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800">
+        {below ? (
+          <>
+            <ChevronDown className="size-3.5" />
+            Scroll for {below} more
+          </>
+        ) : (
+          <>
+            <ChevronUp className="size-3.5" />
+            Back to the top
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * "Needs your attention", the same on every home page and screen size. It is a copy of the Vegas hotel system's panel (Nino 2026-11-08, from that
+ * project's own code, not from screenshots, which are taken at different zoom levels): area chips on top, then one slim row per item (coloured bar,
+ * icon, what and why, a tap through), three rows in view and the rest a scroll away. Chips for groups with nothing in them are not drawn.
+ * Sizes are Vegas's: chips 12 px (py-1), rows py-3 with a 14 px title and a 12 px detail, an 18 px icon, a 3 px bar 32 px high.
  */
 export default function AttentionPanel({ items, tabs = DIRECTOR_TABS, empty = "Nothing needs your attention right now.", className }: { items: AttentionItem[]; tabs?: AttentionTab[]; empty?: string; /** spacing around the whole block (heading + card) */ className?: string }) {
   const [tab, setTab] = useState("all");
-  const [scrolled, setScrolled] = useState(0);
-  const list = useRef<HTMLUListElement>(null);
   const shown = tab === "all" ? items : items.filter((i) => i.group === tab);
   const count = (k: string) => (k === "all" ? items.length : items.filter((i) => i.group === k).length);
-  const pills: AttentionTab[] = [{ key: "all", label: "All" }, ...tabs].filter((t) => t.key === "all" || t.key === tab || count(t.key) > 0);
-  // rows still hidden below the box's bottom edge (follows the scroll position)
-  const more = Math.max(0, shown.length - VISIBLE - scrolled);
-  const rowHeight = () => list.current?.firstElementChild?.getBoundingClientRect().height ?? 72;
+  const chips: AttentionTab[] = [{ key: "all", label: "All" }, ...tabs].filter((t) => t.key === "all" || t.key === tab || count(t.key) > 0);
 
   return (
     <section id="attention" aria-label="Needs your attention" className={cn("scroll-mt-20", className)}>
-      <h2 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+      <h2 className="mb-3 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
         Needs your attention
         <span className="rounded-full bg-[#fdebc4] px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#3a2a00]">{items.length}</span>
       </h2>
       <div className="card overflow-hidden rounded-2xl">
-      <div className="flex flex-wrap items-center gap-2 px-3.5 pb-2.5 pt-3 sm:px-5 sm:pb-3 sm:pt-[13px]">
-        <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]" role="tablist" aria-label="Filter">
-          {pills.map((t) => (
+        <div className="flex gap-1.5 overflow-x-auto border-b border-line px-4 py-2.5 [scrollbar-width:none]" role="tablist" aria-label="Filter">
+          {chips.map((t) => (
             <button
               key={t.key}
               type="button"
               role="tab"
               aria-selected={tab === t.key}
-              onClick={() => {
-                setTab(t.key);
-                setScrolled(0);
-              }}
-              className={cn("inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition sm:h-[30px] sm:px-4 sm:text-[13px]", tab === t.key ? "border-sky-500 bg-sky-500 text-white" : "border-line text-slate-600 hover:border-slate-300 hover:text-slate-900")}
+              onClick={() => setTab(t.key)}
+              className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors", tab === t.key ? "border-sky-500 bg-sky-500 text-white" : "border-line text-slate-600 hover:bg-slate-100")}
             >
               {t.label}
-              <span className={cn("text-[11px] font-normal sm:text-xs", tab === t.key ? "text-white/90" : "text-slate-500")}>{count(t.key)}</span>
+              <span className={cn("tabular-nums", tab === t.key ? "text-white/80" : "text-slate-500")}>{count(t.key)}</span>
             </button>
           ))}
         </div>
-      </div>
 
-      {shown.length === 0 ? (
-        <div className="flex items-center gap-3 border-t border-line px-4 py-5 text-sm text-emerald-700 sm:px-6">
-          <CircleCheck size={20} />
-          {items.length === 0 ? empty : "Nothing here."}
-        </div>
-      ) : (
-        <>
-          <ul
-            ref={list}
-            key={tab}
-            className={cn("divide-y divide-line border-t border-line [--row:3.1rem] sm:[--row:4.3rem]", shown.length > VISIBLE && "overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}
-            style={shown.length > VISIBLE ? { maxHeight: `calc(var(--row) * ${VISIBLE} + ${VISIBLE}px)` } : undefined}
-            onScroll={(e) => setScrolled(Math.round(e.currentTarget.scrollTop / rowHeight()))}
-          >
-            {shown.map((i) => {
-              const Icon = ICONS[i.icon] ?? AlertTriangle;
-              return (
-                <li key={i.id}>
-                  <Link href={i.href} className="group flex h-[var(--row)] items-center gap-2.5 px-3.5 transition hover:bg-slate-50 sm:gap-3.5 sm:px-6">
-                    <span className={cn("h-6 w-[3px] shrink-0 rounded-full sm:h-9 sm:w-1", BAR[i.tone])} aria-hidden />
-                    <Icon className={cn("h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5", ICON_TONE[i.tone])} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-semibold leading-[1.1rem] text-slate-900 sm:text-[15px] sm:leading-5">{i.title}</span>
-                      <span className="block truncate text-[11.5px] leading-4 text-slate-500 sm:text-[13px] sm:leading-[1.15rem]">
-                        {i.main && <span className="font-medium text-slate-700 sm:hidden">{i.main} · </span>}
-                        {i.detail}
+        {shown.length === 0 ? (
+          <div className="flex items-center gap-3 px-4 py-4 text-sm text-emerald-700 sm:px-5">
+            <CircleCheck size={18} />
+            {items.length === 0 ? empty : "Nothing here."}
+          </div>
+        ) : (
+          <ShowRows key={tab} total={shown.length}>
+            <ul className="divide-y divide-line">
+              {shown.map((i) => {
+                const Icon = ICONS[i.icon] ?? AlertTriangle;
+                return (
+                  <li key={i.id} data-row>
+                    <Link href={i.href} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50 sm:px-5">
+                      <span aria-hidden className={cn("h-8 w-[3px] shrink-0 rounded-full", BAR[i.tone])} />
+                      <Icon className={cn("size-[18px] shrink-0", ICON_TONE[i.tone])} />
+                      <span className="min-w-0 flex-1 leading-snug">
+                        <span className="block text-sm font-semibold text-slate-900">{i.title}</span>
+                        <span className="block truncate text-xs text-slate-500">
+                          {i.main && <span className="font-medium text-slate-700 sm:hidden">{i.main} · </span>}
+                          {i.detail}
+                        </span>
                       </span>
-                    </span>
-                    {(i.main || i.sub) && (
-                      <span className="hidden shrink-0 text-right sm:block">
-                        {i.main && <span className="block text-[13px] font-medium tabular-nums text-slate-600">{i.main}</span>}
-                        {i.sub && <span className="block text-xs tabular-nums text-slate-500">{i.sub}</span>}
-                      </span>
-                    )}
-                    <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-600" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-          {shown.length > VISIBLE && (
-            <button
-              type="button"
-              onClick={() => list.current?.scrollBy({ top: more > 0 ? rowHeight() * VISIBLE : -list.current.scrollTop, behavior: "smooth" })}
-              className="flex h-9 w-full items-center justify-center gap-2 border-t border-line text-xs text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 sm:h-[39px] sm:text-[13px]"
-            >
-              {more > 0 ? (
-                <>
-                  <ChevronDown size={15} /> Scroll for {more} more
-                </>
-              ) : (
-                <>
-                  <ChevronUp size={15} /> Back to the top
-                </>
-              )}
-            </button>
-          )}
-        </>
-      )}
+                      {(i.main || i.sub) && (
+                        <span className="hidden shrink-0 text-right text-xs leading-snug text-slate-500 sm:block">
+                          {i.main && <span className="block font-medium tabular-nums text-slate-600">{i.main}</span>}
+                          {i.sub && <span className="block tabular-nums">{i.sub}</span>}
+                        </span>
+                      )}
+                      <ChevronRight className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </ShowRows>
+        )}
       </div>
     </section>
   );
