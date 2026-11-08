@@ -157,23 +157,23 @@ function Form({ p, mode, onClose }: { p: StockChangeProps; mode: Mode; onClose: 
 /** "Add", "Remove" and "Count" on a product: pop-ups with cartons + pieces and a note. */
 export default function StockChangeButtons(p: StockChangeProps) {
   const [mode, setMode] = useState<Mode | null>(null);
-  const btn = p.compact ? "inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-lg border border-line bg-white text-[13px] font-semibold text-slate-700 transition hover:border-navy-200 hover:bg-slate-50" : "btn-secondary btn-sm";
+  const btn = p.compact ? "inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-line bg-white px-2.5 max-sm:w-9 max-sm:px-0 text-[13px] font-semibold text-slate-700 transition hover:border-navy-200 hover:bg-slate-50" : "btn-secondary btn-sm";
   return (
     <>
-      <div className={cn("flex items-center gap-2", p.compact ? "w-full" : "flex-wrap")}>
+      <div className={cn("flex items-center", p.compact ? "gap-1.5" : "flex-wrap gap-2")}>
         {p.allowChange !== false && (
           <>
-            <button type="button" className={p.compact ? btn : "btn-primary btn-sm"} onClick={() => setMode("ADD")}>
-              <Plus size={14} /> Add
+            <button type="button" className={p.compact ? btn : "btn-primary btn-sm"} onClick={() => setMode("ADD")} aria-label="Add stock" title="Add stock">
+              <Plus size={14} /> <span className={cn(p.compact && "max-sm:hidden")}>Add</span>
             </button>
-            <button type="button" className={btn} onClick={() => setMode("REMOVE")}>
-              <Minus size={14} /> Remove
+            <button type="button" className={btn} onClick={() => setMode("REMOVE")} aria-label="Remove stock" title="Remove stock">
+              <Minus size={14} /> <span className={cn(p.compact && "max-sm:hidden")}>Remove</span>
             </button>
           </>
         )}
         {p.canCount && (
-          <button type="button" className={btn} onClick={() => setMode("COUNT")}>
-            <ClipboardCheck size={14} /> Count
+          <button type="button" className={btn} onClick={() => setMode("COUNT")} aria-label="Set the counted stock" title="Set the counted stock">
+            <ClipboardCheck size={14} /> <span className={cn(p.compact && "max-sm:hidden")}>Count</span>
           </button>
         )}
       </div>

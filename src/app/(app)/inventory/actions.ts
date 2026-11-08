@@ -297,8 +297,9 @@ export async function adjustStockAction(_prev: ActionState, fd: FormData): Promi
     const parsed = stockChangeSchema.safeParse({ productId: formString(fd, "productId"), mode: formString(fd, "mode"), quantity: formString(fd, "quantity"), note: formString(fd, "note"), submissionKey: formString(fd, "submissionKey") });
     if (!parsed.success) return fail(parsed.error.issues[0]?.path[0] === "note" ? parsed.error.issues[0].message : "Enter how many, and a short note.", headErrors(parsed.error.issues));
     const p = parsed.data;
-    // adding and removing need the adjust right; setting a counted quantity needs the count right (checked here, never only in the screen)
-    if (p.mode === "COUNT" ? !can(user, "inventory.count") : !can(user, "inventory.adjust")) return fail("You do not have permission to do this.");
+    // adding and removing need the adjust right; setting a counted quantity needs the count right or the adjust right (checked here, never only in the screen)
+    // (the Director does not hold the shop-floor count right, but may already set any quantity with the adjust right, so setting the counted number is allowed for him too)
+    if (p.mode === "COUNT" ? !can(user, "inventory.count") && !can(user, "inventory.adjust") : !can(user, "inventory.adjust")) return fail("You do not have permission to do this.");
     const qty = Number(p.quantity);
     if (!Number.isFinite(qty) || (p.mode === "COUNT" ? qty < 0 : qty <= 0)) return fail("Enter how many.", { quantity: p.mode === "COUNT" ? "Enter the counted number." : "Enter a number above zero." });
     const location = await db.location.findFirst({ where: { isDefault: true, status: "ACTIVE" }, select: { id: true, name: true } });
