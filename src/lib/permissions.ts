@@ -152,6 +152,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
     description: "Looks after the Store Warehouse: receives and counts goods from China, prepares orders, scans pickup notes and releases goods. Never sees prices, costs or money.",
     permissions: [
       "products.view",
+      "products.create", // adds products to the system like the Director (Nino 2026-11-08); prices and costs stay hidden: new products start with no price
       "inventory.view",
       "inventory.movements",
       "shipments.receive",

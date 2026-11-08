@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { diffFields, writeAudit } from "@/lib/audit";
 import { can } from "@/lib/auth/can";
 import { fail, formString, formValues, guarded, isUniqueViolation, type ActionState } from "@/lib/action";
+import { notifyPermission } from "@/lib/notifications";
 import { parseMoney } from "@/lib/money";
 import { generateSku, nextBarcode, uniqueSku } from "@/lib/product-codes";
 import { ImageError, processProductImage } from "@/lib/product-images";
@@ -267,6 +268,8 @@ export async function saveProduct(_prev: ActionState, fd: FormData): Promise<Act
           const initial = priceHistoryRows(created.id, user.id, null, snapshot(created), symbols).filter((r) => r.newValue && !r.newValue.isZero());
           if (initial.length) await tx.productPriceHistory.createMany({ data: initial });
           await writeAudit(tx, { user, action: "product.create", entityType: "Product", entityId: created.id, after: snapshot(created), reference: created.sku });
+          // someone who may not set prices (the warehouse person) added it: the people who set prices are told it still has none
+          if (!canPrice) await notifyPermission(tx, "products.price", { type: "product.created", title: `${user.name} added ${created.name}`, body: "It has no selling price yet, so it cannot be sold. Set its price.", link: `/products/${created.id}` }, user.id);
           return;
         }
 
