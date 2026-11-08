@@ -50,6 +50,7 @@ export default function SidebarFooter({ name, roleName, logoutAction, unread = 0
         <button type="button" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-haspopup="menu" className={cn("glass-row flex w-full items-center gap-3 rounded-full text-left", rail ? "justify-center p-1" : "px-2 py-2")} title={name}>
           <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-navy-600 to-navy-800 text-xs font-semibold text-white ring-1 ring-white/25">
             {initials(name)}
+            {unread > 0 && <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-brand-red ring-2 ring-white dark:ring-[#0f1c33]" aria-hidden />}
           </span>
           {/* only the initials and ONE name (the first); the full name and the position are in the menu that opens from here */}
           {!rail && <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{name.trim().split(/\s+/)[0]}</span>}

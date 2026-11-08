@@ -272,3 +272,7 @@ html:not(.dark) .glass-panel {
 .glass-tree > li { position: relative; }
 .glass-tree > li::before { content: ""; position: absolute; left: -1.05rem; top: 50%; width: 0.8rem; height: 0.8rem; border-left: 1px solid var(--glass-line); border-bottom: 1px solid var(--glass-line); border-bottom-left-radius: 0.65rem; transform: translateY(-88%); pointer-events: none; }
 .glass-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--glass-line), transparent); }
+/* the phone menu slides in from the left */
+.drawer-in { animation: drawer-in 0.22s ease-out; }
+@keyframes drawer-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .drawer-in { animation: none; } }

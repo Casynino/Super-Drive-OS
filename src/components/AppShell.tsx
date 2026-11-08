@@ -113,6 +113,25 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
     if (activeGroup) setOpenGroup(activeGroup);
   }, [activeGroup]);
 
+  // Phone menu: the groups open and close on their own (several can be open at once), the one you are in starts open.
+  const [openMany, setOpenMany] = useState<string[]>(activeGroup ? [activeGroup] : []);
+  useEffect(() => {
+    if (activeGroup) setOpenMany((m) => (m.includes(activeGroup) ? m : [...m, activeGroup]));
+  }, [activeGroup]);
+
+  // The phone menu locks the page behind it and closes with Escape.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   const dot = "absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-brand-red shadow-[0_0_8px_rgba(237,28,36,0.7)] ring-2 ring-white dark:ring-[#0f1c33]";
   const count = (item: NavItem) => (item.badge ? badges[item.badge] : 0);
   const nameOf = (item: NavItem) => labels?.[item.href] ?? item.label;
@@ -129,7 +148,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   const term = q.trim().toLowerCase();
   const results = term ? groups.flatMap((g) => g.items.map((item) => ({ item, group: g.label }))).filter(({ item }) => nameOf(item).toLowerCase().includes(term) || item.label.toLowerCase().includes(term)) : [];
 
-  const row = (item: NavItem, child = false) => {
+  const row = (item: NavItem, child = false, big = false) => {
     const isActive = item.href === active;
     const Icon = item.icon;
     const n = count(item);
@@ -138,9 +157,9 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         <Link
           href={item.href}
           aria-current={isActive ? "page" : undefined}
-          className={cn("relative flex items-center gap-3 rounded-lg", child ? "px-3 py-1.5 text-[13px]" : "px-3 py-2 text-[13px]", isActive ? "glass-active font-medium text-slate-900" : "glass-row text-slate-600 hover:text-slate-900")}
+          className={cn("relative flex items-center gap-3 rounded-lg", big ? "px-3 py-2.5 text-[14px]" : child ? "px-3 py-1.5 text-[13px]" : "px-3 py-2 text-[13px]", isActive ? "glass-active font-medium text-slate-900" : "glass-row text-slate-600 hover:text-slate-900")}
         >
-          <Icon size={child ? 16 : 18} className={cn("shrink-0", isActive && "text-oil-500")} />
+          <Icon size={big ? 18 : child ? 16 : 18} className={cn("shrink-0", isActive && "text-oil-500")} />
           <span className="min-w-0 flex-1 truncate">{nameOf(item)}</span>
           {n > 0 && countBadge(n)}
         </Link>
@@ -173,7 +192,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
       </div>
 
       <div className="px-3 pb-1.5">
-        <label className="glass-field flex items-center gap-2.5 px-3.5 py-2 text-sm text-slate-500 focus-within:text-slate-900">
+        <label className={cn("glass-field flex items-center gap-2.5 px-3.5 text-slate-500 focus-within:text-slate-900", drawer ? "py-3 text-base" : "py-2 text-sm")}>
           <Search size={16} className="shrink-0" />
           <input
             ref={searchRef}
@@ -194,7 +213,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2" aria-label="Main">
         {term ? (
           results.length > 0 ? (
-            <ul className="mt-2 space-y-0.5">{results.map(({ item }) => row(item))}</ul>
+            <ul className="mt-2 space-y-0.5">{results.map(({ item }) => row(item, false, drawer))}</ul>
           ) : (
             <p className="px-4 py-6 text-center text-sm text-slate-500">No page matches “{q.trim()}”.</p>
           )
@@ -205,7 +224,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
                 <p className="px-4 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.18em]" style={DIM}>
                   Main
                 </p>
-                <ul className="space-y-0.5">{topGroups.flatMap((g) => g.items).map((i) => row(i))}</ul>
+                <ul className="space-y-0.5">{topGroups.flatMap((g) => g.items).map((i) => row(i, false, drawer))}</ul>
               </>
             )}
             {folding.length > 0 && (
@@ -216,7 +235,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
             <div className="space-y-0.5">
               {folding.map((group) => {
                 const Icon = group.icon;
-                const isOpen = openGroup === group.label;
+                const isOpen = drawer ? openMany.includes(group.label) : openGroup === group.label;
                 const here = group.label === activeGroup;
                 // a red number on a folded group so a waiting item is never hidden inside it
                 const waiting = group.items.reduce((sum, i) => sum + count(i), 0);
@@ -224,9 +243,9 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
                   <div key={group.label}>
                     <button
                       type="button"
-                      onClick={() => setOpenGroup(isOpen ? null : group.label)}
+                      onClick={() => (drawer ? setOpenMany(isOpen ? openMany.filter((x) => x !== group.label) : [...openMany, group.label]) : setOpenGroup(isOpen ? null : group.label))}
                       aria-expanded={isOpen}
-                      className={cn("glass-row flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] font-medium hover:text-slate-900", here ? "text-slate-900" : "text-slate-600")}
+                      className={cn("glass-row flex w-full items-center gap-3 rounded-lg px-3 text-left font-medium hover:text-slate-900", drawer ? "py-2.5 text-[14px]" : "py-2 text-[13px]", here ? "text-slate-900" : "text-slate-600")}
                     >
                       {Icon && <Icon size={18} className={cn("shrink-0", here ? "text-oil-500" : "text-slate-400")} />}
                       <span className="flex-1">{group.label}</span>
@@ -235,7 +254,7 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
                     </button>
                     <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out", isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
                       <div className="overflow-hidden" inert={!isOpen}>
-                        <ul className="glass-tree ml-[1.7rem] mt-1 space-y-0.5 pb-1 pl-3.5">{group.items.map((i) => row(i, true))}</ul>
+                        <ul className="glass-tree ml-[1.7rem] mt-1 space-y-0.5 pb-1 pl-3.5">{group.items.map((i) => row(i, true, drawer))}</ul>
                       </div>
                     </div>
                   </div>
@@ -307,12 +326,12 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
         </div>
       </aside>
 
-      {/* Phone: the same panel slides over the page */}
+      {/* Phone and tablet: the same glass panel slides in over a blurred page, as tall as its content, never taller than the screen */}
       {open && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} aria-hidden />
-          <aside className="absolute inset-y-3 left-3 w-64 max-w-[85vw]">
-            <div className="glass-panel h-full">{full(true)}</div>
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setOpen(false)} aria-hidden />
+          <aside className="drawer-in absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] w-[min(19rem,86vw)]">
+            <div className="glass-panel flex max-h-[calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col">{full(true)}</div>
           </aside>
         </div>
       )}
