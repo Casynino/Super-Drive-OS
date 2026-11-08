@@ -27,7 +27,7 @@ export default async function LoginPage() {
   if (await getSessionUser()) redirect("/dashboard");
 
   return (
-    <div className="relative isolate min-h-dvh overflow-hidden bg-navy-900">
+    <div data-login-scene className="relative isolate min-h-dvh overflow-hidden bg-navy-900">
       {/* the animated scene fills the whole page */}
       <LoginScene />
 

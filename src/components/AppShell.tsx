@@ -184,7 +184,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
   /** the full menu: brand, search, MAIN, WORKSPACE (folding groups with branches), night mode and the person */
   const full = (drawer: boolean) => (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between gap-2 px-4 pb-3 pr-7 pt-4">
+      <div className={cn("flex items-center justify-between gap-2 px-4 pb-3 pt-4", drawer ? "pr-3" : "pr-7")}>
         {brand(false)}
         {drawer && (
           <button type="button" className="glass-row grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-600" onClick={() => setOpen(false)} aria-label="Close menu">
@@ -332,8 +332,8 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setOpen(false)} aria-hidden />
-          <aside className="drawer-in absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] w-[min(19rem,86vw)]">
-            <div className="glass-panel flex max-h-[calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col">{full(true)}</div>
+          <aside className="drawer-in absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] w-[min(16rem,82vw)]">
+            <div className="glass-panel flex h-full flex-col">{full(true)}</div>
           </aside>
         </div>
       )}

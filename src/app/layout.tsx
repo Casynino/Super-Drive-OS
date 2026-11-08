@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { Geist } from "next/font/google";
 import { THEME_COLOR } from "@/lib/theme-client";
+import RegisterSW from "@/components/RegisterSW";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist", display: "swap" });
@@ -45,6 +46,7 @@ export async function generateViewport(): Promise<Viewport> {
     initialScale: 1,
     viewportFit: "cover", // use the whole screen, including behind the notch; the pages keep their own safe margins
     themeColor: dark ? THEME_COLOR.dark : THEME_COLOR.light,
+    colorScheme: dark ? "dark" : "light", // tells Chrome, Samsung and Huawei browsers the page has its own dark look, so their "force dark mode" does not invert it
   };
 }
 
@@ -58,6 +60,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             in both looks; it has no height in a browser tab, where the browser draws its own bar. */}
         <div aria-hidden className="status-strip" />
         {children}
+        <RegisterSW />
       </body>
     </html>
   );
