@@ -88,6 +88,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
       <HomeBanner user={user} />
       {/* the same plain icon row as the other homes, on a phone and tablet (the till needs the room on a computer) */}
       <QuickIcons
+        fill
         className="mb-4 lg:hidden"
         items={[
           { href: "/overview", label: "Today", icon: LayoutDashboard },

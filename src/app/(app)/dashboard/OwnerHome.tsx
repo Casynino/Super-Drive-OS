@@ -155,10 +155,10 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   const pills = [
     can(user, "cash.view") && { href: "/cash", label: "Accounts", icon: Landmark, tone: "sky" as const },
     can(user, "reports.view") && { href: "/reports", label: "Reports", icon: ChartColumn, tone: "emerald" as const },
-    can(user, "shipments.manage") && { href: "/shipments", label: "Purchase orders", icon: Truck, tone: "amber" as const },
+    can(user, "shipments.manage") && { href: "/shipments", label: "Purchase", icon: Truck, tone: "amber" as const },
     can(user, "resellers.view") && { href: "/resellers", label: "Winga", icon: Handshake, tone: "violet" as const },
-    can(user, "sales.view_all") && { href: "/sales", label: "Sales history", icon: Receipt, tone: "rose" as const },
-    can(user, "audit.view") && { href: "/audit", label: "Audit log", icon: ScrollText, tone: "navy" as const },
+    can(user, "sales.view_all") && { href: "/sales", label: "Sales", icon: Receipt, tone: "rose" as const },
+    can(user, "audit.view") && { href: "/audit", label: "Audit", icon: ScrollText, tone: "navy" as const },
   ].filter(Boolean) as { href: string; label: string; icon: typeof Package; tone: keyof typeof PILL; badge?: number }[];
 
   const stockRing = [
@@ -188,7 +188,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/banner-products.webp" alt="" aria-hidden className="pointer-events-none absolute bottom-0 right-0 hidden h-full w-auto max-w-[56%] select-none object-contain object-right-bottom xl:block" />
 
-        <div className="relative px-5 pb-6 pt-6 max-lg:text-center sm:px-8 sm:pb-8 sm:pt-7 max-sm:px-3">
+        <div className="relative px-5 py-6 max-lg:text-center sm:px-8 lg:pb-8 lg:pt-7">
           {/* the person's name big, his position small in yellow under it, then the date (Nino 2026-11-08, like the Target Express banner) */}
           <h1 className="truncate text-3xl font-semibold uppercase tracking-[0.3em] sm:text-4xl">{firstName}</h1>
           <p className="mt-2 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400 max-lg:justify-center">
@@ -199,7 +199,8 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
           <p className="mt-1.5 text-sm text-white/60">
             {todayLabel} · {profile.name}
           </p>
-          <dl className="mt-5 grid grid-cols-3 gap-x-3 gap-y-4 lg:flex lg:flex-wrap lg:gap-x-9">
+          {/* the three numbers only on a computer: a phone or tablet banner is just name, position and date (they are all in "The money" below) */}
+          <dl className="mt-5 hidden lg:flex lg:flex-wrap lg:gap-x-9">
             {balances.length > 0 && (
               <div>
                 <dt className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/55 sm:text-[11px] sm:tracking-[0.14em]">You can use now</dt>
@@ -218,7 +219,7 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
         </div>
       </section>
 
-      <QuickIcons className="mb-5" items={pills.map((l) => ({ href: l.href, label: l.label, icon: l.icon, n: Number(l.badge) || undefined }))} />
+      <QuickIcons fill className="mb-5" items={pills.map((l) => ({ href: l.href, label: l.label, icon: l.icon, n: Number(l.badge) || undefined }))} />
 
       {alerts.active === 0 && (
         <div className="card card-pad mb-6 border-oil-400/50 bg-oil-soft/60">

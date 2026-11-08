@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { AlertTriangle, CalendarCheck, ChevronDown, ChevronRight, CircleCheck, ClipboardList, Clock, HandCoins, Handshake, Package, PackageCheck, PackageOpen, ReceiptText, Truck, TriangleAlert, Undo2 } from "lucide-react";
+import { AlertTriangle, CalendarCheck, ChevronDown, ChevronRight, ChevronUp, CircleCheck, ClipboardList, Clock, HandCoins, Handshake, Package, PackageCheck, PackageOpen, ReceiptText, Truck, TriangleAlert, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type AttentionTab = { key: string; label: string };
@@ -49,12 +49,12 @@ export default function AttentionPanel({ items, tabs = DIRECTOR_TABS, empty = "N
 
   return (
     <section id="attention" aria-label="Needs your attention" className={cn("scroll-mt-20", className)}>
-      <h2 className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+      <h2 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
         Needs your attention
         <span className="rounded-full bg-[#fdebc4] px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#3a2a00]">{items.length}</span>
       </h2>
       <div className="card overflow-hidden rounded-2xl">
-      <div className="flex flex-wrap items-center gap-2 px-3.5 pb-3 pt-3.5 sm:px-6">
+      <div className="flex flex-wrap items-center gap-2 px-3.5 pb-2.5 pt-3 sm:px-5 sm:pb-3 sm:pt-[13px]">
         <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]" role="tablist" aria-label="Filter">
           {pills.map((t) => (
             <button
@@ -66,10 +66,10 @@ export default function AttentionPanel({ items, tabs = DIRECTOR_TABS, empty = "N
                 setTab(t.key);
                 setScrolled(0);
               }}
-              className={cn("inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition sm:px-4 sm:text-sm", tab === t.key ? "border-sky-500 bg-sky-500 text-white" : "border-line text-slate-600 hover:border-slate-300 hover:text-slate-900")}
+              className={cn("inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition sm:h-[30px] sm:px-4 sm:text-[13px]", tab === t.key ? "border-sky-500 bg-sky-500 text-white" : "border-line text-slate-600 hover:border-slate-300 hover:text-slate-900")}
             >
               {t.label}
-              <span className={cn("text-[12px] font-normal", tab === t.key ? "text-white/90" : "text-slate-500")}>{count(t.key)}</span>
+              <span className={cn("text-[11px] font-normal sm:text-xs", tab === t.key ? "text-white/90" : "text-slate-500")}>{count(t.key)}</span>
             </button>
           ))}
         </div>
@@ -85,7 +85,7 @@ export default function AttentionPanel({ items, tabs = DIRECTOR_TABS, empty = "N
           <ul
             ref={list}
             key={tab}
-            className={cn("divide-y divide-line border-t border-line [--row:3.75rem] sm:[--row:4.5rem]", shown.length > VISIBLE && "overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}
+            className={cn("divide-y divide-line border-t border-line [--row:3.1rem] sm:[--row:4.3rem]", shown.length > VISIBLE && "overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}
             style={shown.length > VISIBLE ? { maxHeight: `calc(var(--row) * ${VISIBLE} + ${VISIBLE}px)` } : undefined}
             onScroll={(e) => setScrolled(Math.round(e.currentTarget.scrollTop / rowHeight()))}
           >
@@ -94,11 +94,11 @@ export default function AttentionPanel({ items, tabs = DIRECTOR_TABS, empty = "N
               return (
                 <li key={i.id}>
                   <Link href={i.href} className="group flex h-[var(--row)] items-center gap-2.5 px-3.5 transition hover:bg-slate-50 sm:gap-3.5 sm:px-6">
-                    <span className={cn("h-8 w-[3px] shrink-0 rounded-full sm:h-9 sm:w-1", BAR[i.tone])} aria-hidden />
-                    <Icon className={cn("h-[18px] w-[18px] shrink-0 sm:h-[22px] sm:w-[22px]", ICON_TONE[i.tone])} />
+                    <span className={cn("h-6 w-[3px] shrink-0 rounded-full sm:h-9 sm:w-1", BAR[i.tone])} aria-hidden />
+                    <Icon className={cn("h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5", ICON_TONE[i.tone])} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13.5px] font-semibold leading-5 text-slate-900 sm:text-[15px]">{i.title}</span>
-                      <span className="block truncate text-xs leading-[1.15rem] text-slate-500 sm:text-[13px]">
+                      <span className="block truncate text-[13px] font-semibold leading-[1.1rem] text-slate-900 sm:text-[15px] sm:leading-5">{i.title}</span>
+                      <span className="block truncate text-[11.5px] leading-4 text-slate-500 sm:text-[13px] sm:leading-[1.15rem]">
                         {i.main && <span className="font-medium text-slate-700 sm:hidden">{i.main} · </span>}
                         {i.detail}
                       </span>
@@ -115,13 +115,21 @@ export default function AttentionPanel({ items, tabs = DIRECTOR_TABS, empty = "N
               );
             })}
           </ul>
-          {more > 0 && (
+          {shown.length > VISIBLE && (
             <button
               type="button"
-              onClick={() => list.current?.scrollBy({ top: rowHeight() * VISIBLE, behavior: "smooth" })}
-              className="flex h-10 w-full items-center justify-center gap-2 border-t border-line text-[13px] text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+              onClick={() => list.current?.scrollBy({ top: more > 0 ? rowHeight() * VISIBLE : -list.current.scrollTop, behavior: "smooth" })}
+              className="flex h-9 w-full items-center justify-center gap-2 border-t border-line text-xs text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 sm:h-[39px] sm:text-[13px]"
             >
-              <ChevronDown size={16} /> Scroll for {more} more
+              {more > 0 ? (
+                <>
+                  <ChevronDown size={15} /> Scroll for {more} more
+                </>
+              ) : (
+                <>
+                  <ChevronUp size={15} /> Back to the top
+                </>
+              )}
             </button>
           )}
         </>
