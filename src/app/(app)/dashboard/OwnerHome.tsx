@@ -1,6 +1,5 @@
-import { BannerBell } from "@/components/BannerBell";
+import HomeBanner from "@/components/HomeBanner";
 import QuickIcons from "@/components/QuickIcons";
-import BannerTheme from "@/components/BannerTheme";
 import { qtyText } from "@/lib/qty";
 import { getUnitMode } from "@/lib/unit-mode";
 import Link from "next/link";
@@ -16,7 +15,7 @@ import { getOwnerDashboard, getOwnerExtras, getOwnerOverview } from "@/lib/dashb
 import { resolveRange } from "@/lib/dashboard/range";
 import { getStockAlerts } from "@/lib/inventory/alerts";
 import { formatMoney } from "@/lib/money";
-import { getBusinessProfile, getCurrency } from "@/lib/settings";
+import { getCurrency } from "@/lib/settings";
 import { cn, formatDateTime } from "@/lib/utils";
 
 function Section({ title, hint, action, children, className }: { title: string; hint?: string; action?: { href: string; label: string }; children: React.ReactNode; className?: string }) {
@@ -95,9 +94,8 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   const range = resolveRange("month");
   const financials = can(user, "dashboard.financials");
   const locationId = await defaultLocationId(db);
-  const [currency, profile, data, extras, overview, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, resellerOverdue, shelf, away, closedToday] = await Promise.all([
+  const [currency, data, extras, overview, alerts, shipmentIssues, shipmentsOnTheWay, balances, pendingExpenses, resellerOverdue, shelf, away, closedToday] = await Promise.all([
     getCurrency(),
-    getBusinessProfile(),
     getOwnerDashboard(db, range, { financials, valuation: can(user, "inventory.valuation") }),
     getOwnerExtras(db, range, { resellers: can(user, "resellers.view"), expenses: can(user, "expenses.view") }),
     getOwnerOverview(db, { financials }),
@@ -123,8 +121,6 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
   const o = overview;
   const usable = balances.reduce((s, b) => s + b.balance.toNumber(), 0);
   const hourNow = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Africa/Dar_es_Salaam" }).format(new Date()));
-  const firstName = user.name.split(" ")[0]!;
-  const todayLabel = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Dar_es_Salaam" }).format(new Date());
   const names = (rows: { name: string }[]) => rows.slice(0, 3).map((r) => r.name).join(", ") + (rows.length > 3 ? ` and ${rows.length - 3} more` : "");
 
   // ── What needs the owner, most urgent first ──
@@ -182,42 +178,8 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
 
   return (
     <>
-      {/* ── Banner: his name and position, the three numbers that matter, and the shop's real products ── */}
-      <section className="relative mb-4 overflow-hidden rounded-2xl bg-[#0a1a33] text-white shadow-[0_10px_30px_-14px_rgba(5,22,39,0.7)] ring-1 ring-white/10">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_380px_at_78%_25%,rgba(47,111,208,0.42),transparent_62%)]" aria-hidden />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/banner-products.webp" alt="" aria-hidden className="pointer-events-none absolute bottom-0 right-0 hidden h-full w-auto max-w-[56%] select-none object-contain object-right-bottom xl:block" />
-
-        <div className="relative px-5 py-6 max-lg:text-center sm:px-8 lg:pb-8 lg:pt-7">
-          {/* the person's name big, his position small in yellow under it, then the date (Nino 2026-11-08, like the Target Express banner) */}
-          <h1 className="truncate text-3xl font-semibold uppercase tracking-[0.3em] sm:text-4xl">{firstName}</h1>
-          <p className="mt-2 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400 max-lg:justify-center">
-            {user.roleName}
-            <BannerBell userId={user.id} className="relative h-6 w-6" />
-            <BannerTheme className="h-6 w-6" />
-          </p>
-          <p className="mt-1.5 text-sm text-white/60">
-            {todayLabel} · {profile.name}
-          </p>
-          {/* the three numbers only on a computer: a phone or tablet banner is just name, position and date (they are all in "The money" below) */}
-          <dl className="mt-5 hidden lg:flex lg:flex-wrap lg:gap-x-9">
-            {balances.length > 0 && (
-              <div>
-                <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">You can use now</dt>
-                <dd className="mt-0.5 text-xl font-bold tabular-nums">{m(usable)}</dd>
-              </div>
-            )}
-            <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Collected today</dt>
-              <dd className="mt-0.5 text-xl font-bold tabular-nums text-emerald-300">{m(o.today.collected)}</dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Owed by customers</dt>
-              <dd className="mt-0.5 text-xl font-bold tabular-nums text-oil-400">{m(k.debt.value)}</dd>
-            </div>
-          </dl>
-        </div>
-      </section>
+      {/* the same clean banner as the shop and warehouse homes (Nino 2026-11-09): name, position, date; no numbers in it (they are in "The money" below) */}
+      <HomeBanner user={user} />
 
       <QuickIcons fill className="mb-5" items={pills.map((l) => ({ href: l.href, label: l.label, icon: l.icon, n: Number(l.badge) || undefined }))} />
 
