@@ -16,6 +16,8 @@ type Props = {
   user: { name: string; roleName: string };
   /** hrefs the signed-in user may see (computed on the server from permissions) */
   visibleHrefs: string[];
+  /** `href|label` of menu items to leave out although their page is allowed (another item shows it) */
+  hiddenItems?: string[];
   logoutAction: () => Promise<void>;
   unread: number;
   /** numbers shown beside menu items that need someone to act */
@@ -27,7 +29,7 @@ type Props = {
 
 const DIM = { color: "var(--glass-text-dim)" } as const;
 
-export default function AppShell({ businessName, user, visibleHrefs, logoutAction, unread, badges, labels, children }: Props) {
+export default function AppShell({ businessName, user, visibleHrefs, hiddenItems, logoutAction, unread, badges, labels, children }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false); // the menu on a phone
@@ -95,7 +97,8 @@ export default function AppShell({ businessName, user, visibleHrefs, logoutActio
   }, [pathname]);
 
   const visible = new Set(visibleHrefs);
-  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.ready && visible.has(i.href)) })).filter((g) => g.items.length > 0);
+  const hidden = new Set(hiddenItems ?? []);
+  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.ready && visible.has(i.href) && !hidden.has(`${i.href}|${i.label}`)) })).filter((g) => g.items.length > 0);
   const topGroups = groups.filter((g) => !g.label);
   const folding = groups.filter((g) => g.label);
 

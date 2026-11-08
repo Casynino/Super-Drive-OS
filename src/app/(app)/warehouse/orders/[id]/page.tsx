@@ -55,6 +55,8 @@ export default async function CollectionPage({ params, searchParams }: { params:
         }
       />
 
+      {/* the release card hides this banner once the goods are handed over in this visit (it would read like an error right after a success) */}
+      <div id="note-banner">
       {block && block.code === "ALREADY_COLLECTED" && !sp.scanned ? (
         <div className="mb-5 rounded-xl border border-line bg-slate-50 px-4 py-3 text-sm text-slate-700">All the goods on this note were handed over. It cannot be used again.</div>
       ) : block ? (
@@ -63,14 +65,37 @@ export default async function CollectionPage({ params, searchParams }: { params:
           <p className="mt-0.5 text-sm">No goods can be released on this note.</p>
         </div>
       ) : sp.scanned ? (
-        <div className="mb-5 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">Scanned. Check the goods against the list below, then confirm.</div>
+        <div className="mb-5 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">Scanned. Check the goods against the list, then release them.</div>
       ) : null}
+      </div>
 
       {!block && note.auth !== "PAID" && (
         <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status">
           <p className="font-semibold">{note.sale.customer?.reseller ? "Winga order · not fully paid" : "Not fully paid"}</p>
           <p className="mt-0.5">{note.auth === "CREDIT_APPROVED" ? "This sale is on credit. It was approved at the till and the customer is recorded, so the goods may be handed over." : "Part of this sale is on credit. It was approved at the till and the customer is recorded, so the goods may be handed over."}</p>
         </div>
+      )}
+
+      {/* the hand-over comes first: who it is for, the products with pictures, one big button */}
+      {/* stays mounted after the release so its "Handed over" card (Scan next) is not lost when the page refreshes; with nothing to release it draws nothing */}
+      {operate && (
+        <ReleaseForm
+          noteId={note.id}
+          noteNo={note.noteNo}
+          submissionKey={randomUUID()}
+          customer={note.sale.customer?.name ?? "Walk-in customer"}
+          winga={Boolean(note.sale.customer?.reseller)}
+          saleNo={note.sale.saleNo}
+          paymentLabel={AUTH_LABEL[note.auth]}
+          lines={(canRelease ? lines.filter((l) => l.waiting.gt(0)) : []).map((l) => ({ id: l.it.id, productId: l.it.product.id, name: l.it.product.name, sku: l.it.product.sku, waiting: Number(l.waiting), waitingText: l.text(Number(l.waiting)).main, symbol: l.sym, imageV: l.it.product.image ? l.it.product.image.updatedAt.getTime() : null }))}
+        />
+      )}
+      {canRelease && (note.status === "NEW" || note.status === "PREPARING") && (
+        <section className="card card-pad mb-5">
+          <h2 className="mb-1 text-base font-semibold text-slate-900">Prepare first (optional)</h2>
+          <p className="mb-3 text-sm text-slate-500">Pick the goods and set them aside, then mark the order ready so the person knows to come.</p>
+          <OrderActions noteId={note.id} status={note.status} />
+        </section>
       )}
 
       <section className="card mb-5 px-4 py-4 sm:px-5">
@@ -134,24 +159,6 @@ export default async function CollectionPage({ params, searchParams }: { params:
           </table>
         </div>
       </section>
-
-      {canRelease && (
-        <div className="mb-5 space-y-4">
-          {(note.status === "NEW" || note.status === "PREPARING") && (
-            <section className="card card-pad">
-              <h2 className="mb-1 text-base font-semibold text-slate-900">Prepare</h2>
-              <p className="mb-3 text-sm text-slate-500">Pick the goods and set them aside, then mark the order ready so the person knows to come.</p>
-              <OrderActions noteId={note.id} status={note.status} />
-            </section>
-          )}
-          <ReleaseForm
-            noteId={note.id}
-            noteNo={note.noteNo}
-            submissionKey={randomUUID()}
-            lines={lines.filter((l) => l.waiting.gt(0)).map((l) => ({ id: l.it.id, name: l.it.product.name, sku: l.it.product.sku, waiting: Number(l.waiting), waitingText: l.text(Number(l.waiting)).main, symbol: l.sym }))}
-          />
-        </div>
-      )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="card overflow-hidden">

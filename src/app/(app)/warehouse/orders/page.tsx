@@ -1,14 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList } from "lucide-react";
+import { ChevronRight, ClipboardList, ScanLine } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
-import { canAny } from "@/lib/auth/can";
+import { can, canAny } from "@/lib/auth/can";
+import { largestPack, qtyText } from "@/lib/qty";
 import { requireUser } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
 import { Prisma, type PickupStatus } from "@/generated/prisma/client";
 import { AUTH_LABEL, OPEN_STATUSES, STATUS_LABEL, STATUS_TEXT } from "@/lib/warehouse/labels";
-import { formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+
+const ago = (d: Date) => {
+  const m = Math.max(0, Math.round((Date.now() - d.getTime()) / 60_000));
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+};
 
 export const metadata = { title: "Collections" };
 
@@ -31,6 +36,7 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
   const filter = FILTERS.find((f) => f.key === sp.f) ?? FILTERS[0];
   const q = sp.q?.trim() ?? "";
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
+  const operate = can(user, "warehouse.operate");
 
   const where: Prisma.PickupNoteWhereInput = {
     status: { in: [...filter.statuses] },
@@ -42,7 +48,7 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
       orderBy: filter.key === "done" || filter.key === "cancelled" ? { createdAt: "desc" } : { createdAt: "asc" }, // waiting ones: the oldest first
       skip: (page - 1) * PAGE,
       take: PAGE,
-      include: { sale: { select: { saleNo: true, customer: { select: { name: true, reseller: { select: { id: true } } } }, salesperson: { select: { name: true } } } }, items: { select: { quantity: true, product: { select: { name: true } } } } },
+      include: { sale: { select: { saleNo: true, customer: { select: { name: true, reseller: { select: { id: true } } } }, salesperson: { select: { name: true } } } }, items: { select: { quantity: true, releasedQty: true, cancelledQty: true, product: { select: { name: true, baseUnit: { select: { symbol: true } }, units: { select: { factor: true, unit: { select: { symbol: true } } } } } } } } },
     }),
     db.pickupNote.count({ where }),
     db.pickupNote.groupBy({ by: ["status"], _count: { _all: true } }),
@@ -57,7 +63,17 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <PageHeader title="Collections" description="Every sale that has to be collected from the warehouse." />
+      <PageHeader
+        title="Collections"
+        description={filter.key === "open" && notes[0] ? `${total} order${total === 1 ? "" : "s"} waiting · the oldest came ${ago(notes[0].createdAt)}` : "Every sale that has to be collected from the warehouse."}
+        actions={
+          operate ? (
+            <Link href="/warehouse/scan" className="btn-primary">
+              <ScanLine size={16} /> Scan &amp; release
+            </Link>
+          ) : undefined
+        }
+      />
       <div className="mb-3 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <Link key={f.key} href={href({ f: f.key === "open" ? undefined : f.key, page: undefined })} className={cn("rounded-full border px-3 py-1.5 text-sm font-medium transition", filter.key === f.key ? "border-navy-600 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-200 hover:text-slate-900")}>
@@ -78,54 +94,59 @@ export default async function CollectionsPage({ searchParams }: { searchParams: 
           <EmptyState icon={<ClipboardList size={22} />} title="Nothing here" description={filter.key === "open" ? "No sale is waiting to be collected." : "No notes match this filter."} />
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <div className="table-wrap">
-            <table className="table w-full md:table-fixed">
-              <colgroup>
-                <col className="md:w-[13%]" />
-                <col className="md:w-[17%]" />
-                <col className="md:w-[14%]" />
-                <col className="md:w-[24%]" />
-                <col className="md:w-[12%]" />
-                <col className="md:w-[10%]" />
-                <col className="md:w-[10%]" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Note</th>
-                  <th>Customer</th>
-                  <th className="hidden md:table-cell">Sold by</th>
-                  <th>Products</th>
-                  <th className="hidden md:table-cell">Payment</th>
-                  <th className="hidden md:table-cell">Time</th>
-                  <th className="text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {notes.map((p) => (
-                  <tr key={p.id} className="relative">
-                    <td className="font-mono text-[13px] font-medium">
-                      <Link href={`/warehouse/orders/${p.id}`} className="after:absolute after:inset-0 after:content-[''] hover:text-navy-700">
-                        {p.noteNo}
+        <div>
+          <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+            {notes.map((p) => {
+              const open = (OPEN_STATUSES as readonly PickupStatus[]).includes(p.status);
+              const lines = p.items
+                .map((i) => {
+                  const pack = largestPack(i.product.units.map((u) => ({ symbol: u.unit.symbol, factor: u.factor })));
+                  const qty = open ? Number(i.quantity.minus(i.releasedQty).minus(i.cancelledQty)) : Number(i.quantity);
+                  return { id: `${p.id}-${i.product.name}`, name: i.product.name, qty, text: qtyText(qty, pack, i.product.baseUnit.symbol).main };
+                })
+                .filter((l) => !open || l.qty > 0);
+              const customer = p.sale.customer?.name;
+              return (
+                <li key={p.id} className="card flex flex-col overflow-hidden">
+                  <Link href={`/warehouse/orders/${p.id}`} className="block flex-1 px-4 py-3.5 transition hover:bg-slate-50/60">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-mono text-[13px] font-semibold text-slate-900">{p.noteNo}</span>
+                      <span className={cn("text-xs", STATUS_TEXT[p.status])}>{STATUS_LABEL[p.status]}</span>
+                    </div>
+                    <p className="mt-2 flex flex-wrap items-center gap-2 text-base font-semibold text-slate-900">
+                      {customer ?? <span className="font-medium text-slate-400">Walk-in customer</span>}
+                      {p.sale.customer?.reseller && <span className="rounded-full bg-oil-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span>}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Sold by {p.sale.salesperson.name} · {ago(p.createdAt)}
+                    </p>
+                    <ul className="mt-3 space-y-1.5 border-t border-line pt-3 text-sm">
+                      {lines.slice(0, 4).map((l) => (
+                        <li key={l.id} className="flex items-baseline justify-between gap-3">
+                          <span className="min-w-0 truncate text-slate-700">{l.name}</span>
+                          <span className="shrink-0 font-semibold tabular-nums text-slate-900">{l.text}</span>
+                        </li>
+                      ))}
+                      {lines.length > 4 && <li className="text-xs text-slate-500">+ {lines.length - 4} more product{lines.length - 4 === 1 ? "" : "s"}</li>}
+                      {lines.length === 0 && <li className="text-xs text-slate-500">Nothing left to hand over.</li>}
+                    </ul>
+                  </Link>
+                  <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5">
+                    <span className={cn("text-xs font-medium", p.auth === "PAID" ? "text-emerald-600" : "text-amber-600")}>{AUTH_LABEL[p.auth].split(",")[0]}</span>
+                    {open && operate ? (
+                      <Link href={`/warehouse/orders/${p.id}`} className="btn-primary btn-sm">
+                        Release <ChevronRight size={14} />
                       </Link>
-                    </td>
-                    <td className="truncate">
-                      {p.sale.customer?.name ?? <span className="text-slate-400">Walk-in</span>}
-                      {p.sale.customer?.reseller && <span className="ml-2 rounded-full bg-oil-400/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800 dark:text-oil-400">Winga</span>}
-                    </td>
-                    <td className="hidden truncate text-slate-600 md:table-cell">{p.sale.salesperson.name}</td>
-                    <td className="truncate text-slate-600">
-                      {p.items.slice(0, 2).map((i) => i.product.name).join(", ")}
-                      {p.items.length > 2 ? ` +${p.items.length - 2}` : ""}
-                    </td>
-                    <td className="hidden truncate text-slate-600 md:table-cell">{AUTH_LABEL[p.auth].split(",")[0]}</td>
-                    <td className="hidden whitespace-nowrap text-slate-500 md:table-cell">{formatDateTime(p.createdAt)}</td>
-                    <td className={cn("text-right", STATUS_TEXT[p.status])}>{STATUS_LABEL[p.status]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    ) : (
+                      <Link href={`/warehouse/orders/${p.id}`} className="text-sm font-medium text-navy-700 hover:underline">
+                        Open
+                      </Link>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
           {total > PAGE && (
             <div className="flex items-center justify-between border-t border-line px-4 py-3 text-sm text-slate-600">
               <span>

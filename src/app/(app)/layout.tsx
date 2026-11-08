@@ -31,6 +31,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .filter((i) => i.ready && (i.permissions.length === 0 || canAny(user, i.permissions)) && !(i.hideIfAny && canAny(user, i.hideIfAny)) && !(sellerOnly && i.href === "/dashboard"))
     .map((i) => i.href);
 
+  // Items hidden for this person even though another item with the same page is shown (the Stock group's "Orders" and the Warehouse group's "Receiving" are the same page)
+  const hiddenItems = NAV.flatMap((g) => g.items)
+    .filter((i) => i.hideIfAny && canAny(user, i.hideIfAny))
+    .map((i) => `${i.href}|${i.label}`);
+
   // Counts beside the menu items that need someone to act
   const [unread, shipmentsToCount, shipmentIssues] = await Promise.all([
     db.notification.count({ where: { userId: user.id, readAt: null } }),
@@ -44,6 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       businessName={await getBusinessName()}
       user={{ name: user.name, roleName: user.roleName }}
       visibleHrefs={visibleHrefs}
+      hiddenItems={hiddenItems}
       logoutAction={logout}
       unread={unread}
       badges={badges}

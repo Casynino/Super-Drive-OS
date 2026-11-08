@@ -177,8 +177,8 @@ export function YearChart({ data, money, showCosts = true }: { data: { label: st
 }
 
 /** Money coming in against money going out, month by month. */
-export function InOutChart({ data, money }: { data: { label: string; in: number; out: number }[]; money: Money }) {
-  if (data.every((d) => d.in === 0 && d.out === 0)) return <Empty text="No money has moved yet" />;
+export function InOutChart({ data, money, inLabel = "Money in", outLabel = "Money out", empty = "No money has moved yet" }: { data: { label: string; in: number; out: number }[]; money: Money; inLabel?: string; outLabel?: string; empty?: string }) {
+  if (data.every((d) => d.in === 0 && d.out === 0)) return <Empty text={empty} />;
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barGap={2}>
@@ -186,8 +186,8 @@ export function InOutChart({ data, money }: { data: { label: string; in: number;
         <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "var(--chart-text)" }} interval="preserveStartEnd" minTickGap={14} />
         <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--chart-text)" }} tickFormatter={short} width={40} />
         <Tooltip cursor={{ fill: "var(--color-slate-100)" }} formatter={(v, name) => [fmt(Number(v), money), String(name)]} contentStyle={{ borderRadius: 10, border: "1px solid var(--chart-grid)", background: "var(--card)", color: "var(--chart-label)" }} />
-        <Bar dataKey="in" name="Money in" fill="var(--c5)" radius={[3, 3, 0, 0]} maxBarSize={14} />
-        <Bar dataKey="out" name="Money out" fill="var(--c2)" radius={[3, 3, 0, 0]} maxBarSize={14} />
+        <Bar dataKey="in" name={inLabel} fill="var(--c5)" radius={[3, 3, 0, 0]} maxBarSize={14} />
+        <Bar dataKey="out" name={outLabel} fill="var(--c2)" radius={[3, 3, 0, 0]} maxBarSize={14} />
       </BarChart>
     </ResponsiveContainer>
   );

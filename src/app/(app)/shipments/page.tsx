@@ -21,7 +21,10 @@ import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import { decideIssueAction, markArrivedAction } from "./actions";
 import { PhaseBadge } from "./badges";
 
-export const metadata = { title: "Purchase orders" };
+export async function generateMetadata() {
+  const user = await requireUser();
+  return { title: can(user, "shipments.manage") ? "Purchase orders" : "Receiving" };
+}
 
 type PhaseTab = "way" | "check" | "investigation" | "history";
 type Tab = PhaseTab | "deliveries";
@@ -39,6 +42,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const manage = can(user, "shipments.manage");
   const receive = can(user, "shipments.receive");
+  const staff = receive && !manage; // the warehouse person: for him this page is "Receiving" (deliveries to count), not purchase orders
   const currency = await getCurrency();
   // The goods that were counted into stock (delivery receipts) live here too, for people who may see them
   const deliveriesAllowed = canAny(user, ["inventory.receive", "inventory.movements", "purchasing.view"]);
@@ -92,17 +96,17 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "way", label: "On the way" },
-    { key: "check", label: "To check" },
+    { key: "check", label: staff ? "To count" : "To check" },
     { key: "investigation", label: "Investigation" },
     { key: "history", label: "History" },
     ...(deliveriesAllowed ? [{ key: "deliveries" as const, label: "Deliveries" }] : []),
   ];
   const countOf = (k: Tab) => (k === "deliveries" ? receiptCount : counts[k]);
   const empty: Record<PhaseTab, { title: string; text: string }> = {
-    way: { title: "Nothing is on the way", text: manage ? "Make a purchase order and it shows up here." : "When the owner sends a purchase order it shows up here." },
-    check: { title: "Nothing to check", text: "When a delivery is marked as arrived it waits here to be counted." },
+    way: { title: staff ? "No delivery is expected" : "Nothing is on the way", text: manage ? "Make a purchase order and it shows up here." : "When the Director announces a delivery it shows up here." },
+    check: { title: staff ? "Nothing to count" : "Nothing to check", text: "When a delivery is marked as arrived it waits here to be counted." },
     investigation: { title: "No problems", text: "Damaged, missing or extra goods are listed here until they are investigated." },
-    history: { title: "No finished orders yet", text: "Orders that are fully in stock appear here." },
+    history: { title: staff ? "No finished deliveries yet" : "No finished orders yet", text: staff ? "Deliveries that are fully in stock appear here." : "Orders that are fully in stock appear here." },
   };
 
   const action = (r: (typeof rows)[number]) => {
@@ -130,8 +134,8 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader
-        title="Purchase orders"
-        description={manage ? "Write down what you order. It goes on the way, the shop marks it arrived and checks it, and anything wrong comes back to you." : "Orders on their way to the shop. Mark one arrived, then check what you receive."}
+        title={staff ? "Receiving" : "Purchase orders"}
+        description={manage ? "Write down what you order. It goes on the way, the shop marks it arrived and checks it, and anything wrong comes back to you." : "Deliveries on their way to the warehouse. Mark one arrived, then count what you receive."}
         actions={
           manage && (
             <Link href="/shipments/new" className="btn-primary">
@@ -141,7 +145,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
         }
       />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className={`mb-5 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 ${staff ? "hidden md:grid" : "grid"}`}>
         <KpiCard
           icon={Truck}
           tone="blue"
@@ -151,7 +155,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
           href="/shipments?tab=way"
           active={tab === "way"}
         />
-        <KpiCard icon={PackageCheck} tone="yellow" label="To check" value={counts.check} hint={counts.check ? "Arrived, waiting to be counted" : "All counted"} href="/shipments?tab=check" active={tab === "check"} />
+        <KpiCard icon={PackageCheck} tone="yellow" label={staff ? "To count" : "To check"} value={counts.check} hint={counts.check ? "Arrived, waiting to be counted" : "All counted"} href="/shipments?tab=check" active={tab === "check"} />
         <KpiCard icon={ShieldAlert} tone={counts.investigation ? "red" : "slate"} label="Investigation" value={counts.investigation} hint={counts.investigation ? "Damaged, missing or extra goods" : "No problems"} href="/shipments?tab=investigation" active={tab === "investigation"} />
         <KpiCard icon={PackageOpen} tone="green" label="In stock" value={doneRecently} hint="Fully received, last 30 days" href={deliveriesAllowed ? "/shipments?tab=deliveries" : "/shipments?tab=history"} active={tab === "deliveries" || (!deliveriesAllowed && tab === "history")} />
       </div>
@@ -242,6 +246,42 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
             }
           />
         ) : (
+          staff ? (
+            <ul className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
+              {list.map((r) => {
+                const s = r.s;
+                return (
+                  <li key={s.id} className="flex flex-col overflow-hidden rounded-2xl border border-line">
+                    <Link href={`/shipments/${s.id}`} className="block flex-1 px-4 py-3.5 transition hover:bg-slate-50/60">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="font-mono text-[13px] font-semibold text-slate-900">{s.shipmentNo}</span>
+                        <PhaseBadge phase={r.phase} />
+                      </div>
+                      <p className="mt-2 text-base font-semibold text-slate-900">{s.cargoName ?? s.supplier?.name ?? s.reference ?? "Delivery"}</p>
+                      {s.supplier?.name && s.cargoName && <p className="text-xs text-slate-500">from {s.supplier.name}</p>}
+                      <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-line pt-3 text-sm">
+                        <div>
+                          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">What is coming</dt>
+                          <dd className="mt-0.5 font-medium text-slate-900">
+                            {productCount(s)} product{productCount(s) === 1 ? "" : "s"}
+                            <span className="block text-xs font-normal text-slate-500">{Math.round(units(s))} items</span>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{r.phase === "ON_THE_WAY" ? "Expected" : "Arrived"}</dt>
+                          <dd className="mt-0.5 font-medium text-slate-900">
+                            {r.phase === "ON_THE_WAY" ? (s.expectedDate ? formatDate(s.expectedDate) : "No date") : s.arrivedAt ? formatDate(s.arrivedAt) : "—"}
+                            <span className="block text-xs font-normal text-slate-500">{r.phase === "ON_THE_WAY" ? (isLate(s) ? "Late" : "On the way") : s.arrivedBy ? `by ${s.arrivedBy.name}` : ""}</span>
+                          </dd>
+                        </div>
+                      </dl>
+                    </Link>
+                    <div className="flex items-center justify-end gap-3 border-t border-line px-4 py-2.5">{action(r)}</div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -297,6 +337,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
               </tbody>
             </table>
           </div>
+          )
         )}
       </section>
       )}
