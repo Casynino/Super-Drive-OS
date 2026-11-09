@@ -34,7 +34,7 @@ export const LIVE: Project[] = [
   {
     name: "Vegas Luxury Hotel", kind: "Hotel website & operations system",
     line: "The hotel's website, online booking and mobile-money payments — and the whole staff system behind it: reception, restaurant and room service, finance, stock and daily reports to the owner on WhatsApp.",
-    url: "https://www.vegashoteltz.com", domain: "vegashoteltz.com", shot: "/nino/vegas-live.webp",
+    url: "https://www.vegashoteltz.com", domain: "vegashoteltz.com", shot: "/nino/vegas-now.webp",
     tags: ["Booking engine", "Mobile money", "Staff system", "Reports"],
   },
   {
@@ -64,7 +64,7 @@ export const LIVE: Project[] = [
   {
     name: "Hǎodeals", kind: "Online store",
     line: "Limited deals, in stock and delivered fast — browse by category, shop and check out.",
-    url: "https://www.haodealtz.com", domain: "haodealtz.com", shot: "/nino/haodeals-live.webp",
+    url: "https://www.haodealtz.com", domain: "haodealtz.com", shot: "/nino/haodeals-now.webp",
     tags: ["E-commerce", "Checkout"],
   },
   {
@@ -82,7 +82,7 @@ export const LIVE: Project[] = [
   {
     name: "ORA Pads", kind: "Social-impact brand",
     line: "Menstrual health, education and period dignity for every girl and woman across Tanzania.",
-    url: "https://www.ora.co.tz", domain: "ora.co.tz", shot: "/nino/ora-live.webp",
+    url: "https://www.ora.co.tz", domain: "ora.co.tz", shot: "/nino/ora-now.webp",
     tags: ["Brand site", "Community"],
   },
   {
@@ -94,7 +94,7 @@ export const LIVE: Project[] = [
   {
     name: "Reckless Lab", kind: "Fashion label & store",
     line: "A laboratory where fashion rules are broken to make something alive.",
-    url: "https://www.recklesslab.shop", domain: "recklesslab.shop", shot: "/nino/reckless-live.webp",
+    url: "https://www.recklesslab.shop", domain: "recklesslab.shop", shot: "/nino/reckless-now.webp",
     tags: ["Store", "Brand"],
   },
 ];
