@@ -237,6 +237,9 @@ html.dark .status-strip { background: #0a1220; }
 /* the sign-in scene is always navy and runs under the clock itself, so it needs no strip, and the page behind it is navy too (no light edge when the page is pulled in the light look) */
 body:has([data-login-scene]) .status-strip { display: none; }
 body:has([data-login-scene]) { background-color: #061a33; }
+/* Nino's page (/nino, reached from the foot of the sign-in page) is always near-black, in either look */
+body:has([data-nino-page]) { background-color: #0a0a0b; }
+body:has([data-nino-page]) .status-strip { background: #0a0a0b; }
 @media print { .status-strip { display: none; } }
 /* taps act at once (no double-tap zoom), buttons and menu links are not selected by a long press, like in a native app */
 html { touch-action: manipulation; }

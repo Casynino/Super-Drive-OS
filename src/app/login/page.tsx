@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 import BrandLogo from "@/components/BrandLogo";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Boxes, HandCoins, Wallet } from "lucide-react";
+import { ArrowUpRight, Boxes, HandCoins, Wallet } from "lucide-react";
 import { getSessionUser } from "@/lib/auth/session";
 import LoginForm from "./LoginForm";
 import LoginGate from "./LoginGate";
@@ -74,9 +75,16 @@ export default async function LoginPage() {
               <LoginForm />
             </div>
           </LoginGate>
-          <p className="mt-5 text-xs text-white/60 max-md:fixed max-md:inset-x-0 max-md:bottom-[max(1rem,env(safe-area-inset-bottom))] max-md:z-10 max-md:text-center max-md:text-white/50">Super Drive Oil · Management System</p>
         </section>
       </div>
+      {/* Foot of the page: the system's name, and who made it, one quiet line to Nino's page and work (Nino 2026-11-09, copied from the Vegas sign-in page). */}
+      <footer className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-0 bg-gradient-to-t from-[#030812]/85 via-[#030812]/45 to-transparent px-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-8 text-xs text-white/60 sm:flex-row sm:justify-between sm:px-8 sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <span>Super Drive Oil · Management System</span>
+        <Link href="/nino" className="group inline-flex min-h-10 items-center gap-1 rounded-sm transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oil-400">
+          Developed by <span className="font-semibold text-white/80 transition-colors group-hover:text-[#c6f432]">Nino</span>
+          <ArrowUpRight size={14} className="transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+        </Link>
+      </footer>
     </div>
   );
 }
