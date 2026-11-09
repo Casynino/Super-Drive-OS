@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, House, Menu, Search, X } from "lucide-react";
 import SidebarFooter from "@/components/SidebarFooter";
 import { InstallPrompt } from "@/components/InstallApp";
+import UpdateNotice from "@/components/UpdateNotice";
 import UserMenu from "@/components/UserMenu";
 import { cn } from "@/lib/utils";
 import { NAV, type NavItem } from "./nav";
@@ -367,6 +368,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
 
       <main className="mx-auto w-full max-w-[1920px] px-4 pb-6 pt-3 max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:pt-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
       <InstallPrompt />
+      <UpdateNotice />
 
       {/* Phone and tablet: the bottom bar. Only icons and short words, the open page has a thin yellow bar on top and a yellow icon. */}
       <nav aria-label="Quick" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden print:hidden">

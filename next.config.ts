@@ -7,7 +7,13 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
 ];
 
+// Which version is this? On Vercel it is the commit being built, so every push has its own id. It is written into BOTH the server code and the
+// browser code of that build, so a page that stays open can ask the server "what is the newest version?" and tell the person when it differs
+// (src/components/UpdateNotice.tsx, /api/version). Outside Vercel it is "dev" and the notice never shows.
+const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || "dev";
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: BUILD_ID },
   poweredByHeader: false,
   // hides the round "N" badge Next.js draws in the corner while developing (it covered the sidebar corner)
   devIndicators: false,

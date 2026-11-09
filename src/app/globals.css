@@ -245,6 +245,10 @@ body:has([data-login-scene]) { background-color: #061a33; }
 body:has([data-nino-page]) { background-color: #0a0a0b; }
 body:has([data-nino-page]) .status-strip { background: #0a0a0b; }
 @media print { .status-strip { display: none; } }
+/* the "New update" pill drops in from the top */
+.update-in { animation: update-in 0.24s ease-out both; }
+@keyframes update-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .update-in { animation: none; } }
 /* taps act at once (no double-tap zoom), buttons and menu links are not selected by a long press, like in a native app */
 html { touch-action: manipulation; }
 @media (pointer: coarse) {
