@@ -8,13 +8,34 @@
   container-type: inline-size;
   color: #fff;
   background:
-    /* the top and bottom edge fade into the colour of the phone's own bars (theme-color #061a33), so no hard line shows where the page meets them */
-    linear-gradient(180deg, #061a33 0, rgba(6, 26, 51, 0) 16svh),
-    linear-gradient(0deg, #061a33 0, rgba(6, 26, 51, 0) 9svh),
     radial-gradient(1000px 560px at 56% 12%, rgba(70, 140, 230, 0.4), transparent 62%),
     radial-gradient(800px 460px at 6% 100%, rgba(237, 28, 36, 0.22), transparent 60%),
     radial-gradient(700px 400px at 100% 70%, rgba(253, 196, 0, 0.1), transparent 60%),
     linear-gradient(180deg, #061a33 0%, #0b2f57 58%, #0a2342 100%);
+}
+
+/* On a phone the scene's top and bottom edges melt into the colour of the phone's own bars (theme-color #061a33), so no hard line shows where the page
+   meets them. Only a soft fade over the edge: nothing is covered (the cars keep passing all the way down). */
+@media (max-width: 767px) {
+  .ls::before,
+  .ls::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .ls::before {
+    top: 0;
+    height: 64px;
+    background: linear-gradient(180deg, #061a33 0%, rgba(6, 26, 51, 0.6) 45%, rgba(6, 26, 51, 0) 100%);
+  }
+  .ls::after {
+    bottom: 0;
+    height: 40px;
+    background: linear-gradient(0deg, #061a33 0%, rgba(6, 26, 51, 0.55) 45%, rgba(6, 26, 51, 0) 100%);
+  }
 }
 
 /* glowing road: a grid plane that streams towards the viewer */

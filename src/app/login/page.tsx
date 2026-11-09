@@ -28,7 +28,7 @@ export default async function LoginPage() {
   if (await getSessionUser()) redirect("/dashboard");
 
   return (
-    <div data-login-scene className="relative isolate min-h-dvh overflow-hidden bg-navy-900">
+    <div data-login-scene className="relative isolate min-h-dvh overflow-hidden bg-[#061a33]">
       {/* the animated scene fills the whole page */}
       <LoginScene />
 
@@ -78,11 +78,12 @@ export default async function LoginPage() {
         </section>
       </div>
       {/* Foot of the page: the system's name, and who made it, one quiet line to Nino's page and work (Nino 2026-11-09, copied from the Vegas sign-in page). */}
-      <footer className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-0 pb-[max(0.5rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pt-2 text-xs text-white/65 max-sm:border-t max-sm:border-white/10 max-sm:bg-[#061a33]/95 max-sm:backdrop-blur-sm sm:flex-row sm:justify-between sm:bg-gradient-to-t sm:from-[#061a33]/85 sm:via-[#061a33]/45 sm:to-transparent sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pl-[max(2rem,env(safe-area-inset-left))] sm:pr-[max(2rem,env(safe-area-inset-right))] sm:pt-8">
+      <footer className="absolute inset-x-0 bottom-0 z-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-0 pb-[max(0.125rem,calc(env(safe-area-inset-bottom)_-_0.9rem))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-1 text-[11px] text-white/70 [text-shadow:0_1px_6px_rgba(3,8,18,0.95)] sm:flex-nowrap sm:justify-between sm:bg-gradient-to-t sm:from-[#061a33]/85 sm:via-[#061a33]/45 sm:to-transparent sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pl-[max(2rem,env(safe-area-inset-left))] sm:pr-[max(2rem,env(safe-area-inset-right))] sm:pt-8 sm:text-xs sm:text-white/60 sm:[text-shadow:none]">
         <span>Super Drive Oil · Management System</span>
-        <Link href="/nino" className="group inline-flex min-h-10 items-center gap-1 rounded-sm transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oil-400">
-          Developed by <span className="font-semibold text-white/80 transition-colors group-hover:text-[#c6f432]">Nino</span>
-          <ArrowUpRight size={14} className="transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+        <span aria-hidden className="sm:hidden">·</span>
+        <Link href="/nino" className="group inline-flex min-h-8 items-center gap-1 rounded-sm transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oil-400 sm:min-h-10">
+          Developed by <span className="font-semibold text-white/85 transition-colors group-hover:text-[#c6f432] sm:text-white/80">Nino</span>
+          <ArrowUpRight size={13} className="transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
         </Link>
       </footer>
     </div>
