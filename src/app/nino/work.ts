@@ -1,7 +1,7 @@
 /**
  * Nino's work, as shown on /nino (copied from the Vegas Luxury Hotel project's page of the same name; keep the two lists in step). Every line comes
  * from the project's own live site (its title and description), its README, or from Nino — nothing invented. Screenshots in /public/nino are the live
- * home pages, taken 2026-10-05 (Super Drive Oil: its sign-in page, 2026-11-09).
+ * home pages, taken 2026-10-05 (Super Drive Oil: its sign-in page, retaken 2026-11-09 after the animated scene, the engine and the new footer).
  */
 
 export type Project = {
@@ -25,9 +25,9 @@ const GH = "https://github.com/Casynino";
 export const LIVE: Project[] = [
   {
     name: "Super Drive Oil", kind: "Oil distribution · sales, stock & credit",
-    line: "You're on it. Sales, stock and credit in one place — every sale, payment and stock movement is recorded against the person who made it.",
-    url: "https://super-drive-os.vercel.app", domain: "super-drive-os.vercel.app", shot: "/nino/superdrive.webp",
-    tags: ["Live stock", "Cash & daily closing", "Credit control"], code: `${GH}/Super-Drive-OS`,
+    line: "You're on it. Every carton that comes in, goes out or is still owed is on the system — counter sales, the warehouse and pickup notes, cash and daily closing, Winga and credit — each one recorded against the person who made it.",
+    url: "https://super-drive-os.vercel.app", domain: "super-drive-os.vercel.app", shot: "/nino/superdrive-2.webp",
+    tags: ["Point of sale", "Warehouse pickups", "Daily closing", "Credit & Winga"], code: `${GH}/Super-Drive-OS`,
   },
   {
     name: "Vegas Luxury Hotel", kind: "Hotel website & operations system",

@@ -151,7 +151,7 @@ export default function NinoPage() {
 
         {/* ── Work with me ── */}
         <section id="contact" aria-labelledby="contact-title" className={cn(wrap, "scroll-mt-20 pb-16 pt-10 sm:pb-24 sm:pt-16")}>
-          <div className="relative overflow-hidden rounded-[2rem] border border-[var(--rule)] bg-[linear-gradient(140deg,rgb(198_244_50/0.10),rgb(255_255_255/0.02)_45%)] p-6 sm:p-12">
+          <div className="relative overflow-hidden rounded-[2rem] border border-[var(--rule)] bg-[linear-gradient(140deg,rgb(253_196_0/0.10),rgb(255_255_255/0.02)_45%)] p-6 sm:p-12">
             <p className={eyebrow}>04 — Work with me</p>
             <h2 id="contact-title" className="mt-4 max-w-3xl text-balance text-4xl font-black leading-[0.95] tracking-[-0.045em] sm:text-6xl">
               Have something to build? Let&apos;s talk<span className="text-[var(--accent)]">.</span>
