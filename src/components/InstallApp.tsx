@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, EllipsisVertical, Menu, Share, SquarePlus, Smartphone, TriangleAlert, X } from "lucide-react";
+import { Download, EllipsisVertical, Menu, Share, SquarePlus, TriangleAlert, X } from "lucide-react";
 import Modal from "@/components/Modal";
 import { detectDevice, type Device } from "@/lib/device";
 
@@ -81,11 +81,11 @@ function stepsFor(d: Device): Step[] {
         text:
           d.browser === "safari" || d.inApp ? (
             <>
-              Tap <b>Share</b> at the bottom of Safari (on newer iPhones it is under the <b>···</b> button).
+              Tap <b>Share</b> (bottom bar, or <b>···</b>).
             </>
           ) : (
             <>
-              Tap <b>Share</b> next to the address at the top.
+              Tap <b>Share</b> in the address bar or menu.
             </>
           ),
       },
@@ -93,14 +93,14 @@ function stepsFor(d: Device): Step[] {
         icon: SquarePlus,
         text: (
           <>
-            Scroll down and tap <b>Add to Home Screen</b>.
+            Tap <b>Add to Home Screen</b>.
           </>
         ),
       },
       {
         text: (
           <>
-            Tap <b>Add</b>, then open <b>Super Drive</b> from your home screen.
+            Tap <b>Add</b>, then open <b>Super Drive</b>.
           </>
         ),
       },
@@ -164,50 +164,45 @@ export function InstallSheet({ open, onClose }: { open: boolean; onClose: () => 
   // a card with space round it, centred, like a pop-up in an app (not a sheet glued to the bottom edge, where the browser's own toolbar sits)
   return (
     <Modal open={open} onClose={onClose} label="Use it as an app" bare>
-      <div className="relative w-[calc(100vw-2rem)] max-w-sm rounded-2xl border border-line bg-white p-5 shadow-2xl">
-        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-3 top-3 grid size-8 place-items-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">
-          <X size={16} />
+      <div className="relative w-[calc(100vw-2.5rem)] max-w-[19.5rem] rounded-2xl border border-line bg-white p-4 shadow-2xl">
+        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-2.5 top-2.5 grid size-7 place-items-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">
+          <X size={15} />
         </button>
-        <div className="flex items-center gap-3 pr-8">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#0a1a33] text-oil-400">
-            <Smartphone size={20} />
-          </span>
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Use it like an app</h2>
-            <p className="text-[13px] text-slate-500">Full screen, no browser bar, its own icon.</p>
-          </div>
+        <div className="pr-7">
+          <h2 className="text-[15px] font-semibold leading-tight text-slate-900">Use it like an app</h2>
+          <p className="mt-0.5 text-xs text-slate-500">Full screen, no browser bar, its own icon.</p>
         </div>
 
         {device.inApp && (
-          <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-oil-400/40 bg-oil-400/10 px-3 py-2.5 text-[13px] leading-snug text-slate-800">
-            <TriangleAlert size={16} className="mt-px shrink-0 text-oil-500" />
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-oil-400/40 bg-oil-400/10 px-2.5 py-2 text-xs leading-snug text-slate-800">
+            <TriangleAlert size={14} className="mt-px shrink-0 text-oil-500" />
             <span>
-              This page is open inside {device.appName}, which cannot put it on the home screen. Tap the <b>···</b> (or three dots) at the top and choose <b>Open in {browserName}</b> or <b>Open in browser</b>, then do these steps.
+              Opened inside {device.appName}, which cannot add it to the home screen. Tap <b>···</b> at the top, choose <b>Open in {browserName}</b>, then do these steps.
             </span>
           </div>
         )}
 
         {canPrompt && !device.inApp ? (
-          <div className="mt-4 flex flex-col gap-2">
-            <button type="button" className="btn-primary" onClick={async () => { if (await install()) onClose(); }}>
-              <Download size={16} /> Install the app
+          <div className="mt-3.5 flex flex-col gap-1.5">
+            <button type="button" className="btn-primary w-full py-2 text-[13px]" onClick={async () => { if (await install()) onClose(); }}>
+              <Download size={14} /> Install the app
             </button>
-            <button type="button" className="btn-secondary" onClick={onClose}>
+            <button type="button" className="btn-secondary w-full py-1.5 text-[12.5px]" onClick={onClose}>
               Not now
             </button>
           </div>
         ) : (
           <>
-            <ol className="mt-4 space-y-2">
+            <ol className="mt-3 space-y-1.5">
               {stepsFor(device).map((st, i) => (
-                <li key={i} className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-[13px] leading-snug text-slate-700">
-                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-oil-400 text-[11px] font-semibold text-[#0a1a33]">{i + 1}</span>
+                <li key={i} className="flex items-center gap-2.5 rounded-lg bg-slate-50 px-2.5 py-2 text-[12.5px] leading-snug text-slate-700">
+                  <span className="grid size-4 shrink-0 place-items-center rounded-full bg-oil-400 text-[10px] font-semibold text-[#0a1a33]">{i + 1}</span>
                   <span className="min-w-0 flex-1">{st.text}</span>
-                  {st.icon && <st.icon size={16} className="shrink-0 text-slate-500" />}
+                  {st.icon && <st.icon size={14} className="shrink-0 text-slate-500" />}
                 </li>
               ))}
             </ol>
-            <button type="button" className="btn-secondary mt-4 w-full" onClick={onClose}>
+            <button type="button" className="btn-secondary mt-3 w-full py-1.5 text-[12.5px]" onClick={onClose}>
               Got it
             </button>
           </>
