@@ -60,13 +60,13 @@ function Metric({ icon: Icon, label, value, hint, change, upIsGood = true, tone,
   const body = (
     <div className={cn("@container card h-full p-4 transition", href && "hover:border-navy-300")}>
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-[13px] font-medium text-slate-600">
+        <span className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-slate-600">
           <span className={cn("h-2 w-2 shrink-0 rounded-full", dot)} aria-hidden />
-          <Icon size={16} className="text-slate-400" />
-          {label}
+          <Icon size={16} className="shrink-0 text-slate-400" />
+          <span className="truncate">{label}</span>
         </span>
         {change !== null && change !== undefined && (
-          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", good ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-rose-500/15 text-rose-700 dark:text-rose-300")}>
+          <span className={cn("shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold", good ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-rose-500/15 text-rose-700 dark:text-rose-300")}>
             {change >= 0 ? "+" : "−"}
             {Math.abs(change).toFixed(Math.abs(change) >= 100 ? 0 : 1)}%
           </span>
@@ -259,13 +259,13 @@ export default async function OwnerHome({ user }: { user: SessionUser }) {
       >
         {o.monthLabel} · against {o.prevMonthLabel}
       </Heading>
-      <div className="mb-3 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <div className="mb-3 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <Metric icon={Receipt} tone="blue" label="Sales" value={m(o.month.sales.value)} change={o.month.sales.change} hint={`${o.month.sales.count} sale${o.month.sales.count === 1 ? "" : "s"} so far`} href={`/sales?from=${range.fromYmd}&to=${range.toYmd}`} />
         <Metric icon={Wallet} tone="green" label="Money received" value={m(o.month.money.value)} change={o.month.money.change} hint="Cash, mobile money and bank" href="/payments" />
         <Metric icon={ReceiptText} tone="red" label="Expenses" value={m(o.month.spent.value)} change={o.month.spent.change} upIsGood={false} hint="Approved expenses" href="/expenses" />
         {o.month.profit ? <Metric icon={TrendingUp} tone="amber" label="Gross profit" value={m(o.month.profit.value)} change={o.month.profit.change} hint={o.month.margin !== null ? `${o.month.margin.toFixed(1)}% of sales` : undefined} /> : <Metric icon={ShoppingBag} tone="amber" label="Items sold" value={Math.round(o.month.units.value).toLocaleString("en-US")} change={o.month.units.change} />}
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <Metric icon={HandCoins} tone="amber" label="Owed to us" value={m(o.owedTotal)} hint="On every unpaid bill, not just this month" href="/credit" />
         <Metric icon={PiggyBank} tone="violet" label="Collected of what was sold" value={o.month.collectionRate === null ? "—" : `${Math.round(o.month.collectionRate)}%`} hint={`${m(o.month.money.value)} of ${m(o.month.sales.value)}`} />
         <Metric icon={ShoppingBag} tone="blue" label="Items sold" value={Math.round(o.month.units.value).toLocaleString("en-US")} change={o.month.units.change} hint="Bottles and tins this month" />

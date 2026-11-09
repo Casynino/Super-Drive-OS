@@ -84,7 +84,7 @@ export default async function PaymentPage({ params, searchParams }: { params: Pr
           {p.allocations.length === 0 ? (
             <p className="text-sm text-slate-600">No invoice. The full amount is held as customer credit.</p>
           ) : (
-            <table className="table">
+            <div className="table-wrap"><table className="table">
               <thead>
                 <tr>
                   <th>Invoice</th>
@@ -101,7 +101,7 @@ export default async function PaymentPage({ params, searchParams }: { params: Pr
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
 

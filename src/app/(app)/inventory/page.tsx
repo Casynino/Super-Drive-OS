@@ -362,7 +362,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input name="q" defaultValue={sp.q ?? ""} placeholder="Search a product" className="input h-9 pl-9 text-sm" aria-label="Search stock" />
         </div>
-        <select name="location" defaultValue={sp.location ?? ""} className="input h-9 w-auto text-sm" aria-label="Location">
+        <select name="location" defaultValue={sp.location ?? ""} className="input h-9 w-auto min-w-0 max-w-full text-sm" aria-label="Location">
           <option value="">All locations</option>
           {locations.map((l) => (
             <option key={l.id} value={l.id}>
@@ -370,7 +370,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </option>
           ))}
         </select>
-        <select name="category" defaultValue={sp.category ?? ""} className="input h-9 w-auto text-sm" aria-label="Category">
+        <select name="category" defaultValue={sp.category ?? ""} className="input h-9 w-auto min-w-0 max-w-full text-sm" aria-label="Category">
           <option value="">All categories</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
@@ -378,7 +378,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             </option>
           ))}
         </select>
-        <select name="sort" defaultValue={sort} className="input h-9 w-auto text-sm" aria-label="Sort by">
+        <select name="sort" defaultValue={sort} className="input h-9 w-auto min-w-0 max-w-full text-sm" aria-label="Sort by">
           {(Object.keys(SORTS) as SortKey[])
             .filter((k) => k !== "value" || canValue)
             .map((k) => (

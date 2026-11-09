@@ -50,7 +50,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
 
       {canPay && bal && (
         <>
-          <div className="mb-5 grid grid-cols-3 gap-3 sm:gap-4">
+          <div className="mb-5 grid grid-cols-1 gap-3 min-[360px]:grid-cols-3 sm:gap-4">
             <div className="card card-pad"><p className="text-[13px] font-medium text-slate-500">Supplied to us</p><p className="mt-1 text-xl font-semibold tabular-nums">{m(bal.purchases)}</p></div>
             <div className="card card-pad"><p className="text-[13px] font-medium text-slate-500">Paid so far</p><p className="mt-1 text-xl font-semibold tabular-nums">{m(bal.paid)}</p></div>
             <div className={`card card-pad ${bal.owed > 0 ? "border-amber-200 bg-oil-soft/50" : ""}`}><p className="text-[13px] font-medium text-slate-500">We still owe</p><p className="mt-1 text-xl font-semibold tabular-nums">{m(bal.owed)}</p></div>

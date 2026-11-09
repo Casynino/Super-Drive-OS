@@ -135,14 +135,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       })()}
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <nav className="flex gap-1 rounded-xl bg-white p-1 shadow-[0_1px_2px_rgba(15,27,45,0.06)] ring-1 ring-line" aria-label="Report">
+        <nav className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-[0_1px_2px_rgba(15,27,45,0.06)] ring-1 ring-line [scrollbar-width:none]" aria-label="Report">
           {TABS.filter((x) => x.key !== "finance" || financials || can(user, "reports.view")).map((x) => (
             <Link key={x.key} href={q({ tab: x.key })} className={cn("rounded-lg px-3.5 py-1.5 text-sm font-medium transition", tab === x.key ? "bg-navy-700 text-white" : "text-slate-600 hover:bg-slate-100")}>
               {x.label}
             </Link>
           ))}
         </nav>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           <nav className="flex flex-wrap gap-1 text-sm" aria-label="Period">
             {PRESETS.map((p) => (
               <Link key={p.key} href={q({ range: p.key, from: "", to: "" })} className={cn("rounded-full px-3 py-1", !sp.from && (sp.range ?? "30d") === p.key ? "bg-navy-700 text-white" : "bg-white text-slate-600 ring-1 ring-line hover:bg-slate-50")}>
@@ -150,7 +150,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </Link>
             ))}
           </nav>
-          <form method="get" className="flex items-center gap-1.5 text-sm">
+          <form method="get" className="flex flex-wrap items-center gap-1.5 text-sm">
             <input type="hidden" name="tab" value={tab} />
             <input type="date" name="from" defaultValue={sp.from ?? ""} className="input h-8 w-36 px-2 py-0 text-sm" aria-label="From date" />
             <span className="text-slate-400">–</span>

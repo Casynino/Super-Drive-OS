@@ -52,7 +52,7 @@ export function paginate<T>(lines: T[]): T[][] {
 }
 
 const PAGE: CSSProperties = { width: "148mm", height: "210mm", boxSizing: "border-box", background: "var(--pn-paper)", color: INK, fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", margin: "0 auto 8mm", boxShadow: "0 1px 4px rgba(15,23,42,0.18)" };
-const CSS = `.a5-doc{--pn-paper:#fff;--pn-ink:#0f172a;--pn-muted:#64748b;--pn-line:#e5e7eb;--pn-navy:#0b2a4d;--pn-head:#0E3D6E;--pn-gold:#FDC400;--pn-gold-text:#a07c00;--pn-zebra:#fafafa;--pn-note:#faf8f2;--pn-note-line:#ece6d6}
+const CSS = `@media screen{.a5-doc{overflow-x:auto}}.a5-doc{--pn-paper:#fff;--pn-ink:#0f172a;--pn-muted:#64748b;--pn-line:#e5e7eb;--pn-navy:#0b2a4d;--pn-head:#0E3D6E;--pn-gold:#FDC400;--pn-gold-text:#a07c00;--pn-zebra:#fafafa;--pn-note:#faf8f2;--pn-note-line:#ece6d6}
 .a5-logo-light{display:block}.a5-logo-dark{display:none}
 @media screen{html.dark .a5-doc{--pn-paper:#101b30;--pn-ink:#e8eef8;--pn-muted:#93a3bd;--pn-line:#22304a;--pn-navy:#8fb4e8;--pn-head:#8cbcf7;--pn-gold-text:#FDC400;--pn-zebra:#0d1829;--pn-note:#14233d;--pn-note-line:#22304a}html.dark .a5-logo-light{display:none}html.dark .a5-logo-dark{display:block}}
 .a5-qr svg{display:block;width:100%;height:100%}@media print{.a5-page{margin:0!important;box-shadow:none!important;break-after:page;page-break-after:always}.a5-page:last-child{break-after:auto;page-break-after:auto}}`;

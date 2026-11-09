@@ -169,13 +169,13 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
     );
   };
 
-  const brand = (compact: boolean) => (
-    <Link href="/dashboard" className="flex min-w-0 items-center gap-3" aria-label={`${businessName} home`}>
-      <Image src="/brand/app-192.png" alt="" width={44} height={44} priority className={cn("shrink-0 rounded-full ring-2 ring-oil-400/45", "h-10 w-10")} />
+  const brand = (compact: boolean, small = false) => (
+    <Link href="/dashboard" className={cn("flex min-w-0 items-center", small ? "gap-2.5" : "gap-3")} aria-label={`${businessName} home`}>
+      <Image src="/brand/app-192.png" alt="" width={44} height={44} priority className={cn("shrink-0 rounded-full ring-2 ring-oil-400/45", small ? "h-9 w-9" : "h-10 w-10")} />
       {!compact && (
         <span className="min-w-0 leading-tight">
           <span className="block truncate text-sm font-semibold tracking-tight text-slate-900">{businessName}</span>
-          <span className="mt-0.5 block truncate text-xs text-slate-500">Sales &amp; distribution</span>
+          <span className={cn("mt-0.5 block truncate text-slate-500", small ? "text-[11px]" : "text-xs")}>Sales &amp; distribution</span>
         </span>
       )}
     </Link>
@@ -184,10 +184,10 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
   /** the full menu: brand, search, MAIN, WORKSPACE (folding groups with branches), night mode and the person */
   const full = (drawer: boolean) => (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className={cn("flex items-center justify-between gap-2 px-4 pb-3 pt-4", drawer ? "pr-3" : "pr-7")}>
-        {brand(false)}
+      <div className={cn("flex items-center justify-between gap-2", drawer ? "px-3 pb-2 pt-3" : "px-4 pb-3 pt-4 pr-7")}>
+        {brand(false, drawer)}
         {drawer && (
-          <button type="button" className="glass-row grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-600" onClick={() => setOpen(false)} aria-label="Close menu">
+          <button type="button" className="glass-row grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-600" onClick={() => setOpen(false)} aria-label="Close menu">
             <X size={17} />
           </button>
         )}
@@ -332,7 +332,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setOpen(false)} aria-hidden />
-          <aside className="drawer-in absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] w-[min(16rem,82vw)]">
+          <aside className="drawer-in absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] w-[min(13.75rem,74vw)]">
             <div className="glass-panel flex h-full flex-col">{full(true)}</div>
           </aside>
         </div>

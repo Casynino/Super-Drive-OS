@@ -55,7 +55,7 @@ export default async function SalePage({ params, searchParams }: { params: Promi
         <BackLink href="/sales" className="py-1 text-sm text-slate-500 hover:text-navy-700">
           ← Sales history
         </BackLink>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {can(user, "sales.pos") && (
             <Link href="/pos" className="btn-primary">
               New sale

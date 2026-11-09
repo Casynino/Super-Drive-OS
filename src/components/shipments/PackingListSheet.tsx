@@ -62,6 +62,7 @@ export default function PackingListSheet({ data }: { data: SheetData }) {
   return (
     <article className="pl-sheet" style={{ background: "#fff", color: INK, border: `1px solid ${LINE}`, borderRadius: 12, padding: 32, maxWidth: 860, margin: "0 auto", fontFamily: "inherit", lineHeight: 1.4 }}>
       <style>{`
+        @media screen { .pl-sheet { overflow-x: auto; } }
         @media print { .pl-sheet { border: 0 !important; border-radius: 0 !important; padding: 0 !important; max-width: none !important; } }
         .pl-sheet tr { break-inside: avoid; page-break-inside: avoid; }
         .pl-sheet thead { display: table-header-group; }
