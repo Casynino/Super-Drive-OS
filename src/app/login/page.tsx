@@ -61,7 +61,7 @@ export default async function LoginPage() {
         </section>
 
         {/* Sign-in card, floating over the scene */}
-        <section className="flex flex-col items-center px-5 py-6 max-md:pt-[9vh] lg:justify-center lg:py-10">
+        <section className="flex flex-col items-center py-6 pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] max-md:pt-[max(9svh,calc(env(safe-area-inset-top)+1rem))] lg:justify-center lg:py-10">
           <div className="ls-up ls-brand mb-4 self-center md:mb-6 lg:hidden" style={delay(0.05)}>
             <Logo className="h-28 sm:h-28" />
           </div>
@@ -78,7 +78,7 @@ export default async function LoginPage() {
         </section>
       </div>
       {/* Foot of the page: the system's name, and who made it, one quiet line to Nino's page and work (Nino 2026-11-09, copied from the Vegas sign-in page). */}
-      <footer className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-0 bg-gradient-to-t from-[#030812]/85 via-[#030812]/45 to-transparent px-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-8 text-xs text-white/60 sm:flex-row sm:justify-between sm:px-8 sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <footer className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-0 pb-[max(0.5rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pt-2 text-xs text-white/65 max-sm:border-t max-sm:border-white/10 max-sm:bg-[#061a33]/95 max-sm:backdrop-blur-sm sm:flex-row sm:justify-between sm:bg-gradient-to-t sm:from-[#061a33]/85 sm:via-[#061a33]/45 sm:to-transparent sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pl-[max(2rem,env(safe-area-inset-left))] sm:pr-[max(2rem,env(safe-area-inset-right))] sm:pt-8">
         <span>Super Drive Oil · Management System</span>
         <Link href="/nino" className="group inline-flex min-h-10 items-center gap-1 rounded-sm transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oil-400">
           Developed by <span className="font-semibold text-white/80 transition-colors group-hover:text-[#c6f432]">Nino</span>

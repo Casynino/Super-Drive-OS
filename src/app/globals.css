@@ -228,7 +228,11 @@ body {
 
 /* Like an app on a phone or tablet: nothing scrolls sideways, no accidental text size jumps, and room for the notch and the home bar */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
-body { overflow-x: clip; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); }
+/* No bottom padding on the body: on an iPhone it made EVERY page 34 px taller than the screen (the sign-in page could be pulled up and its bottom cut off).
+   What sits at the bottom pads itself: the bottom bar, the pop-ups, the footers. */
+body { overflow-x: clip; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* the sign-in scene runs edge to edge, also under the notch of a phone turned sideways (its content keeps clear of it itself) */
+body:has([data-login-scene]) { padding-left: 0; padding-right: 0; }
 
 /* Full screen like an app (Nino 2026-11-09). The installed app runs under the phone's status bar (clock, battery): this strip is the status bar's own
    colour (navy in the light look, the page colour in the dark look) so the white clock is always readable. In a browser tab the top inset is 0, so the strip has no height. */

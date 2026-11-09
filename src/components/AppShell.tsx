@@ -364,7 +364,7 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
         </header>
       </div>
 
-      <main className="mx-auto w-full max-w-[1920px] px-4 pb-6 pt-3 max-lg:pb-24 sm:px-6 lg:pt-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
+      <main className="mx-auto w-full max-w-[1920px] px-4 pb-6 pt-3 max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 lg:pt-6 xl:px-8 print:max-w-none print:p-0">{children}</main>
       <InstallPrompt />
 
       {/* Phone and tablet: the bottom bar. Only icons and short words, the open page has a thin yellow bar on top and a yellow icon. */}
