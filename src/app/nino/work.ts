@@ -2,7 +2,7 @@
  * Nino's work, as shown on /nino (copied from the Vegas Luxury Hotel project's page of the same name; keep the two lists in step). Every line comes
  * from the project's own live site (its title and description), its README, or from Nino — nothing invented. Screenshots in /public/nino are the live
  * home pages, taken 2026-10-05 (Super Drive Oil: its sign-in page, retaken 2026-11-09 after the animated scene, the engine and the new footer).
- * Hao Labs, Super Drive Oil and BlueWave Cargo: their live sign-in pages, retaken 2026-11-09.
+ * ZELab, Super Drive Oil and BlueWave Cargo: their live sign-in pages, retaken 2026-11-09.
  * The other live sites' pictures were retaken from their live home pages on the evening of 2026-11-09.
  */
 
@@ -28,73 +28,73 @@ export const LIVE: Project[] = [
   {
     name: "Super Drive Oil", kind: "Oil distribution · sales, stock & credit",
     line: "You're on it. Every carton that comes in, goes out or is still owed is on the system — counter sales, the warehouse and pickup notes, cash and daily closing, Winga and credit — each one recorded against the person who made it.",
-    url: "https://super-drive-os.vercel.app", domain: "super-drive-os.vercel.app", shot: "/nino/superdrive-2.webp",
+    url: "https://super-drive-os.vercel.app", domain: "super-drive-os.vercel.app", shot: "/nino/superdrive-nov10.webp",
     tags: ["Point of sale", "Warehouse pickups", "Daily closing", "Credit & Winga"], code: `${GH}/Super-Drive-OS`,
   },
   {
     name: "Vegas Luxury Hotel", kind: "Hotel website & operations system",
     line: "The hotel's website, online booking and mobile-money payments — and the whole staff system behind it: reception, restaurant and room service, finance, stock and daily reports to the owner on WhatsApp.",
-    url: "https://www.vegashoteltz.com", domain: "vegashoteltz.com", shot: "/nino/vegas-now.webp",
+    url: "https://www.vegashoteltz.com", domain: "vegashoteltz.com", shot: "/nino/vegas-nov10.webp",
     tags: ["Booking engine", "Mobile money", "Staff system", "Reports"],
   },
   {
     name: "Swift Cargo", kind: "Sea freight · China → Tanzania",
     line: "Loose cargo and full containers from Guangzhou to Dar es Salaam — track a shipment, work out the CBM and see the price.",
-    url: "https://www.swiftcargotz.com", domain: "swiftcargotz.com", shot: "/nino/swiftcargo-live.webp",
+    url: "https://www.swiftcargotz.com", domain: "swiftcargotz.com", shot: "/nino/swiftcargo-nov10.webp",
     tags: ["Tracking", "Price calculator"],
   },
   {
     name: "Target Express Air Cargo", kind: "Air cargo · China → Tanzania",
     line: "Air freight from Guangzhou and Hong Kong to Dar es Salaam, followed from the China warehouse to collection.",
-    url: "https://targetexpressaircargo.com", domain: "targetexpressaircargo.com", shot: "/nino/target-live.webp",
+    url: "https://targetexpressaircargo.com", domain: "targetexpressaircargo.com", shot: "/nino/target-nov10.webp",
     tags: ["Tracking", "Bookings"],
   },
   {
     name: "AiTransit Cargo", kind: "Air cargo · China → Zambia",
     line: "Air cargo to Lusaka with duty included, supplier payments in RMB and money exchange — one team on both ends of the route.",
-    url: "https://ai-transit-rouge.vercel.app", domain: "ai-transit-rouge.vercel.app", shot: "/nino/aitransit-live.webp",
+    url: "https://ai-transit-rouge.vercel.app", domain: "ai-transit-rouge.vercel.app", shot: "/nino/aitransit-nov10.webp",
     tags: ["Tracking", "Payments"], code: `${GH}/AiTransit`,
   },
   {
     name: "EA Trade Link SIS", kind: "Education & business · China ↔ Tanzania",
     line: "Scholarships, visas, sourcing, factory visits and currency exchange — one platform for studying and doing business in China.",
-    url: "https://www.eatradelink.com", domain: "eatradelink.com", shot: "/nino/eatradelink-live.webp",
+    url: "https://www.eatradelink.com", domain: "eatradelink.com", shot: "/nino/eatradelink-nov10.webp",
     tags: ["Platform", "Accounts"], code: `${GH}/EA-Trade-link-SIS-`,
   },
   {
     name: "Hǎodeals", kind: "Online store",
     line: "Limited deals, in stock and delivered fast — browse by category, shop and check out.",
-    url: "https://www.haodealtz.com", domain: "haodealtz.com", shot: "/nino/haodeals-now.webp",
+    url: "https://www.haodealtz.com", domain: "haodealtz.com", shot: "/nino/haodeals-nov10.webp",
     tags: ["E-commerce", "Checkout"],
   },
   {
     name: "HA GROUP", kind: "Engineering company",
     line: "Turnkey electrical and electro-mechanical projects for mining, manufacturing and commercial clients across Africa.",
-    url: "https://hag-mancom.vercel.app", domain: "hag-mancom.vercel.app", shot: "/nino/hagroup-live.webp",
+    url: "https://hag-mancom.vercel.app", domain: "hag-mancom.vercel.app", shot: "/nino/hagroup-nov10.webp",
     tags: ["Company site"],
   },
   {
     name: "KOTES (T) Limited", kind: "ICT infrastructure",
     line: "Fibre networks, systems integration and 24/7 managed support for government and enterprise in Tanzania.",
-    url: "https://kotes.vercel.app", domain: "kotes.vercel.app", shot: "/nino/kotes-live.webp",
+    url: "https://kotes.vercel.app", domain: "kotes.vercel.app", shot: "/nino/kotes-nov10.webp",
     tags: ["Company site"],
   },
   {
     name: "ORA Pads", kind: "Social-impact brand",
     line: "Menstrual health, education and period dignity for every girl and woman across Tanzania.",
-    url: "https://www.ora.co.tz", domain: "ora.co.tz", shot: "/nino/ora-now.webp",
+    url: "https://www.ora.co.tz", domain: "ora.co.tz", shot: "/nino/ora-nov10.webp",
     tags: ["Brand site", "Community"],
   },
   {
-    name: "Hao Labs", kind: "Stock, settlement & commission system",
-    line: "Every box that leaves the Lab is on the system — who took it, what came back, what is still owed, and what each rep has earned. We keep Tanzania stocked.",
-    url: "https://hao-stock.vercel.app", domain: "hao-stock.vercel.app", shot: "/nino/haolabs-signin.webp",
+    name: "ZELab", kind: "Stock, settlement & commission system",
+    line: "Every box that leaves ZELab is on the system — who took it, what came back, what is still owed, and what each rep has earned. We keep Tanzania stocked.",
+    url: "https://www.zelab.site", domain: "zelab.site", shot: "/nino/zelab-card.webp",
     tags: ["Stock control", "Settlements", "Commission", "Reports"], code: `${GH}/The-Lab`,
   },
   {
     name: "Reckless Lab", kind: "Fashion label & store",
     line: "A laboratory where fashion rules are broken to make something alive.",
-    url: "https://www.recklesslab.shop", domain: "recklesslab.shop", shot: "/nino/reckless-now.webp",
+    url: "https://www.recklesslab.shop", domain: "recklesslab.shop", shot: "/nino/reckless-nov10.webp",
     tags: ["Store", "Brand"],
   },
 ];
@@ -104,7 +104,7 @@ export const MORE: Project[] = [
   {
     name: "BlueWave Cargo", kind: "Sourcing & sea cargo · China → Tanzania", status: "soon",
     line: "Find the markets and factories behind what you sell, plan a buying trip, get it sourced — and it ships from the Foshan warehouse to Dar es Salaam.",
-    url: "https://bluewave-cargo.vercel.app", domain: "bluewave-cargo.vercel.app", shot: "/nino/bluewave-signin.webp",
+    url: "https://bluewave-cargo.vercel.app", domain: "bluewave-cargo.vercel.app", shot: "/nino/bluewave-nov10.webp",
     tags: ["Sourcing", "Tracking", "Warehouses", "Billing"],
   },
   {

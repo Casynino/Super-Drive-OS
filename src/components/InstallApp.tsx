@@ -174,7 +174,7 @@ export function InstallSheet({ open, onClose }: { open: boolean; onClose: () => 
   // On an iPhone in Safari a small arrow points at the Share button, so nobody hunts for it.
   const hint = device.os === "ios" && device.browser === "safari" && !device.inApp && !canPrompt;
 
-  /* Frosted glass that belongs to the page (Nino 2026-11-09, from the Hao Stock card: "clean, small, match the backdrop"): it sits low, in the
+  /* Frosted glass that belongs to the page (Nino 2026-11-09, from the ZELab card: "clean, small, match the backdrop"): it sits low, in the
      empty ground above the browser's toolbar, and leaves the logo and the buttons alone; the dim behind it is barely there; the card is see-through,
      navy like the scene, blurring what is under it instead of covering it with a slab. Only a title and plain lines. Closing is the X, a tap outside
      or Escape. Drawn into <body> so no box or menu can cover it. */

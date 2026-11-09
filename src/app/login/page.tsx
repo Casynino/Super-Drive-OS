@@ -77,7 +77,7 @@ export default async function LoginPage() {
           </LoginGate>
         </section>
       </div>
-      {/* Foot of the page: ONE quiet centred line, "Sales Inventory System by Nino", linking to Nino's page and work (Nino 2026-11-09; the words follow Hao Stock's "The Distribution Chain by Nino", not "Developed by"). */}
+      {/* Foot of the page: ONE quiet centred line, "Sales Inventory System by Nino", linking to Nino's page and work (Nino 2026-11-09; the words follow ZELab's "The Distribution Chain by Nino", not "Developed by"). */}
       <footer className="absolute inset-x-0 bottom-0 z-10 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0 pb-[max(0.125rem,calc(env(safe-area-inset-bottom)_-_0.9rem))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-1 text-[11px] text-white/70 [text-shadow:0_1px_6px_rgba(3,8,18,0.95)] sm:bg-gradient-to-t sm:from-[#061a33]/85 sm:via-[#061a33]/45 sm:to-transparent sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pt-8 sm:text-xs sm:text-white/60 sm:[text-shadow:none]">
         <span>Sales Inventory System</span>
         <Link href="/nino" aria-label="Sales Inventory System by Nino: see his work" className="group inline-flex min-h-8 items-center gap-1 rounded-sm transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oil-400 sm:min-h-10">
