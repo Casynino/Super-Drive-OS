@@ -46,7 +46,7 @@ export default function UpdateNotice() {
       type="button"
       onClick={() => window.location.reload()}
       aria-label="New update available. Refresh to get it."
-      className="update-in fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+0.5rem)] z-[65] mx-auto flex h-8 w-fit items-center gap-2 rounded-full bg-[#0a1a33]/90 pl-3 pr-1.5 text-[12px] font-medium text-white shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] ring-1 ring-white/15 backdrop-blur transition-colors hover:bg-[#0e2547]/95 print:hidden"
+      className="update-in fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+4.75rem)] z-[65] lg:top-3 mx-auto flex h-8 w-fit items-center gap-2 rounded-full bg-[#0a1a33]/90 pl-3 pr-1.5 text-[12px] font-medium text-white shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] ring-1 ring-white/15 backdrop-blur transition-colors hover:bg-[#0e2547]/95 print:hidden"
     >
       <span className="size-1.5 rounded-full bg-[#fdc400]" aria-hidden />
       New update
