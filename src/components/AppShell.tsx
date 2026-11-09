@@ -342,8 +342,9 @@ export default function AppShell({ businessName, user, visibleHrefs, hiddenItems
       <div className="pointer-events-none sticky top-0 z-20 px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] print:hidden sm:px-6 lg:hidden xl:px-8" style={{ background: "linear-gradient(to bottom, var(--color-surface) 60%, transparent)" }}>
         <header className="pointer-events-auto flex h-14 items-center justify-between gap-3 rounded-2xl border border-line bg-white/90 px-3 shadow-sm backdrop-blur sm:px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <button type="button" className="btn-secondary btn-sm lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
-              <Menu size={18} />
+            {/* the menu button is just the icon: no box, no border (Nino 2026-11-09: "I don't want a shape around it") */}
+            <button type="button" className="-ml-1 grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-700 transition-colors hover:text-slate-900 active:text-slate-900 lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
+              <Menu size={22} strokeWidth={2} />
             </button>
             <p className="min-w-0 truncate text-sm font-medium text-slate-700" suppressHydrationWarning>
               <span className="hidden sm:inline">{dateText}</span>

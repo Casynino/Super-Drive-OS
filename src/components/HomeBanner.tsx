@@ -4,7 +4,7 @@ import BannerTheme from "@/components/BannerTheme";
 /**
  * The banner at the top of a person's home (the shop person's POS and the warehouse attendant's Today): his first name big in spaced
  * capitals between two thin yellow lines, his position small in yellow under it, then the date; the bell and the night / light icon
- * sit small at the left side, in the middle (a phone has them in its own top bar and menu). Like the Target Express banner, and the
+ * sit small at the left side, in the middle (a phone has them in its own top bar and menu; the date line shows from `lg` only, because a phone's top card already shows the date: Nino 2026-11-09). Like the Target Express banner, and the
  * same look on a phone.
  */
 export default function HomeBanner({ user }: { user: { id: string; name: string; roleName: string } }) {
@@ -24,7 +24,7 @@ export default function HomeBanner({ user }: { user: { id: string; name: string;
           <span className="hidden h-px w-10 shrink-0 bg-oil-400/60 sm:block" aria-hidden />
         </h1>
         <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-oil-400">{user.roleName}</p>
-        <p className="mt-1.5 text-sm text-white/65" suppressHydrationWarning>
+        <p className="mt-1.5 text-sm text-white/65 max-lg:hidden" suppressHydrationWarning>
           {bannerDate()}
         </p>
       </div>
