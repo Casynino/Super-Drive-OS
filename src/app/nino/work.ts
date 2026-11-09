@@ -2,6 +2,7 @@
  * Nino's work, as shown on /nino (copied from the Vegas Luxury Hotel project's page of the same name; keep the two lists in step). Every line comes
  * from the project's own live site (its title and description), its README, or from Nino — nothing invented. Screenshots in /public/nino are the live
  * home pages, taken 2026-10-05 (Super Drive Oil: its sign-in page, retaken 2026-11-09 after the animated scene, the engine and the new footer).
+ * Hao Labs, Super Drive Oil and BlueWave Cargo: their live sign-in pages, retaken 2026-11-09.
  */
 
 export type Project = {
@@ -84,10 +85,10 @@ export const LIVE: Project[] = [
     tags: ["Brand site", "Community"],
   },
   {
-    name: "The Lab", kind: "Stock & commission dashboard",
-    line: "Request stock, track commission and watch performance. Take stock, make moves, earn more.",
-    url: "https://hao-stock.vercel.app", domain: "hao-stock.vercel.app", shot: "/nino/thelab.webp",
-    tags: ["Dashboard", "Accounts"],
+    name: "Hao Labs", kind: "Stock, settlement & commission system",
+    line: "Every box that leaves the Lab is on the system — who took it, what came back, what is still owed, and what each rep has earned. We keep Tanzania stocked.",
+    url: "https://hao-stock.vercel.app", domain: "hao-stock.vercel.app", shot: "/nino/haolabs-signin.webp",
+    tags: ["Stock control", "Settlements", "Commission", "Reports"], code: `${GH}/The-Lab`,
   },
   {
     name: "Reckless Lab", kind: "Fashion label & store",
@@ -100,10 +101,10 @@ export const LIVE: Project[] = [
 /** Everything else he has built: launching soon, code on GitHub, and private projects (no public address). Each line comes from the project's own README, business plan, package description or folder, never invented. */
 export const MORE: Project[] = [
   {
-    name: "BlueWave Cargo", kind: "Sourcing & cargo · China → Tanzania", status: "soon",
-    line: "Explore China's markets and factories, source products, plan a business visit and ship home from the Foshan warehouse.",
-    url: "https://bluewave-cargo.vercel.app", domain: "bluewave-cargo.vercel.app", shot: "/nino/bluewave.webp",
-    tags: ["Sourcing", "Cargo"],
+    name: "BlueWave Cargo", kind: "Sourcing & sea cargo · China → Tanzania", status: "soon",
+    line: "Find the markets and factories behind what you sell, plan a buying trip, get it sourced — and it ships from the Foshan warehouse to Dar es Salaam.",
+    url: "https://bluewave-cargo.vercel.app", domain: "bluewave-cargo.vercel.app", shot: "/nino/bluewave-signin.webp",
+    tags: ["Sourcing", "Tracking", "Warehouses", "Billing"],
   },
   {
     name: "Swift Cargo OS", kind: "Sea freight system · China → Tanzania",
