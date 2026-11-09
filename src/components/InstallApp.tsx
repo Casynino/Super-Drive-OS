@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download, EllipsisVertical, Menu, Share, SquarePlus, TriangleAlert, X } from "lucide-react";
-import Modal from "@/components/Modal";
+import { ArrowDown, Download, EllipsisVertical, Menu, Share, SquarePlus, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { detectDevice, type Device } from "@/lib/device";
 
 /**
@@ -161,54 +161,87 @@ function stepsFor(d: Device): Step[] {
 export function InstallSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { device, canPrompt, install } = useInstall();
   const browserName = device.os === "ios" ? "Safari" : "Chrome";
-  // a card with space round it, centred, like a pop-up in an app (not a sheet glued to the bottom edge, where the browser's own toolbar sits)
-  return (
-    <Modal open={open} onClose={onClose} label="Use it as an app" bare>
-      <div className="relative w-[calc(100vw-2.5rem)] max-w-[19.5rem] rounded-2xl border border-line bg-white p-4 shadow-2xl">
-        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-2.5 top-2.5 grid size-7 place-items-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">
-          <X size={15} />
-        </button>
-        <div className="pr-7">
-          <h2 className="text-[15px] font-semibold leading-tight text-slate-900">Use it like an app</h2>
-          <p className="mt-0.5 text-xs text-slate-500">Full screen, no browser bar, its own icon.</p>
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  // On an iPhone in Safari a small arrow points at the Share button, so nobody hunts for it.
+  const hint = device.os === "ios" && device.browser === "safari" && !device.inApp && !canPrompt;
+
+  /* Frosted glass that belongs to the page (Nino 2026-11-09, from the Hao Stock card: "clean, small, match the backdrop"): it sits low, in the
+     empty ground above the browser's toolbar, and leaves the logo and the buttons alone; the dim behind it is barely there; the card is see-through,
+     navy like the scene, blurring what is under it instead of covering it with a slab. Only a title and plain lines. Closing is the X, a tap outside
+     or Escape. Drawn into <body> so no box or menu can cover it. */
+  return createPortal(
+    <div
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      className={`fixed inset-0 z-[70] flex items-end justify-center bg-black/15 p-5 ${
+        hint ? "pb-[calc(max(0.5rem,env(safe-area-inset-bottom))+5.75rem)]" : "pb-[max(1.75rem,calc(env(safe-area-inset-bottom)+1rem))]"
+      }`}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Use it like an app"
+        className="w-full max-w-[17.5rem] rounded-2xl border border-white/[0.09] bg-[#0a1a33]/75 px-4 pb-1.5 pt-3.5 shadow-[0_18px_44px_-22px_rgba(0,0,0,0.75)] backdrop-blur-2xl backdrop-saturate-150"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[14px] font-medium tracking-tight text-white">Use it like an app</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1.5 grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-white/40 transition-colors hover:bg-white/10 hover:text-white/80">
+            <X size={14} />
+          </button>
         </div>
 
         {device.inApp && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg border border-oil-400/40 bg-oil-400/10 px-2.5 py-2 text-xs leading-snug text-slate-800">
-            <TriangleAlert size={14} className="mt-px shrink-0 text-oil-500" />
-            <span>
-              Opened inside {device.appName}, which cannot add it to the home screen. Tap <b>···</b> at the top, choose <b>Open in {browserName}</b>, then do these steps.
-            </span>
-          </div>
+          <p className="mt-1.5 border-b border-white/[0.06] pb-2.5 text-[12px] leading-snug text-white/60">
+            Opened inside {device.appName}, which cannot add it to the home screen. Tap <b className="font-medium text-white">···</b> at the top, choose <b className="font-medium text-white">Open in {browserName}</b>, then do these steps.
+          </p>
         )}
 
         {canPrompt && !device.inApp ? (
-          <div className="mt-3.5 flex flex-col gap-1.5">
-            <button type="button" className="btn-primary w-full py-2 text-[13px]" onClick={async () => { if (await install()) onClose(); }}>
+          <div className="mb-1.5 mt-3 flex flex-col items-stretch">
+            <button
+              type="button"
+              className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white/10 text-[13px] font-medium text-white ring-1 ring-inset ring-white/15 transition-colors hover:bg-white/15"
+              onClick={async () => {
+                if (await install()) onClose();
+              }}
+            >
               <Download size={14} /> Install the app
             </button>
-            <button type="button" className="btn-secondary w-full py-1.5 text-[12.5px]" onClick={onClose}>
+            <button type="button" className="h-8 cursor-pointer text-[12px] text-white/45 transition-colors hover:text-white/75" onClick={onClose}>
               Not now
             </button>
           </div>
         ) : (
-          <>
-            <ol className="mt-3 space-y-1.5">
-              {stepsFor(device).map((st, i) => (
-                <li key={i} className="flex items-center gap-2.5 rounded-lg bg-slate-50 px-2.5 py-2 text-[12.5px] leading-snug text-slate-700">
-                  <span className="grid size-4 shrink-0 place-items-center rounded-full bg-oil-400 text-[10px] font-semibold text-[#0a1a33]">{i + 1}</span>
-                  <span className="min-w-0 flex-1">{st.text}</span>
-                  {st.icon && <st.icon size={14} className="shrink-0 text-slate-500" />}
-                </li>
-              ))}
-            </ol>
-            <button type="button" className="btn-secondary mt-3 w-full py-1.5 text-[12.5px]" onClick={onClose}>
-              Got it
-            </button>
-          </>
+          <ol className="mt-1.5 divide-y divide-white/[0.06] [&_b]:font-medium [&_b]:text-white">
+            {stepsFor(device).map((st, i) => (
+              <li key={i} className="flex items-center gap-3 py-2.5 text-[13px] leading-snug text-white/65">
+                <span className="w-2.5 shrink-0 text-center font-mono text-[11px] text-oil-400">{i + 1}</span>
+                <span className="min-w-0 flex-1">{st.text}</span>
+                {st.icon && <st.icon size={14} className="shrink-0 text-white/30" />}
+              </li>
+            ))}
+          </ol>
         )}
       </div>
-    </Modal>
+
+      {hint && (
+        <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-[calc(max(0.5rem,env(safe-area-inset-bottom))+2.4rem)] z-[71] flex justify-center">
+          <span className="flex animate-bounce flex-col items-center gap-0.5 text-[10px] font-medium text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+            Share
+            <ArrowDown size={14} className="text-oil-400" />
+          </span>
+        </div>
+      )}
+    </div>,
+    document.body,
   );
 }
 
