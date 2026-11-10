@@ -47,6 +47,8 @@ type Props = {
   categories: Option[];
   brands: Option[];
   defaultCategoryId: string;
+  /** products on the latest orders, newest first: they are offered first */
+  recentIds: string[];
   cargoNames: string[];
   canPrice: boolean;
   currencySymbol: string;
@@ -74,7 +76,7 @@ const newLine = (p: PickerProduct): Line => {
   return { productId: p.id, unitId, qty: "1", buy: "", sell: currentSell(p, unitId) };
 };
 
-export default function OrderForm({ action, createProduct, saveDraft, products: initialProducts, locations, suppliers, canAddSupplier, categories, brands, defaultCategoryId, cargoNames, canPrice, currencySymbol, submissionKey: key, draft }: Props) {
+export default function OrderForm({ action, createProduct, saveDraft, products: initialProducts, locations, suppliers, canAddSupplier, categories, brands, defaultCategoryId, recentIds, cargoNames, canPrice, currencySymbol, submissionKey: key, draft }: Props) {
   const [state, formAction] = useActionState(action, initial);
   const fe = state.fieldErrors ?? {};
   const [submissionKey] = useState(key);
@@ -92,7 +94,9 @@ export default function OrderForm({ action, createProduct, saveDraft, products: 
   const [locationId, setLocationId] = useState(start?.locationId && locations.some((l) => l.id === start.locationId) ? start.locationId : (locations.find((l) => l.isDefault)?.id ?? locations[0]?.id ?? ""));
   const [notes, setNotes] = useState(start?.notes ?? "");
   const [query, setQuery] = useState("");
-  const [showAll, setShowAll] = useState(false);
+  const [cat, setCat] = useState(""); // category filter of the picker (empty = all)
+  const [expanded, setExpanded] = useState(false); // a phone starts with the first few products
+  const [cap, setCap] = useState(40); // how many rows are drawn at most; more with Show more
   const [newOpen, setNewOpen] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(draft?.id ?? null);
   const [savedAt, setSavedAt] = useState<string | null>(draft?.savedAt ?? null);
@@ -199,12 +203,31 @@ export default function OrderForm({ action, createProduct, saveDraft, products: 
     patch(i, { unitId, buy: conv(l.buy), sell: p ? currentSell(p, unitId) : l.sell });
   };
 
-  // tiles: what matches the search and is not on the list yet
+  // the picker: what is not on the list yet, narrowed by the search and the category; recent products first, then A to Z
   const q = query.trim().toLowerCase();
-  const matches = products.filter((p) => !lines.some((l) => l.productId === p.id) && (!q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)));
-  const LIMIT = 24;
-  const PHONE_FIRST = 6; // a phone shows the first few and a Show all button, so the list below stays close
-  const shown = showAll || q ? matches : matches.slice(0, LIMIT);
+  const recentRank = new Map(recentIds.map((id, i) => [id, i]));
+  const categoryChips = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of products) if (p.categoryId && p.categoryName) m.set(p.categoryId, p.categoryName);
+    return [...m].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [products]);
+  const matches = products
+    .filter((p) => !lines.some((l) => l.productId === p.id) && (!cat || p.categoryId === cat) && (!q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)))
+    .sort((a, b) => {
+      if (q) {
+        const sa = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+        const sb = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+        if (sa !== sb) return sa - sb;
+      } else {
+        const ra = recentRank.get(a.id) ?? 1e6;
+        const rb = recentRank.get(b.id) ?? 1e6;
+        if (ra !== rb) return ra - rb;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  const PHONE_FIRST = 8;
+  const shown = matches.slice(0, cap);
+  const recentShown = q || cat ? 0 : shown.filter((p) => recentRank.has(p.id)).length;
   const oneLocation = locations.length === 1;
   const detailsFilled = Boolean(supplierText.trim() || cargoName.trim() || expectedDate || notes.trim());
 
@@ -234,42 +257,17 @@ export default function OrderForm({ action, createProduct, saveDraft, products: 
         <section className="card card-pad min-w-0">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-900">What did you buy?</h2>
-            {lines.length > 0 && (
-              <a href="#order-list" className="text-sm font-medium text-navy-700 xl:hidden">
-                Your list ({lines.length}) ↓
-              </a>
-            )}
-          </div>
-
-          <div className="relative mt-3">
-            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden />
-            <input className="input h-11 pl-10" placeholder="Search your products" value={query} onChange={(e) => setQuery(e.target.value)} autoComplete="off" aria-label="Search your products" />
-          </div>
-
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3 2xl:grid-cols-4">
-            <button type="button" onClick={() => setNewOpen((o) => !o)} aria-expanded={newOpen} className={cn("flex min-h-14 items-center gap-2.5 rounded-xl border border-dashed px-3 py-2 text-left text-sm font-medium transition-colors", newOpen ? "border-navy-500 bg-navy-50 text-navy-800" : "border-slate-300 text-slate-700 hover:border-navy-400 hover:bg-slate-50")}>
-              <PackagePlus size={18} className="shrink-0 text-navy-600" />
-              New product
-            </button>
-            {shown.map((p, idx) => (
-              <button key={p.id} type="button" onClick={() => add(p)} className={cn("flex min-h-14 items-center gap-2.5 rounded-xl border border-line bg-white px-2.5 py-2 text-left transition-colors hover:border-navy-300 hover:bg-slate-50", !showAll && !q && idx >= PHONE_FIRST && "max-sm:hidden")}>
-                <Thumb p={p} className="size-10" />
-                <span className="min-w-0 flex-1">
-                  <span className="line-clamp-2 text-[13px] font-medium leading-snug text-slate-900">{p.name}</span>
-                  {packNote(p) && <span className="block truncate text-[11px] text-slate-500">{packNote(p)}</span>}
-                </span>
-                <Plus size={16} className="shrink-0 text-slate-400" aria-hidden />
+            <div className="flex items-center gap-3">
+              {lines.length > 0 && (
+                <a href="#order-list" className="text-sm font-medium text-navy-700 xl:hidden">
+                  Your list ({lines.length}) ↓
+                </a>
+              )}
+              <button type="button" onClick={() => setNewOpen((o) => !o)} aria-expanded={newOpen} className={cn("btn-secondary btn-sm", newOpen && "border-navy-500 bg-navy-50 text-navy-800")}>
+                <PackagePlus size={15} /> New product
               </button>
-            ))}
+            </div>
           </div>
-          {matches.length === 0 && (
-            <p className="mt-3 text-sm text-slate-500">{products.length === 0 ? "There are no products yet. Press New product to add the first one." : q ? "Nothing matches. Press New product to add it." : "Every product is already on your list."}</p>
-          )}
-          {!showAll && !q && (matches.length > LIMIT || matches.length > PHONE_FIRST) && (
-            <button type="button" className={cn("mt-3 text-sm font-medium text-navy-700", matches.length <= LIMIT && "sm:hidden")} onClick={() => setShowAll(true)}>
-              Show all {matches.length} products
-            </button>
-          )}
 
           {newOpen && (
             <NewProduct
@@ -287,6 +285,80 @@ export default function OrderForm({ action, createProduct, saveDraft, products: 
               }}
             />
           )}
+
+          <div className="relative mt-3">
+            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden />
+            <input
+              className="input h-11 pl-10"
+              placeholder="Search by name or code"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setCap(40);
+              }}
+              onKeyDown={(e) => {
+                // Enter adds the first match, so a long list can be filled from the keyboard
+                if (e.key === "Enter" && matches[0]) {
+                  add(matches[0]);
+                  setQuery("");
+                }
+              }}
+              autoComplete="off"
+              aria-label="Search your products"
+            />
+          </div>
+
+          {categoryChips.length > 1 && (
+            <div className="-mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label="Category">
+              {[{ id: "", name: "All" }, ...categoryChips].map((c) => (
+                <button key={c.id || "all"} type="button" onClick={() => { setCat(c.id); setCap(40); }} aria-pressed={cat === c.id} className={cn("shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors", cat === c.id ? "border-navy-600 bg-navy-700 text-white" : "border-line bg-white text-slate-600 hover:border-navy-300")}>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <p className="mt-3 text-xs text-slate-500">
+            {matches.length === 0 ? "" : q || cat ? `${matches.length} found` : `${matches.length} product${matches.length === 1 ? "" : "s"}`}
+          </p>
+
+          {matches.length === 0 ? (
+            <p className="mt-1 rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+              {products.length === 0 ? "There are no products yet. Press New product to add the first one." : q || cat ? "Nothing matches. Press New product to add it." : "Every product is already on your list."}
+            </p>
+          ) : (
+            <ul className="mt-1 divide-y divide-line overflow-hidden rounded-xl border border-line md:max-h-[27rem] md:overflow-y-auto">
+              {shown.map((p, idx) => (
+                <li key={p.id} className={cn(!expanded && idx >= PHONE_FIRST && "max-md:hidden")}>
+                  {recentShown > 0 && idx === 0 && <p className="bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ordered recently</p>}
+                  {recentShown > 0 && idx === recentShown && <p className="bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">All products</p>}
+                  <button type="button" onClick={() => add(p)} className="group flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-slate-50">
+                    <Thumb p={p} className="size-9" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium leading-snug text-slate-900">{p.name}</span>
+                      <span className="block truncate text-xs text-slate-500">{[packNote(p), p.categoryName].filter(Boolean).join(" · ")}</span>
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-line px-2 py-1 text-xs font-medium text-slate-600 transition-colors group-hover:border-navy-300 group-hover:text-navy-700">
+                      <Plus size={13} /> Add
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {matches.length > cap && (
+                <li>
+                  <button type="button" className="w-full px-3 py-2.5 text-center text-sm font-medium text-navy-700 hover:bg-slate-50" onClick={() => setCap((c) => c + 40)}>
+                    Show more ({matches.length - cap} left)
+                  </button>
+                </li>
+              )}
+            </ul>
+          )}
+          {!expanded && shown.length > PHONE_FIRST && (
+            <button type="button" className="mt-3 text-sm font-medium text-navy-700 md:hidden" onClick={() => setExpanded(true)}>
+              Show all {matches.length} products
+            </button>
+          )}
+
         </section>
 
         {/* ───────── the list ───────── */}

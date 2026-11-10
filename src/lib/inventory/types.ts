@@ -15,6 +15,9 @@ export type PickerProduct = {
   wholesalePrice?: string | null;
   /** the shipment form: today's selling price of the product's carton (its biggest pack), exact */
   packPrice?: string | null;
+  /** the shipment form: for the category chips of the picker */
+  categoryId?: string;
+  categoryName?: string;
   imageV?: number | null;
   /** carton-first: the unit forms start with (null = the biggest pack, else the base unit) and whether single pieces may be sold */
   defaultSalesUnitId?: string | null;

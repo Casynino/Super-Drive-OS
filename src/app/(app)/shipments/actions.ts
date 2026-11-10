@@ -415,6 +415,8 @@ export async function createProductForShipment(fd: FormData): Promise<{ ok: true
       barcode: created.barcode,
       sellingPrice: price.toString(),
       packPrice: cartonPrice ? cartonPrice.toString() : null,
+      categoryId: category.id,
+      categoryName: category.name,
       wholesalePrice: null,
       imageV: image ? Date.now() : null,
       baseUnitId: piece.id,
