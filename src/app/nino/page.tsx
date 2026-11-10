@@ -239,7 +239,7 @@ function ProjectCard({ p, featured, priority }: { p: Project; featured?: boolean
             {featured && <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-ink)]"><MapPin className="size-3" aria-hidden="true" />You are here</p>}
             <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--faint)]">{p.kind}</p>
             <h3 className={cn("mt-2 flex items-start justify-between gap-3 font-bold tracking-[-0.03em]", featured ? "text-3xl sm:text-4xl" : "text-xl")}>
-              {p.name}
+              {p.logo ? <img src={p.logo} alt={p.name} width="678" height="264" className={cn("w-auto", featured ? "h-14 sm:h-[4.5rem]" : "h-10")} /> : p.name}
               <ArrowUpRight className={cn(s.arrow, "mt-1 size-5 shrink-0 text-[var(--faint)] group-hover:text-[var(--accent)]")} aria-hidden="true" />
             </h3>
             <p className={cn("mt-2.5 text-pretty leading-relaxed text-[var(--muted)]", featured ? "text-base sm:text-[17px]" : "text-[14.5px]")}>{p.line}</p>

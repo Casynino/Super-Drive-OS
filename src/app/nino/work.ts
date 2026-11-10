@@ -16,6 +16,8 @@ export type Project = {
   /** Shown on the card: the address without https:// and www. */
   domain: string;
   shot?: string;
+  /** The project's official logo, drawn as the card's title instead of the name (alt text stays the name). */
+  logo?: string;
   tags: string[];
   code?: string;
   status?: "soon" | "private";
@@ -88,7 +90,8 @@ export const LIVE: Project[] = [
   {
     name: "ZELab", kind: "Stock, settlement & commission system",
     line: "Every box that leaves ZELab is on the system — who took it, what came back, what is still owed, and what each rep has earned. We keep Tanzania stocked.",
-    url: "https://www.zelab.site", domain: "zelab.site", shot: "/nino/zelab-card.webp",
+    url: "https://www.zelab.site", domain: "zelab.site", shot: "/nino/zelab-card-2.webp",
+    logo: "/brand/zelab-dark.svg",
     tags: ["Stock control", "Settlements", "Commission", "Reports"], code: `${GH}/The-Lab`,
   },
   {
