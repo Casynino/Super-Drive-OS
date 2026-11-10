@@ -1,59 +1,83 @@
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/ui";
-import ShipmentForm from "@/components/shipments/ShipmentForm";
+import OrderForm, { type OrderDraftState } from "@/components/shipments/OrderForm";
 import { can } from "@/lib/auth/can";
 import { requirePagePermission } from "@/lib/auth/guard";
 import { db } from "@/lib/db";
-import { getBusinessProfile, getCurrency } from "@/lib/settings";
+import { getCurrency } from "@/lib/settings";
 import { getActiveLocations, getPickerProducts } from "../../inventory/data";
-import { announceShipment, createProductForShipment } from "../actions";
+import { announceShipment, createProductForShipment, saveOrderDraft } from "../actions";
 
-export const metadata = { title: "New purchase order" };
+export const metadata = { title: "New order" };
 
-export default async function NewShipmentPage() {
+export default async function NewShipmentPage({ searchParams }: { searchParams: Promise<{ draft?: string }> }) {
   const user = await requirePagePermission("shipments.manage");
+  const sp = await searchParams;
   const canPrice = can(user, "products.price");
-  const [picker, extras, locations, suppliers, categories, brands, currency, cargoRows, biz] = await Promise.all([
+  const [picker, extras, packRows, locations, suppliers, categories, brands, currency, cargoRows, perCategory, draftRow] = await Promise.all([
     getPickerProducts(),
     // current prices and picture versions, so each line starts from today's selling price (prices are only read for people who may set them)
     db.product.findMany({ where: { status: "ACTIVE" }, select: { id: true, sellingPrice: true, wholesalePrice: true, image: { select: { updatedAt: true } } } }),
+    db.productUnit.findMany({ where: { product: { status: "ACTIVE" }, factor: { gt: 1 } }, select: { productId: true, unitId: true, factor: true, sellingPrice: true } }),
     getActiveLocations(),
     db.supplier.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.category.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.brand.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     getCurrency(),
     db.shipment.findMany({ where: { cargoName: { not: null } }, distinct: ["cargoName"], orderBy: { createdAt: "desc" }, take: 20, select: { cargoName: true } }),
-    getBusinessProfile(),
+    db.product.groupBy({ by: ["categoryId"], _count: { _all: true }, orderBy: { _count: { categoryId: "desc" } }, take: 1 }),
+    sp.draft ? db.shipmentDraft.findFirst({ where: { id: sp.draft, createdById: user.id } }) : null,
   ]);
   const extra = new Map(extras.map((e) => [e.id, e]));
+  // the carton price of each product: its biggest pack's own price when it has one
+  const biggestPack = new Map<string, (typeof packRows)[number]>();
+  for (const r of packRows) {
+    const cur = biggestPack.get(r.productId);
+    if (!cur || Number(r.factor) > Number(cur.factor)) biggestPack.set(r.productId, r);
+  }
   const products = picker.map((p) => {
     const e = extra.get(p.id);
-    return { ...p, sellingPrice: canPrice ? e?.sellingPrice.toString() : undefined, wholesalePrice: canPrice ? (e?.wholesalePrice?.toString() ?? null) : null, imageV: e?.image ? e.image.updatedAt.getTime() : null };
+    const pack = biggestPack.get(p.id);
+    return {
+      ...p,
+      sellingPrice: canPrice ? e?.sellingPrice.toString() : undefined,
+      wholesalePrice: canPrice ? (e?.wholesalePrice?.toString() ?? null) : null,
+      packPrice: canPrice && pack?.sellingPrice ? pack.sellingPrice.toString() : null,
+      imageV: e?.image ? e.image.updatedAt.getTime() : null,
+    };
   });
+
+  const data = draftRow?.data as Partial<OrderDraftState> | null | undefined;
+  const draft =
+    draftRow && data && data.v === 1 && Array.isArray(data.lines)
+      ? { id: draftRow.id, savedAt: draftRow.updatedAt.toISOString(), state: { v: 1 as const, lines: data.lines, supplierText: data.supplierText ?? "", cargoName: data.cargoName ?? "", expectedDate: data.expectedDate ?? "", locationId: data.locationId ?? "", notes: data.notes ?? "" } }
+      : null;
 
   return (
     <>
-      <PageHeader title="New purchase order" description="Write down what you ordered. It goes on the way to the shop, and they mark it arrived and check it when it lands." back={{ href: "/shipments", label: "Purchase orders" }} />
+      <PageHeader title="New order" description="Pick what you bought. Save it and finish later, or send it to the shop." back={{ href: "/shipments", label: "Orders" }} />
       {locations.length === 0 ? (
         <div className="card">
           <EmptyState title="Add a stock location first" action={<Link href="/settings" className="btn-primary">Open settings</Link>} />
         </div>
       ) : (
-        <ShipmentForm
+        <OrderForm
           action={announceShipment}
           createProduct={createProductForShipment}
+          saveDraft={saveOrderDraft}
           products={products}
           locations={locations}
           suppliers={suppliers}
           canAddSupplier={can(user, "suppliers.manage")}
           categories={categories}
           brands={brands}
+          defaultCategoryId={perCategory[0]?.categoryId ?? categories[0]?.id ?? ""}
           cargoNames={cargoRows.map((c) => c.cargoName!).filter(Boolean)}
           canPrice={canPrice}
           currencySymbol={currency.symbol}
-          business={{ name: biz.name, address: biz.address, phone: biz.phone }}
           submissionKey={randomUUID()}
+          draft={draft}
         />
       )}
     </>

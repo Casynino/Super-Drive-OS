@@ -13,6 +13,8 @@ export type PickerProduct = {
   /** only filled where a form needs them (the shipment form): current prices per piece and the picture version */
   sellingPrice?: string;
   wholesalePrice?: string | null;
+  /** the shipment form: today's selling price of the product's carton (its biggest pack), exact */
+  packPrice?: string | null;
   imageV?: number | null;
   /** carton-first: the unit forms start with (null = the biggest pack, else the base unit) and whether single pieces may be sold */
   defaultSalesUnitId?: string | null;

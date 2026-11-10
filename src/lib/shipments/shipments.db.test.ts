@@ -164,7 +164,7 @@ describe("arrival", () => {
 });
 
 describe("selling prices entered with the shipment", () => {
-  const withPrices = (w: W, prices: { sellingPrice?: string; wholesalePrice?: string }) =>
+  const withPrices = (w: W, prices: { sellingPrice?: string; wholesalePrice?: string; packSellingPrice?: string }) =>
     db.$transaction((tx) =>
       createShipment(tx, {
         user: { id: ownerId },
@@ -208,6 +208,34 @@ describe("selling prices entered with the shipment", () => {
     expect((await db.shipmentItem.findFirstOrThrow({ where: { shipmentId: same.id } })).sellingPrice).toBeNull();
     await expect(withPrices(w, { sellingPrice: "abc" })).rejects.toBeInstanceOf(ShipmentError);
     await expect(withPrices(w, { wholesalePrice: "0" })).rejects.toBeInstanceOf(ShipmentError);
+  });
+
+  it("a carton price sets the exact carton price when the stock is counted in; the piece price follows from it", async () => {
+    const w = await world(); // 12 per carton, pieces sell at 25000 (so a carton is 300000 today)
+    const s = await withPrices(w, { packSellingPrice: "310000" });
+    const item = await db.shipmentItem.findFirstOrThrow({ where: { shipmentId: s.id } });
+    expect(item.packSellingPrice?.toString()).toBe("310000");
+    expect(item.sellingPrice?.toString()).toBe("25833"); // 310000 / 12, rounded to whole TZS
+    await db.$transaction((tx) => markArrived(tx, { shipmentId: s.id, user: { id: shopId } }));
+    expect(await db.productUnit.findFirstOrThrow({ where: { productId: w.a.id, unitId: carton } }).then((u) => u.sellingPrice)).toBeNull(); // nothing changes before the count
+
+    await count(s.id, [line(w.a.id, "24")]);
+    const pu = await db.productUnit.findFirstOrThrow({ where: { productId: w.a.id, unitId: carton } });
+    expect(pu.sellingPrice?.toString()).toBe("310000");
+    expect((await product(w.a.id)).sellingPrice.toString()).toBe("25833");
+    const symbol = (await db.unit.findUniqueOrThrow({ where: { id: carton } })).symbol;
+    const history = await db.productPriceHistory.findMany({ where: { productId: w.a.id, field: "unitSellingPrice" } });
+    expect(history.map((h) => [h.unitLabel, h.oldValue, h.newValue?.toString(), h.changedById])).toEqual([[symbol, null, "310000", ownerId]]);
+
+    // the same carton price again is no change; a carton price on a line bought in pieces is refused
+    const again = await withPrices(w, { packSellingPrice: "310000" });
+    const a = await db.shipmentItem.findFirstOrThrow({ where: { shipmentId: again.id } });
+    expect([a.packSellingPrice, a.sellingPrice]).toEqual([null, null]);
+    await expect(
+      db.$transaction((tx) =>
+        createShipment(tx, { user: { id: ownerId }, supplierId: null, reference: null, expectedDate: null, locationId: w.location.id, notes: null, lines: [{ productId: w.a.id, unitId: bottle, quantity: "5", totalCost: "50000", packSellingPrice: "310000" }], submissionKey: randomUUID(), currencyDecimals: 0 }),
+      ),
+    ).rejects.toBeInstanceOf(ShipmentError);
   });
 });
 

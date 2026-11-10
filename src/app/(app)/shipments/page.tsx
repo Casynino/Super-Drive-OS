@@ -14,6 +14,7 @@ import { toIssueViews } from "@/lib/shipments/issue-view";
 import { getUnitMode } from "@/lib/unit-mode";
 import { fmtQty, inPacks } from "@/lib/qty";
 import MarkArrivedButton from "@/components/shipments/MarkArrivedButton";
+import DraftsStrip, { type DraftRow } from "@/components/shipments/DraftsStrip";
 import { can, canAny } from "@/lib/auth/can";
 import { requireUser } from "@/lib/auth/guard";
 import { todayYmd } from "@/lib/dashboard/range";
@@ -22,7 +23,7 @@ import { formatMoney } from "@/lib/money";
 import { canCount, canMarkArrived, shipmentPhase, type ShipmentPhase } from "@/lib/shipments/phase";
 import { getCurrency } from "@/lib/settings";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
-import { decideIssueAction, decideProblemAction, markArrivedAction, reportProblemAction } from "./actions";
+import { decideIssueAction, decideProblemAction, deleteOrderDraftAction, markArrivedAction, reportProblemAction } from "./actions";
 import { PhaseBadge } from "./badges";
 
 export async function generateMetadata() {
@@ -48,6 +49,17 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
   const receive = can(user, "shipments.receive");
   const staff = receive && !manage; // the warehouse person: for him this page is "Receiving" (deliveries to count), not purchase orders
   const currency = await getCurrency();
+  // orders the boss saved to finish later: only his own, and only the owner side ever sees them
+  const draftRows = manage ? await db.shipmentDraft.findMany({ where: { createdById: user.id }, orderBy: { updatedAt: "desc" }, take: 20 }) : [];
+  const drafts: DraftRow[] = draftRows.map((d) => {
+    const data = (d.data ?? {}) as { lines?: unknown[]; supplierText?: string; cargoName?: string };
+    return {
+      id: d.id,
+      products: Array.isArray(data.lines) ? data.lines.length : 0,
+      detail: [data.supplierText, data.cargoName].filter((x): x is string => Boolean(x && x.trim())).join(" · "),
+      savedText: formatDateTime(d.updatedAt),
+    };
+  });
   // The goods that were counted into stock (delivery receipts) live here too, for people who may see them
   const deliveriesAllowed = canAny(user, ["inventory.receive", "inventory.movements", "purchasing.view"]);
   const showCost = can(user, "inventory.valuation") || can(user, "products.cost");
@@ -187,11 +199,13 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
         actions={
           manage && (
             <Link href="/shipments/new" className="btn-primary">
-              <Plus size={16} /> New purchase order
+              <Plus size={16} /> New order
             </Link>
           )
         }
       />
+
+      {manage && <DraftsStrip drafts={drafts} discard={deleteOrderDraftAction} />}
 
       {!staff && (
       <KpiStrip className="mb-5">
@@ -301,7 +315,7 @@ export default async function ShipmentsPage({ searchParams }: { searchParams: Pr
             action={
               tab === "way" && manage ? (
                 <Link href="/shipments/new" className="btn-primary">
-                  <Plus size={16} /> New purchase order
+                  <Plus size={16} /> New order
                 </Link>
               ) : undefined
             }

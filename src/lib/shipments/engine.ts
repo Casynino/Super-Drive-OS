@@ -41,8 +41,12 @@ export type CreateShipmentInput = {
   expectedDate: string | null; // YYYY-MM-DD
   locationId: string;
   notes: string | null;
-  /** sellingPrice / wholesalePrice: new price per piece (base unit); blank = keep the current price. They go live when the stock is counted in. */
-  lines: { productId: string; unitId: string; quantity: string; totalCost: string; sellingPrice?: string; wholesalePrice?: string }[];
+  /**
+   * sellingPrice / wholesalePrice: new price per piece (base unit); blank = keep the current price. They go live when the stock is counted in.
+   * packSellingPrice: the new selling price per carton (the unit the line is bought in; only for a pack). It sets the exact carton price and the
+   * piece price follows from it.
+   */
+  lines: { productId: string; unitId: string; quantity: string; totalCost: string; sellingPrice?: string; wholesalePrice?: string; packSellingPrice?: string }[];
   submissionKey: string;
   currencyDecimals: number;
 };
@@ -58,6 +62,9 @@ export async function createShipment(tx: Tx, input: CreateShipmentInput) {
     const m = parseMoney(v, input.currencyDecimals);
     return m && m.gt(0) ? m : "bad";
   };
+  // the carton prices the products have today, to tell a real change from "the same price again"
+  const packRows = await tx.productUnit.findMany({ where: { productId: { in: [...new Set(resolved.lines.map((l) => l.productId))] } }, select: { productId: true, unitId: true, sellingPrice: true } });
+  const packNow = new Map(packRows.map((r) => [`${r.productId}:${r.unitId}`, r.sellingPrice]));
   const lines = resolved.lines.flatMap((l) => {
     const raw = input.lines[l.index]!;
     const cost = parseMoney(raw.totalCost, input.currencyDecimals);
@@ -65,11 +72,27 @@ export async function createShipment(tx: Tx, input: CreateShipmentInput) {
       errors[`line.${l.index}`] = "Enter what this line cost you (buying price), landed.";
       return [];
     }
-    const sell = price(raw.sellingPrice);
+    let sell = price(raw.sellingPrice);
     const whole = price(raw.wholesalePrice);
-    if (sell === "bad" || whole === "bad") {
+    const pack = price(raw.packSellingPrice);
+    if (sell === "bad" || whole === "bad" || pack === "bad") {
       errors[`line.${l.index}`] = "Enter the selling price as a valid amount, or leave it empty.";
       return [];
+    }
+    let packPrice: Dec | null = null;
+    if (pack) {
+      if (!l.factor.gt(1)) {
+        errors[`line.${l.index}`] = "A carton price needs a product that comes in cartons.";
+        return [];
+      }
+      // the carton price is the exact one; the piece price follows from it
+      const current = packNow.get(`${l.productId}:${l.enteredUnitId}`) ?? l.basePrice.mul(l.factor);
+      if (!pack.eq(current)) {
+        packPrice = pack;
+        sell = pack.div(l.factor).toDecimalPlaces(input.currencyDecimals);
+      } else {
+        sell = null;
+      }
     }
     // only a real change is stored; the same price as today means "no change"
     return [{
@@ -78,6 +101,7 @@ export async function createShipment(tx: Tx, input: CreateShipmentInput) {
       unitCost: cost.div(l.quantity).toDecimalPlaces(4),
       sellingPrice: sell && !sell.eq(l.basePrice) ? sell : null,
       wholesalePrice: whole && !(l.baseWholesale && whole.eq(l.baseWholesale)) ? whole : null,
+      packSellingPrice: packPrice,
     }];
   });
   if (Object.keys(errors).length) throw new ShipmentError("Please fix the highlighted lines.", errors);
@@ -95,7 +119,7 @@ export async function createShipment(tx: Tx, input: CreateShipmentInput) {
       createdById: input.user.id,
       submissionKey: input.submissionKey,
       items: {
-        create: lines.map(({ l, lineCost, unitCost, sellingPrice, wholesalePrice }) => ({
+        create: lines.map(({ l, lineCost, unitCost, sellingPrice, wholesalePrice, packSellingPrice }) => ({
           productId: l.productId,
           expectedQty: l.quantity,
           enteredQty: l.enteredQty,
@@ -105,6 +129,7 @@ export async function createShipment(tx: Tx, input: CreateShipmentInput) {
           lineCost,
           sellingPrice,
           wholesalePrice,
+          packSellingPrice,
         })),
       },
     },
@@ -287,10 +312,10 @@ export async function confirmSession(tx: Tx, input: { shipmentId: string; sessio
   // 1b. New selling prices the owner entered with the announcement go live now that this stock is on the shelf (once per line).
   for (const a of arrived) {
     const item = a.item;
-    if (a.total.lte(0) || item.priceAppliedAt || (!item.sellingPrice && !item.wholesalePrice)) continue;
+    if (a.total.lte(0) || item.priceAppliedAt || (!item.sellingPrice && !item.wholesalePrice && !item.packSellingPrice)) continue;
     const p = await tx.product.findUniqueOrThrow({ where: { id: a.ri.productId }, select: { sellingPrice: true, wholesalePrice: true } });
     const data: { sellingPrice?: Dec; wholesalePrice?: Dec } = {};
-    const history: { field: string; oldValue: Dec | null; newValue: Dec }[] = [];
+    const history: { field: string; unitLabel?: string | null; oldValue: Dec | null; newValue: Dec }[] = [];
     if (item.sellingPrice && !item.sellingPrice.eq(p.sellingPrice)) {
       data.sellingPrice = item.sellingPrice;
       history.push({ field: "sellingPrice", oldValue: p.sellingPrice, newValue: item.sellingPrice });
@@ -299,8 +324,17 @@ export async function confirmSession(tx: Tx, input: { shipmentId: string; sessio
       data.wholesalePrice = item.wholesalePrice;
       history.push({ field: "wholesalePrice", oldValue: p.wholesalePrice, newValue: item.wholesalePrice });
     }
+    // the carton price the owner entered: exact, on the product's carton unit
+    if (item.packSellingPrice) {
+      const pu = await tx.productUnit.findUnique({ where: { productId_unitId: { productId: a.ri.productId, unitId: item.enteredUnitId } } });
+      if (pu && !(pu.sellingPrice && pu.sellingPrice.eq(item.packSellingPrice))) {
+        await tx.productUnit.update({ where: { id: pu.id }, data: { sellingPrice: item.packSellingPrice } });
+        const unit = await tx.unit.findUnique({ where: { id: item.enteredUnitId }, select: { symbol: true } });
+        history.push({ field: "unitSellingPrice", unitLabel: unit?.symbol ?? null, oldValue: pu.sellingPrice, newValue: item.packSellingPrice });
+      }
+    }
     if (history.length) {
-      await tx.product.update({ where: { id: a.ri.productId }, data });
+      if (Object.keys(data).length) await tx.product.update({ where: { id: a.ri.productId }, data });
       await tx.productPriceHistory.createMany({ data: history.map((h) => ({ productId: a.ri.productId, ...h, changedById: shipment.createdById })) });
     }
     await tx.shipmentItem.update({ where: { id: item.id }, data: { priceAppliedAt: new Date() } });

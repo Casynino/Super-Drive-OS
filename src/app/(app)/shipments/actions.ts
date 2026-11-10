@@ -40,15 +40,17 @@ const createSchema = z.object({
   expectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   locationId: z.string().min(1, "Choose where it will be delivered."),
   notes: z.string().trim().max(500).nullable(),
-  lines: z.array(z.object({ productId: z.string().min(1), unitId: z.string().min(1), quantity: z.string().max(24), totalCost: z.string().max(24), sellingPrice: z.string().max(24).optional(), wholesalePrice: z.string().max(24).optional() })).min(1, "Add at least one product.").max(100),
+  lines: z.array(z.object({ productId: z.string().min(1), unitId: z.string().min(1), quantity: z.string().max(24), totalCost: z.string().max(24), sellingPrice: z.string().max(24).optional(), wholesalePrice: z.string().max(24).optional(), packSellingPrice: z.string().max(24).optional() })).min(1, "Add at least one product.").max(100),
   submissionKey: z.string().min(16).max(64),
+  /** the saved draft this order was made from; it is deleted once the order is sent */
+  draftId: z.string().max(40).nullable().optional(),
 });
 
 export async function announceShipment(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const result = await guarded("shipments.manage", async (user) => {
     const parsed = parse(createSchema, fd);
     if (!parsed) return fail(BAD);
-    const { newSupplierName, ...p } = parsed;
+    const { newSupplierName, draftId, ...p } = parsed;
     const currency = await getCurrency();
     // Adding a supplier needs the same right as the Suppliers screen.
     let newSupplier: string | null = null;
@@ -62,7 +64,7 @@ export async function announceShipment(_prev: ActionState, fd: FormData): Promis
       else newSupplier = newSupplierName;
     }
     // New selling prices need the same permission as changing a price anywhere else.
-    if (!can(user, "products.price") && p.lines.some((l) => l.sellingPrice?.trim() || l.wholesalePrice?.trim())) return fail("You are not allowed to set selling prices. Remove them and announce the shipment again.");
+    if (!can(user, "products.price") && p.lines.some((l) => l.sellingPrice?.trim() || l.wholesalePrice?.trim() || l.packSellingPrice?.trim())) return fail("You are not allowed to set selling prices. Remove them and announce the shipment again.");
     const location = await db.location.findFirst({ where: { id: p.locationId, status: "ACTIVE" } });
     if (!location) return fail("Please fix the highlighted fields.", { locationId: "Choose an active location." });
     if (p.supplierId && !(await db.supplier.findFirst({ where: { id: p.supplierId, status: "ACTIVE" } }))) return fail("Please fix the highlighted fields.", { supplierId: "Choose an active supplier." });
@@ -77,6 +79,7 @@ export async function announceShipment(_prev: ActionState, fd: FormData): Promis
             supplierId = sup.id;
           }
           const created = await createShipment(tx, { user, ...p, supplierId, currencyDecimals: currency.decimals });
+          if (draftId) await tx.shipmentDraft.deleteMany({ where: { id: draftId, createdById: user.id } });
           const total = created.items.reduce((sum, i) => sum.plus(i.lineCost ?? 0), new Prisma.Decimal(0));
           await writeAudit(tx, { user, action: "shipment.create", entityType: "Shipment", entityId: created.id, reference: created.shipmentNo, after: { items: created.items.length, totalCost: total, cargo: p.cargoName, reference: p.reference, expectedDate: p.expectedDate } });
           await notifyPermission(tx, "shipments.receive", { type: "shipment.announced", title: `New purchase order on its way: ${created.shipmentNo}`, body: `${created.items.length} product${created.items.length === 1 ? "" : "s"} expected${p.expectedDate ? ` around ${p.expectedDate}` : ""}${p.cargoName ? ` · ${p.cargoName}` : p.reference ? ` · ${p.reference}` : ""}`, link: `/shipments/${created.id}` });
@@ -97,6 +100,36 @@ export async function announceShipment(_prev: ActionState, fd: FormData): Promis
   });
   if (result.ok && result.message) redirect(`/shipments/${result.message}?created=1`);
   return result;
+}
+
+// ───────────── Owner: save an order to finish later ─────────────
+// A draft is only the form's state. Nothing is announced, the shop is not told and no stock or money moves until the order is sent.
+
+const MAX_DRAFT_BYTES = 60_000;
+
+export async function saveOrderDraft(input: { id: string | null; state: unknown }): Promise<{ ok: true; id: string; savedAt: string } | { ok: false; error: string }> {
+  const out: { id?: string; savedAt?: string } = {};
+  const result = await guarded("shipments.manage", async (user) => {
+    if (!input.state || typeof input.state !== "object" || Array.isArray(input.state)) return fail("This draft could not be saved.");
+    if (JSON.stringify(input.state).length > MAX_DRAFT_BYTES) return fail("This draft is too big to save.");
+    const mine = input.id ? await db.shipmentDraft.findFirst({ where: { id: input.id, createdById: user.id }, select: { id: true } }) : null;
+    const data = input.state as Prisma.InputJsonValue;
+    const row = mine ? await db.shipmentDraft.update({ where: { id: mine.id }, data: { data } }) : await db.shipmentDraft.create({ data: { createdById: user.id, data } });
+    out.id = row.id;
+    out.savedAt = row.updatedAt.toISOString();
+    revalidatePath("/shipments");
+    return { ok: true };
+  });
+  if (!result.ok || !out.id) return { ok: false, error: result.error ?? "Could not save the draft." };
+  return { ok: true, id: out.id, savedAt: out.savedAt! };
+}
+
+export async function deleteOrderDraftAction(fd: FormData): Promise<void> {
+  await guarded("shipments.manage", async (user) => {
+    await db.shipmentDraft.deleteMany({ where: { id: formString(fd, "id"), createdById: user.id } });
+    revalidatePath("/shipments");
+    return { ok: true };
+  });
 }
 
 export async function cancelShipmentAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
@@ -325,6 +358,18 @@ export async function createProductForShipment(fd: FormData): Promise<{ ok: true
       price = parsed;
     }
 
+    // The carton price is the exact selling price of the carton; the piece price follows from it.
+    let cartonPrice: Prisma.Decimal | null = null;
+    const rawCarton = formString(fd, "cartonPrice");
+    if (rawCarton && can(user, "products.price")) {
+      if (!perCarton) return fail("A carton price needs the number of pieces in a carton.");
+      const currency = await getCurrency();
+      const parsed = parseMoney(rawCarton, currency.decimals);
+      if (!parsed || parsed.lte(0)) return fail("Enter the carton price as a valid amount.");
+      cartonPrice = parsed;
+      price = parsed.div(perCarton).toDecimalPlaces(currency.decimals);
+    }
+
     // Picture (optional)
     const file = fd.get("image");
     let image: Awaited<ReturnType<typeof processProductImage>> | null = null;
@@ -353,10 +398,11 @@ export async function createProductForShipment(fd: FormData): Promise<{ ok: true
           purchasePrice: 0,
           sellingPrice: price,
           createdById: user.id,
-          ...(perCarton ? { units: { create: [{ unitId: ctn!.id, factor: perCarton }] }, defaultSalesUnitId: ctn!.id, defaultPurchaseUnitId: ctn!.id } : {}),
+          ...(perCarton ? { units: { create: [{ unitId: ctn!.id, factor: perCarton, ...(cartonPrice ? { sellingPrice: cartonPrice } : {}) }] }, defaultSalesUnitId: ctn!.id, defaultPurchaseUnitId: ctn!.id } : {}),
         },
       });
       if (price.gt(0)) await tx.productPriceHistory.create({ data: { productId: p.id, field: "sellingPrice", oldValue: null, newValue: price, changedById: user.id } });
+      if (cartonPrice) await tx.productPriceHistory.create({ data: { productId: p.id, field: "unitSellingPrice", unitLabel: ctn!.symbol, oldValue: null, newValue: cartonPrice, changedById: user.id } });
       if (image) await tx.productImage.create({ data: { productId: p.id, mime: image.mime, full: new Uint8Array(image.full), thumb: new Uint8Array(image.thumb), width: image.width, height: image.height, updatedById: user.id } });
       await writeAudit(tx, { user, action: "product.create", entityType: "Product", entityId: p.id, reference: sku, after: { name, category: category.name, brand: brand?.name ?? null, perCarton: perCarton || null, via: "shipment form" } });
       return p;
@@ -368,6 +414,7 @@ export async function createProductForShipment(fd: FormData): Promise<{ ok: true
       sku: created.sku,
       barcode: created.barcode,
       sellingPrice: price.toString(),
+      packPrice: cartonPrice ? cartonPrice.toString() : null,
       wholesalePrice: null,
       imageV: image ? Date.now() : null,
       baseUnitId: piece.id,

@@ -5,15 +5,21 @@
 --          cartons (ProductUnit) and pictures, the cash accounts (names and numbers only), expense categories, the product-barcode counter.
 -- CLEARED: every stock, sale, payment, credit, return, shipment, closing, cash, expense, Winga, customer and supplier record, the
 --          audit log, the activity log, notifications and every document counter (so the first invoice is INV-2026-000001 again).
---          Product average cost goes back to 0 (no stock = no cost). With -v clear_prices=1 the placeholder prices are cleared too.
+--          Product average cost goes back to 0 (no stock = no cost). With -v clear_prices=1 the placeholder prices are cleared too
+--          (only for products created before -v prices_before='YYYY-MM-DD', default: every product; a price someone typed on a newer product stays).
 --
 -- Run on ONE database at a time, after a backup (pg_dump), in one transaction (-1): either everything is cleared or nothing is.
---   psql "$URL" -v ON_ERROR_STOP=1 -1 -v clear_prices=0 -f scripts/reset-business-data.sql
+--   psql "$URL" -v ON_ERROR_STOP=1 -1 -v clear_prices=1 -v prices_before=2026-11-10 -f scripts/reset-business-data.sql
+-- (a dry run: psql "$URL" -v ON_ERROR_STOP=1 -c BEGIN -v clear_prices=1 -f scripts/reset-business-data.sql -c ROLLBACK)
 -- Never run it by accident: it asks for nothing, so the connection string you pass IS the confirmation.
 
 \if :{?clear_prices}
 \else
   \set clear_prices 0
+\endif
+\if :{?prices_before}
+\else
+  \set prices_before 9999-01-01
 \endif
 
 \echo '--- BEFORE (rows per table)'
@@ -68,9 +74,10 @@ DELETE FROM "DocumentCounter" WHERE key <> 'PRODUCT-BARCODE';
 -- 4. products: no stock means no cost; the placeholder prices only when asked
 UPDATE "Product" SET "avgCost" = 0;
 \if :clear_prices
-  UPDATE "Product" SET "purchasePrice" = 0, "sellingPrice" = 0, "wholesalePrice" = NULL;
-  UPDATE "ProductUnit" SET "sellingPrice" = NULL, "wholesalePrice" = NULL;
-  DELETE FROM "ProductPriceHistory";
+  CREATE TEMP TABLE _placeholder_products ON COMMIT DROP AS SELECT id FROM "Product" WHERE "createdAt" < :'prices_before'::timestamp;
+  UPDATE "Product" SET "purchasePrice" = 0, "sellingPrice" = 0, "wholesalePrice" = NULL WHERE id IN (SELECT id FROM _placeholder_products);
+  UPDATE "ProductUnit" SET "sellingPrice" = NULL, "wholesalePrice" = NULL WHERE "productId" IN (SELECT id FROM _placeholder_products);
+  DELETE FROM "ProductPriceHistory" WHERE "productId" IN (SELECT id FROM _placeholder_products);
 \endif
 
 -- 5. one line in the (new, empty) audit log, so the reset itself is on record

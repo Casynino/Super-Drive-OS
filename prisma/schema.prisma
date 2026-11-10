@@ -90,6 +90,7 @@ model User {
   creditApplications  CreditApplication[]
   notifications       Notification[]
   shipmentsCreated    Shipment[]              @relation("ShipmentCreator")
+  shipmentDrafts      ShipmentDraft[]
   shipmentsResolved   Shipment[]              @relation("ShipmentResolver")
   shipmentsClosed     Shipment[]              @relation("ShipmentCloser")
   shipmentsArrived    Shipment[]              @relation("ShipmentArriver")
@@ -899,28 +900,42 @@ model Shipment {
 }
 
 model ShipmentItem {
-  id             String                  @id @default(cuid())
-  shipmentId     String
-  shipment       Shipment                @relation(fields: [shipmentId], references: [id])
-  productId      String
-  product        Product                 @relation(fields: [productId], references: [id])
-  expectedQty    Decimal                 @db.Decimal(14, 3) // base units; 0 for goods the shop found that were not announced
-  enteredQty     Decimal                 @db.Decimal(14, 3) // as the owner typed it, in enteredUnit
-  enteredUnitId  String
-  enteredUnit    Unit                    @relation(fields: [enteredUnitId], references: [id])
-  factor         Decimal                 @db.Decimal(14, 4)
-  unitCost       Decimal?                @db.Decimal(16, 4) // landed cost per base unit, set by the owner (hidden from the shop)
-  lineCost       Decimal?                @db.Decimal(14, 2)
-  unexpected     Boolean                 @default(false)
-  missingQty     Decimal                 @default(0) @db.Decimal(14, 3) // filled in when the shipment is closed
-  sellingPrice   Decimal?                @db.Decimal(14, 2) // new selling price per base unit the owner entered with the shipment; null = no change
-  wholesalePrice Decimal?                @db.Decimal(14, 2) // same, wholesale
-  priceAppliedAt DateTime? // the new prices go live when this line's stock is first counted in
-  receivingItems ShipmentReceivingItem[]
-  issueDecisions ShipmentIssueDecision[]
+  id               String                  @id @default(cuid())
+  shipmentId       String
+  shipment         Shipment                @relation(fields: [shipmentId], references: [id])
+  productId        String
+  product          Product                 @relation(fields: [productId], references: [id])
+  expectedQty      Decimal                 @db.Decimal(14, 3) // base units; 0 for goods the shop found that were not announced
+  enteredQty       Decimal                 @db.Decimal(14, 3) // as the owner typed it, in enteredUnit
+  enteredUnitId    String
+  enteredUnit      Unit                    @relation(fields: [enteredUnitId], references: [id])
+  factor           Decimal                 @db.Decimal(14, 4)
+  unitCost         Decimal?                @db.Decimal(16, 4) // landed cost per base unit, set by the owner (hidden from the shop)
+  lineCost         Decimal?                @db.Decimal(14, 2)
+  unexpected       Boolean                 @default(false)
+  missingQty       Decimal                 @default(0) @db.Decimal(14, 3) // filled in when the shipment is closed
+  sellingPrice     Decimal?                @db.Decimal(14, 2) // new selling price per base unit the owner entered with the shipment; null = no change
+  wholesalePrice   Decimal?                @db.Decimal(14, 2) // same, wholesale
+  packSellingPrice Decimal?                @db.Decimal(14, 2) // new selling price per ENTERED pack (carton), exact; sets the carton price (ProductUnit) when the stock is first counted in
+  priceAppliedAt   DateTime? // the new prices go live when this line's stock is first counted in
+  receivingItems   ShipmentReceivingItem[]
+  issueDecisions   ShipmentIssueDecision[]
 
   @@unique([shipmentId, productId])
   @@index([productId])
+}
+
+// An order the boss started and saved to finish later. Only the form's state is kept (as JSON); nothing is announced, no stock or money
+// moves and the shop never sees it. Sending the order creates the real Shipment and deletes the draft.
+model ShipmentDraft {
+  id          String   @id @default(cuid())
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  data        Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdById])
 }
 
 // What the owner decided about a problem product of a received shipment (missing, damaged, extra). Append-only: a decision is never edited.
